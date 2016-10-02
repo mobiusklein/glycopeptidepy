@@ -1,0 +1,2 @@
+glypy
+pyteomics>=3.0
