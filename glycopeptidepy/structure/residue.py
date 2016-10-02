@@ -1,7 +1,7 @@
 from . import ResidueBase
-from .composition import Composition, composition_to_mass
+from .composition import Composition
 from ..utils.memoize import memoize
-from glypy.utils import MultiMap
+from glypy.utils.multimap import MultiMap
 
 symbol_to_residue = {
     'A': 'Ala',
@@ -173,7 +173,7 @@ class Residue(ResidueBase):
     def mass_by_name(sym):
         name = symbol_to_residue.get(sym, sym)
         formula = residue_table.get(name)
-        return composition_to_mass(formula)
+        return Composition(formula).mass
 
     def __init__(self, symbol=None, name=None):
         self.symbol = symbol

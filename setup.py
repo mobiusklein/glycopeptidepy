@@ -3,7 +3,7 @@ from setuptools import setup, find_packages, Extension
 
 
 def version():
-    return re.sub(r'[\s\'"\n]', '', open("glycresoft_sqlalchemy/version.py").readline().split("=")[1])
+    return re.sub(r'[\s\'"\n]', '', open("glycopeptidepy/version.py").readline().split("=")[1])
 
 
 required = []

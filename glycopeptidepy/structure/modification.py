@@ -8,11 +8,11 @@ from collections import defaultdict
 from collections import Iterable
 from glypy.composition.glycan_composition import (
     FrozenMonosaccharideResidue, FrozenGlycanComposition)
+from glypy.utils import Enum
 
 from .residue import Residue
-from .composition import composition_to_mass, Composition
+from .composition import Composition
 from .parser import prefix_to_postfix_modifications
-from ..utils import Enum
 from . import ModificationBase
 
 
@@ -805,10 +805,10 @@ class ModificationTable(ModificationSource):
         "O-GlcNAc": OGlcNAcylation(),
         "H": ModificationRule(
             "N-term", "H", "H",
-            composition_to_mass("H"), composition=Composition("H")),
+            Composition("H").mass, composition=Composition("H")),
         "OH": ModificationRule(
             "C-term", "OH", "OH",
-            composition_to_mass("OH"), composition=Composition("OH")),
+            Composition("OH").mass, composition=Composition("OH")),
     }
 
     def __init__(self, rules=None):
