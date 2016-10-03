@@ -5,14 +5,20 @@ from collections import defaultdict, deque, Counter
 
 from . import PeptideSequenceBase, MoleculeBase
 from . import constants as structure_constants
+
 from .composition import Composition
-from .fragment import PeptideFragment, fragment_shift, fragment_shift_composition, SimpleFragment, IonSeries, _n_glycosylation
+from .fragment import (
+    PeptideFragment, fragment_shift, fragment_shift_composition,
+    SimpleFragment, IonSeries, _n_glycosylation)
 from .modification import Modification, SequenceLocation, ModificationCategory
 from .residue import Residue
-from glypy import GlycanComposition, Glycan, ReducedEnd
-from glypy.composition.glycan_composition import FrozenGlycanComposition, FrozenMonosaccharideResidue
 
-from .parser import sequence_tokenizer, sequence_length, strip_modifications
+from glypy import GlycanComposition, Glycan, ReducedEnd
+from glypy.composition.glycan_composition import (
+    FrozenGlycanComposition, FrozenMonosaccharideResidue)
+
+from .parser import sequence_tokenizer, sequence_length
+
 from .glycan import (
     GlycosylationType, GlycosylationManager, GlycosylationSite,
     glycosylation_site_detectors, GlycanCompositionProxy)
@@ -297,7 +303,7 @@ class PeptideSequence(PeptideSequenceBase):
     def __init__(self, sequence=None, parser_function=None, **kwargs):
         if parser_function is None:
             parser_function = sequence_tokenizer
-        self.mass = 0.0
+        self._mass = 0.0
         self.sequence = []
         self.modification_index = defaultdict(int)
         self._fragment_index = None
@@ -347,7 +353,7 @@ class PeptideSequence(PeptideSequenceBase):
         c_term = ""
         if self.c_term is not None:
             c_term = "-({0})".format(self.c_term)
-        rep = "{n_term}{sequence}{c_term}{glycan}[{mass}]".format(
+        rep = "{n_term}{sequence}{c_term}{glycan}[{_mass}]".format(
             n_term=n_term, c_term=c_term,
             glycan=self._glycan if self._glycan is not None else "",
             **self.__dict__)
@@ -355,6 +361,14 @@ class PeptideSequence(PeptideSequenceBase):
 
     def __len__(self):
         return len(self.sequence)
+
+    @property
+    def mass(self):
+        return self._mass
+
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
 
     @property
     def total_mass(self):
@@ -1062,46 +1076,6 @@ class PeptideSequence(PeptideSequenceBase):
 
 Sequence = PeptideSequence
 parse = Sequence
-
-_get1 = operator.itemgetter(1)
-
-
-def cleave(sequence, rule, missed_cleavages=0, min_length=0, **kwargs):
-    '''A reimplementation of pyteomics.parser.cleave which produces leaky cleavages
-    of a peptide sequence by a regex rule. Includes the cut indices, not included in
-    pyteomics.'''
-    peptides = []
-    if isinstance(sequence, Sequence):
-        sequence = str(sequence)
-    cleavage_sites = deque([0], maxlen=missed_cleavages + 2)
-    for i in itertools.chain(map(lambda x: x.end(), re.finditer(rule, sequence)), [None]):
-        cleavage_sites.append(i)
-        for j in range(len(cleavage_sites) - 1):
-            seq = sequence[cleavage_sites[j]:cleavage_sites[-1]]
-            if seq:
-                if min_length is None or sequence_length(seq) >= min_length:
-                    peptides.append((seq, cleavage_sites[j], cleavage_sites[-1] if cleavage_sites[-1]
-                                     is not None else sequence_length(sequence)))
-    return sorted(set(peptides), key=_get1)
-
-
-def itercleave(sequence, rule, missed_cleavages=0, min_length=0, **kwargs):
-    if isinstance(sequence, Sequence):
-        sequence = str(sequence)
-    seen = set()
-    cleavage_sites = deque([0], maxlen=missed_cleavages + 2)
-    for i in itertools.chain(map(lambda x: x.end(), re.finditer(rule, sequence)), [None]):
-        cleavage_sites.append(i)
-        for j in range(len(cleavage_sites) - 1):
-            seq = sequence[cleavage_sites[j]:cleavage_sites[-1]]
-            if seq:
-                if min_length is None or sequence_length(seq) >= min_length:
-                    case = ((seq, cleavage_sites[j], cleavage_sites[-1] if cleavage_sites[-1]
-                             is not None else sequence_length(sequence)))
-                    if case in seen:
-                        continue
-                    seen.add(case)
-                    yield case
 
 
 class FragmentationStrategyBase(object):

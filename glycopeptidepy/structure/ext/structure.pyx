@@ -1,4 +1,4 @@
-from glycresoft_sqlalchemy.structure import residue as pyresidue, modification as pymodification
+from glycopeptidepy.structure import residue as pyresidue, modification as pymodification
 from cpython.ref cimport PyObject
 from cpython.string cimport PyString_AsString, PyString_FromString
 from cpython.float cimport PyFloat_AsDouble

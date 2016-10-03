@@ -1,8 +1,12 @@
 import logging
 from . import constants as structure_constants
 from . import PeptideSequenceBase
+from .modification import NGlycanCoreGlycosylation
+
+
 from glypy.composition.glycan_composition import FrozenGlycanComposition
 
+_n_glycan_core = NGlycanCoreGlycosylation()
 glycan_parser = FrozenGlycanComposition.parse
 
 
@@ -349,7 +353,7 @@ def sequence_tokenizer_respect_sequons(sequence):
     sequence_length = len(chunks)
     while(i < sequence_length):
         cur_pos = chunks[i]
-        if cur_pos[0] == "N" and "HexNAc" in cur_pos[1]:
+        if cur_pos[0] == "N" and _n_glycan_core in cur_pos[1]:
             positions.append(chunks[i:(i + 3)])
             i += 2
         else:

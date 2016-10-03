@@ -72,8 +72,9 @@ class NeutralLoss(object):
 
 class FragmentBase(object):
     _neutral_loss = None
-    _glycosylation = None
     _name = None
+
+    __slots__ = ("_neutral_loss", "_name")
 
     def get_series(self):
         raise NotImplementedError()
@@ -132,12 +133,11 @@ class FragmentBase(object):
 
 
 class PeptideFragment(FragmentBase):
-    # parser = re.compile(r"(?P<kind>[abcxyz])(?P<position>[0-9]+)(?P<modificaiton>\+.*)?")
     concerned_mods = [_n_glycosylation]
 
     __slots__ = ("type", "position", "modification_dict", "bare_mass",
                  "golden_pairs", "flanking_amino_acids", "glycosylation",
-                 "_neutral_loss", "composition")
+                 "_neutral_loss", "composition", 'mass')
 
     def __init__(self, frag_type, position, modification_dict, mass, golden_pairs=None,
                  flanking_amino_acids=None, glycosylation=None, neutral_loss=None,

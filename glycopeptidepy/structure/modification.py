@@ -12,7 +12,6 @@ from glypy.utils import Enum
 
 from .residue import Residue
 from .composition import Composition
-from .parser import prefix_to_postfix_modifications
 from . import ModificationBase
 
 
@@ -564,6 +563,7 @@ class AminoAcidSubstitution(AnonymousModificationRule):
             return None
 
     def __init__(self, original_residue, substitution_residue, **kwargs):
+        from .parser import prefix_to_postfix_modifications
         self.common_name = "{0}->{1}".format(original_residue, substitution_residue)
         self.mass = 0.0
         self.original = prefix_to_postfix_modifications(original_residue)
