@@ -1,6 +1,4 @@
-import re
 import itertools
-import operator
 from collections import defaultdict, deque, Counter
 
 from . import PeptideSequenceBase, MoleculeBase
@@ -17,14 +15,13 @@ from glypy import GlycanComposition, Glycan, ReducedEnd
 from glypy.composition.glycan_composition import (
     FrozenGlycanComposition, FrozenMonosaccharideResidue)
 
-from .parser import sequence_tokenizer, sequence_length
+from .parser import sequence_tokenizer
 
 from .glycan import (
     GlycosylationType, GlycosylationManager, GlycosylationSite,
     glycosylation_site_detectors, GlycanCompositionProxy)
 
 from ..utils.iterators import peekable
-from ..utils.memoize import memoize
 from ..utils.collectiontools import descending_combination_counter
 
 
@@ -43,25 +40,6 @@ def list_to_sequence(seq_list, wrap=True):
             flat_chunks.append(chunk)
     seq = Sequence.from_iterable(flat_chunks) if wrap else flat_chunks
     return seq
-
-
-@memoize()
-def sequence_to_mass(sequence):
-    mass = 0.0
-    chunks, modifications, glycan, n_term, c_term = sequence_tokenizer(sequence)
-    for residue, mods in chunks:
-        mass += Residue.mass_by_name(residue)
-        for mod in mods:
-            mass += Modification.mass_by_name(mod)
-    if n_term is not None:
-        mass += Modification.mass_by_name(n_term)
-    else:
-        mass += Composition("H").mass
-    if c_term is not None:
-        mass += Modification.mass_by_name(c_term)
-    else:
-        mass += Composition("OH").mass
-    return mass
 
 
 @glycosylation_site_detectors(GlycosylationType.o_linked)
@@ -242,7 +220,7 @@ class PeptideSequence(PeptideSequenceBase):
 
     Attributes
     ----------
-    seq: list
+    sequence: list
         The underlying container for positions in the amino acid sequence
     modification_index: defaultdict(int)
         A count of different modifications attached to the amino acid sequence
@@ -749,6 +727,13 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass -= residue.mass
         for mod in mods:
             self.mass -= mod.mass
+
+    def substitute(self, position, residue):
+        old_residue = self.sequence[position][0]
+        self.mass -= old_residue.mass
+        self.mass += residue.mass
+        self.sequence[position][0] = residue
+        self._invalidate()
 
     def append(self, residue, modification=None):
         self._invalidate()

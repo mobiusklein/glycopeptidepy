@@ -146,10 +146,10 @@ class MemoizedResidueMetaclass(type):
                 return inst
             else:
                 raise UnknownAminoAcidException(
-                    "Cannot find a Residue for %r" % ((symbol, name),))
+                    "Cannot find a AminoAcidResidue for %r" % ((symbol, name),))
 
 
-class Residue(ResidueBase):
+class AminoAcidResidue(ResidueBase):
     '''
     Represent a single Amino Acid residue which compose peptide sequences. The
     structure itself is intended to be immutable.
@@ -157,11 +157,18 @@ class Residue(ResidueBase):
     Attributes
     ----------
     name: str
+        The three letter abbreviation for the amino acid
     symbol: str
+        The single letter abbreviation for the amino acid
     mass: float
+        The neutral mass of the amino acid
     composition: :class:`glypy.Composition`
+        The chemical composition of the amino acid
     chemical_class: str
-    is_degenerate: bool
+        One of hydrophobic, polar_uncharged, positive_side_chain, negative_side_chain, or special_case,
+        corresponding to the gross molecular properties of the amino acid
+    is_degenerate: bool:
+        Whether this amino acid may stand for other amino acids
 
     '''
     __slots__ = ["name", "symbol", "mass", "composition", "neutral_loss"]
@@ -181,15 +188,15 @@ class Residue(ResidueBase):
         self.mass = 0.0
         try:
             if symbol is not None:
-                self.by_symbol(symbol)
+                self._by_symbol(symbol)
             elif name is not None:
-                self.by_name(name)
+                self._by_name(name)
         except KeyError:
             raise UnknownAminoAcidException(
                 "No definition for Amino Acid %s" % (symbol if symbol is not None else name))
         self.neutral_loss = residue_to_neutral_loss[self.name]
 
-    def by_name(self, name):
+    def _by_name(self, name):
         """Configure this instance by name information
 
         Parameters
@@ -202,7 +209,7 @@ class Residue(ResidueBase):
         self.mass = self.composition.mass
         self.symbol = residue_to_symbol[name]
 
-    def by_symbol(self, symbol):
+    def _by_symbol(self, symbol):
         """Configure this instance by symbol information,
         by going from symbol to name, and from name to data
 
@@ -213,9 +220,9 @@ class Residue(ResidueBase):
         """
         try:
             name = symbol_to_residue[symbol]
-            self.by_name(name)
+            self._by_name(name)
         except KeyError:
-            self.by_name(symbol)
+            self._by_name(symbol)
 
     def __repr__(self):
         return self.name
@@ -261,6 +268,9 @@ class Residue(ResidueBase):
             return False
 
 
+Residue = AminoAcidResidue
+
+
 def register_residue(name, symbol, formula, chemical_class):
     assert symbol not in symbol_to_residue
     assert name not in residue_table
@@ -268,7 +278,7 @@ def register_residue(name, symbol, formula, chemical_class):
     symbol_to_residue[symbol] = name
     residue_table[name] = formula
     residue_chemical_property_group[name] = chemical_class
-    return Residue(symbol=symbol)
+    return AminoAcidResidue(symbol=symbol)
 
 
 def register_degenerate(name, symbol, mappings):
@@ -281,14 +291,14 @@ def register_degenerate(name, symbol, mappings):
         name] = residue_chemical_property_group[mappings[0]]
     residue_to_neutral_loss[name] = residue_to_neutral_loss[mappings[0]]
     degeneracy_index[name] = frozenset(mappings)
-    return Residue(symbol=symbol)
+    return AminoAcidResidue(symbol=symbol)
 
 
 register_degenerate("Xle", "J", ["Leu", "Ile"])
 
 
 def get_all_residues():
-    return set(map(Residue, symbol_to_residue))
+    return set(map(AminoAcidResidue, symbol_to_residue))
 
 
 def get_all_sequencing_residues():

@@ -66,6 +66,16 @@ class TestPeptideSequence(unittest.TestCase):
         peptide = sequence.parse(p3)
         self.assertEqual(peptide, peptide.clone())
 
+    def test_add_remove_modification(self):
+        p = sequence.parse("ENGTISR")
+        ref_mass = p.mass
+        p.add_modification(1, "Deamidated")
+        self.assertAlmostEqual(sequence.parse(str(p)).mass, p.mass, 5)
+
+        p.drop_modification(1, "Deamidated")
+
+        self.assertAlmostEqual(p.mass, ref_mass, 5)
+
 
 if __name__ == '__main__':
     unittest.main()
