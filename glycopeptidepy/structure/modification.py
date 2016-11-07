@@ -152,7 +152,7 @@ class ModificationTarget(object):
     @classmethod
     def from_unimod_specificity(cls, specificity):
         amino_acid = (specificity["site"])
-        if amino_acid in set(["N-term", "C-term"]):
+        if amino_acid in (["N-term", "C-term", None]):
             amino_acid = None
         else:
             amino_acid = {Residue(amino_acid)}
@@ -647,9 +647,12 @@ class Glycosylation(ModificationRule):
 
     @classmethod
     def try_parse(cls, rule_string):
-        glycosylation = cls.parser.search(rule_string)
-        glycosylation = FrozenGlycanComposition.parse(glycosylation.group(0))
-        return cls(glycosylation)
+        try:
+            glycosylation = cls.parser.search(rule_string)
+            glycosylation = FrozenGlycanComposition.parse(glycosylation.group(0))
+            return cls(glycosylation)
+        except:
+            return None
 
     def __init__(self, glycan_composition):
         if isinstance(glycan_composition, basestring):
@@ -811,6 +814,12 @@ class ModificationTable(ModificationSource):
             Composition("OH").mass, composition=Composition("OH")),
     }
 
+    _custom_rules = {}
+
+    @classmethod
+    def register_new_rule(cls, rule):
+        cls._custom_rules[rule.preferred_name] = rule
+
     def __init__(self, rules=None):
         if rules is None:
             rules = self._definitions_from_stream_default()
@@ -836,9 +845,15 @@ class ModificationTable(ModificationSource):
         except KeyError:
             try:
                 name = title_cleaner.search(key).groupdict()["name"]
-                return self.store[name]
-            except (KeyError, AttributeError):
+            except (AttributeError):
                 raise ModificationStringParseError("Could not parse {0}".format(key))
+            try:
+                return self.store[name]
+            except KeyError:
+                try:
+                    return self._custom_rules[name]
+                except KeyError:
+                    raise ModificationStringParseError("Could not resolve {0}".format(name))
 
     def add(self, rule):
         if not isinstance(rule, ModificationRule):
@@ -908,6 +923,10 @@ class Modification(ModificationBase):
     _table = ModificationTable()
 
     __slots__ = ["name", "mass", "position", "number", "rule", "composition"]
+
+    @classmethod
+    def register_new_rule(cls, rule):
+        ModificationTable.register_new_rule(rule)
 
     @classmethod
     def mass_by_name(cls, name, mod_num=1):

@@ -950,11 +950,11 @@ class PeptideSequence(PeptideSequenceBase):
                     composition=composition - water,
                     kind=oxonium_ion_series)
                 yield SimpleFragment(
-                    name=key + "-2H2O", mass=mass - water2.mass,
+                    name=key + "-H4O2", mass=mass - water2.mass,
                     composition=composition - (
                         water2), kind=oxonium_ion_series)
                 yield SimpleFragment(
-                    name=key + "-2H2O-CH2O",
+                    name=key + "-CH6O3",
                     mass=mass - water2_plus_sidechain_plus_carbon.mass,
                     composition=composition - water2_plus_sidechain_plus_carbon,
                     kind=oxonium_ion_series)
@@ -972,10 +972,10 @@ class PeptideSequence(PeptideSequenceBase):
                         name=key + "-H2O", mass=mass - water.mass, kind=oxonium_ion_series,
                         composition=composition - water)
                     yield SimpleFragment(
-                        name=key + "-2H2O", mass=mass - water2.mass, kind=oxonium_ion_series,
+                        name=key + "-H4O2", mass=mass - water2.mass, kind=oxonium_ion_series,
                         composition=composition - (water2))
                     yield SimpleFragment(
-                        name=key + "-2H2O-CH2O", mass=mass - water2_plus_sidechain_plus_carbon.mass,
+                        name=key + "-CH6O3", mass=mass - water2_plus_sidechain_plus_carbon.mass,
                         kind=oxonium_ion_series,
                         composition=composition - water2_plus_sidechain_plus_carbon)
 
@@ -1173,3 +1173,22 @@ class ExDFragmentationStrategy(FragmentationStrategyBase):
 
     def handle_peptide_backbone(self, fragment_state, position):
         pass
+
+
+class NamedSequence(PeptideSequence):
+    def __init__(self, name=None, sequence=None, parser_function=None, **kwargs):
+        super(NamedSequence, self).__init__(sequence, parser_function, **kwargs)
+        self.name = name
+
+    def clone(self):
+        dup = super(NamedSequence, self).clone()
+        dup.name = self.name
+        return dup
+
+    def __repr__(self):
+        string = super(NamedSequence, self).__str__()
+        return ">%s\n%s" % (self.name, string)
+
+
+class ProteinSequence(NamedSequence):
+    pass
