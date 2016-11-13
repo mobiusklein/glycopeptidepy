@@ -345,8 +345,8 @@ class ModificationRule(object):
         elif isinstance(amino_acid_specificity, Iterable):
             self.targets = set(amino_acid_specificity)
         else:
-            print(amino_acid_specificity, type(amino_acid_specificity))
-            raise ValueError("Could not interpret target specificity")
+            raise ValueError("Could not interpret target specificity from %r" % (
+                amino_acid_specificity,))
 
     @property
     def name(self):
@@ -837,7 +837,7 @@ class ModificationTable(ModificationSource):
             self.add(rule)
 
     def rules(self):
-        return set(self.store.values())
+        return set(self.store.values()) | set(self._custom_rules.values())
 
     def __getitem__(self, key):
         try:
