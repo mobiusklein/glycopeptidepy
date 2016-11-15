@@ -349,6 +349,10 @@ class PeptideSequence(PeptideSequenceBase):
         self._mass = value
 
     @property
+    def peptide_backbone_mass(self):
+        return self.mass
+
+    @property
     def total_mass(self):
         return self.total_composition().mass
 
