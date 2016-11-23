@@ -41,7 +41,15 @@ glycosylation_site_detectors = decoratordict({
 })
 
 
-class TypedGlycanComposition(glypy.GlycanComposition):
+class HashableGlycanComposition(glypy.glycan_composition.FrozenGlycanComposition):
+    def __hash__(self):
+        return hash(str(self))
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+
+class TypedGlycanComposition(HashableGlycanComposition):
 
     def __init__(self, glycosylation_type, *args, **kwargs):
         self.glycosylation_type = GlycosylationType[glycosylation_type]
@@ -52,14 +60,6 @@ class TypedGlycanComposition(glypy.GlycanComposition):
 
     def is_type(self, glycosylation_type):
         return self.glycosylation_type is GlycosylationType[glycosylation_type]
-
-
-class HashableGlycanComposition(glypy.glycan_composition.FrozenGlycanComposition):
-    def __hash__(self):
-        return hash(str(self))
-
-    def __eq__(self, other):
-        return str(self) == str(other)
 
 
 class GlycanCompositionProxy(object):

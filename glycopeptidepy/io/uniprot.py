@@ -1,9 +1,13 @@
+import re
 import threading
+import urllib2
 
 from lxml import etree
 from glycopeptidepy.structure import glycan
-from glypy.utils import make_struct
+from glycopeptidepy.structure.modification import ModificationRule
 from glycopeptidepy.utils import simple_repr
+from glypy import Composition
+from glypy.utils import make_struct
 
 
 uri_template = "http://www.uniprot.org/uniprot/{accession}.xml"
@@ -17,6 +21,9 @@ class UniProtFeatureBase(object):
     @property
     def is_defined(self):
         return self.known
+
+    def describe(self):
+        return self.description.split("; ")
 
 
 class SignalPeptide(UniProtFeatureBase):
@@ -114,6 +121,10 @@ class ModifiedResidue(UniProtFeatureBase):
             feature.attrib["description"])
 
 
+class Site(Domain):
+    feature_type = 'site'
+
+
 class GlycosylationSite(UniProtFeatureBase):
     feature_type = 'glycosylation site'
 
@@ -140,7 +151,7 @@ class GlycosylationSite(UniProtFeatureBase):
         return cls(position, glycosylation_type)
 
 
-UniProtProtein = make_struct("UniProtProtein", ("sequence", "features", "names"))
+UniProtProtein = make_struct("UniProtProtein", ("sequence", "features", "names", "accessions"))
 
 
 def get_etree_for(accession):
@@ -153,6 +164,8 @@ def get_features_for(accession):
     seq = tree.find(".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}sequence").text.replace("\n", '')
     names = [el.text for el in tree.findall(
         ".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}fullName")]
+    accessions = [el.text for el in tree.findall(
+        ".//{http://uniprot.org/uniprot}accession")]
     features = []
     for tag in tree.findall(".//{http://uniprot.org/uniprot}feature"):
         feature_type = tag.attrib['type']
@@ -169,9 +182,14 @@ def get_features_for(accession):
                 features.append(RegionOfInterest.fromxml(tag))
             elif feature_type == 'disulfide bond':
                 features.append(DisulfideBond.fromxml(tag))
+            elif feature_type == "site":
+                features.append(Site.fromxml(tag))
         except Exception as e:
             print(e, feature_type, accession, etree.tostring(tag))
-    return UniProtProtein(seq, features, names)
+    return UniProtProtein(seq, features, names, accessions)
+
+
+get = get_features_for
 
 
 class ProteinDownloader(object):
@@ -214,3 +232,78 @@ class ProteinDownloader(object):
 
     def __call__(self, *args, **kwargs):
         return self.download(*args, **kwargs)
+
+
+class _UniProtPTMListParser(object):
+    def __init__(self, path):
+        self.path = path
+        self.handle = open(path)
+        self._find_starting_point()
+
+    def _find_starting_point(self):
+        self.handle.seek(0)
+        for line in self.handle:
+            if line.startswith("___"):
+                break
+
+    def _next_line(self):
+        line = next(self.handle)
+        line = line.strip("\n")
+        tokens = re.split("\s+", line, maxsplit=1)
+        if len(tokens) == 1:
+            return tokens[0], ""
+        else:
+            typecode, content = tokens
+            return typecode, content
+
+    def _formula_parser(self, formula):
+        counts = dict()
+        for symbol, count in re.findall(r"([A-Za-z]+)(-?\d+)", formula):
+            count = int(count)
+            counts[symbol] = count
+        return Composition(counts)
+
+    def parse_entry(self):
+        ptm_id = None
+        accession = None
+        feature_key = None
+        mass_difference = None
+        correction_formula = None
+        keywords = []
+        crossref = []
+        while True:
+            typecode, line = self._next_line()
+            if typecode == "ID":
+                ptm_id = line
+            elif typecode == "AC":
+                accession = line
+            elif typecode == "FT":
+                feature_key = line
+            elif typecode == "CF":
+                correction_formula = self._formula_parser(line)
+            elif typecode == "MM":
+                mass_difference = float(line)
+            elif typecode == "KW":
+                keywords.append(line.strip("."))
+            elif typecode == "DR":
+                crossref.append(line.strip('.'))
+            elif typecode == "//":
+                break
+        if mass_difference is None or correction_formula is None:
+            return None
+        rule = ModificationRule(
+            [], ptm_id, monoisotopic_mass=mass_difference, composition=correction_formula,
+            alt_names={accession}, categories=keywords)
+        return rule
+
+    def build_table(self):
+        table = {}
+        while True:
+            try:
+                entry = self.parse_entry()
+                if entry is None:
+                    continue
+                table[entry.name] = entry
+            except StopIteration:
+                break
+        return table

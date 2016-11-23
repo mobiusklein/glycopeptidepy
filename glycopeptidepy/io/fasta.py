@@ -79,7 +79,7 @@ class ProteinFastFileWriter(FastaFileWriter):
 
     def write(self, protein):
         defline = ">%s" % protein.name
-        seq = '\n'.join(textwrap.wrap(protein.protein_sequence, 80))
+        seq = '\n'.join(textwrap.wrap(protein.get_sequence(), 80))
         super(ProteinFastFileWriter, self).write(defline, seq)
 
     def writelines(self, iterable):

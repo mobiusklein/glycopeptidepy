@@ -1,13 +1,17 @@
 import re
 from collections import defaultdict
 
-from .modification import Modification, NGlycanCoreGlycosylation
+from .modification import (
+    Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
+    GlycosaminoglycanLinkerGlycosylation)
 from .composition import Composition
 from ..utils.collectiontools import descending_combination_counter
 from ..utils import simple_repr
 
 _n_glycosylation = NGlycanCoreGlycosylation()
-_modificaiton_hexnac = Modification("HexNAc").rule
+_o_glycosylation = OGlycanCoreGlycosylation()
+_gag_linker_glycosylation = GlycosaminoglycanLinkerGlycosylation()
+_modification_hexnac = Modification("HexNAc").rule
 
 fragment_pairing = {
     "a": "x",
@@ -51,6 +55,7 @@ generic_neutral_losses_composition = {
 
 
 class NeutralLoss(object):
+
     def __init__(self, name, composition=None):
         if composition is None:
             composition = generic_neutral_losses_composition[name]
@@ -71,16 +76,32 @@ class NeutralLoss(object):
 
 
 class FragmentBase(object):
-    _neutral_loss = None
-    _name = None
+    """Base class for all Fragment types. Defines basic
+    name generation and neutral loss handling functions.
+    
+    Attributes
+    ----------
+    neutral_loss : NeutralLoss
+        The NeutralLoss associated with this fragment, or None.
+        If a NeutralLoss, its composition and mass are subtracted
+        from this object's composition and mass attributes.
+    name: str
+        The human readable description of this fragment
+    series: IonSeries
+        The ion ladder this fragment is derived from
 
-    __slots__ = ("_neutral_loss", "_name")
+    """
+    _neutral_loss = None
+
+    __slots__ = ("_neutral_loss", "_name", "_hash")
 
     def get_series(self):
         raise NotImplementedError()
 
     def __hash__(self):
-        return hash(self.name)
+        if self._hash is None:
+            self._hash = hash(self.name)
+        return self._hash
 
     def __eq__(self, other):
         try:
@@ -115,10 +136,16 @@ class FragmentBase(object):
             parts.append(str(neutral_loss))
         return ''.join(parts)
 
+    @property
+    def name(self):
+        if self._name is None:
+            self._name = self.get_fragment_name()
+        return self._name
+
+    @name.setter
     def set_name(self, name):
         self._name = name
 
-    name = property(get_fragment_name, set_name)
     neutral_loss = property(get_neutral_loss, set_neutral_loss)
 
     def generate_neutral_losses(self, losses=NeutralLoss.AllLosses):
@@ -133,7 +160,7 @@ class FragmentBase(object):
 
 
 class PeptideFragment(FragmentBase):
-    concerned_mods = [_n_glycosylation]
+    concerned_mods = [_n_glycosylation, _modification_hexnac, _o_glycosylation, _gag_linker_glycosylation]
 
     __slots__ = ("type", "position", "modification_dict", "bare_mass",
                  "golden_pairs", "flanking_amino_acids", "glycosylation",
@@ -152,6 +179,8 @@ class PeptideFragment(FragmentBase):
         self.mass = mass
         self.composition = composition
         self._neutral_loss = None
+        self._name = None
+        self._hash = None
 
         self.flanking_amino_acids = flanking_amino_acids
         self.position = position
@@ -166,7 +195,6 @@ class PeptideFragment(FragmentBase):
         for key, value in self.modification_dict.items():
             self.mass += (key).mass * value
         if self.neutral_loss is not None:
-            print("loss!")
             self.mass += self.neutral_loss.mass
 
     def get_series(self):
@@ -175,7 +203,8 @@ class PeptideFragment(FragmentBase):
     def clone(self):
         return self.__class__(
             self.series, self.position, dict(self.modification_dict),
-            self.bare_mass, self.golden_pairs, tuple(self.flanking_amino_acids),
+            self.bare_mass, self.golden_pairs, tuple(
+                self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
             self._neutral_loss.clone() if self._neutral_loss is not None else None,
             self.composition.clone())
@@ -206,40 +235,47 @@ class PeptideFragment(FragmentBase):
         fragment_name.append(str(self.position))
 
         # Only concerned modifications are reported.
-        for mod_name in self.concerned_mods + ["HexNAc"]:
-            if mod_name in self.modification_dict:
-                if self.modification_dict[mod_name] > 1:
-                    fragment_name.extend(['+', str(self.modification_dict[mod_name]), mod_name])
-                elif self.modification_dict[mod_name] == 1:
-                    fragment_name.extend(['+', mod_name])
+        for mod_rule in self.concerned_mods:
+            if mod_rule in self.modification_dict:
+                if self.modification_dict[mod_rule] > 1:
+                    fragment_name.extend(
+                        ['+', str(self.modification_dict[mod_rule]), (mod_rule.name)])
+                elif self.modification_dict[mod_rule] == 1:
+                    fragment_name.extend(['+', (mod_rule.name)])
                 else:
                     pass
 
         if self.neutral_loss is not None:
             fragment_name.append(str(self.neutral_loss))
-
-        return ''.join(fragment_name)
+        name = ''.join(fragment_name)
+        return name
 
     def partial_loss(self, modifications=None):
         if modifications is None:
             modifications = self.concerned_mods
         modifications = list(modifications)
-        modifications.append(_modificaiton_hexnac)
+        modifications.append(_modification_hexnac)
         mods = dict(self.modification_dict)
-        mods_of_interest = defaultdict(int, {k: v for k, v in mods.items() if k in modifications})
+        mods_of_interest = defaultdict(
+            int, {k: v for k, v in mods.items() if k in modifications})
 
-        mod_to_composition = {k: Modification(k).composition for k in modifications}
+        mod_to_composition = {k: Modification(
+            k).composition for k in modifications}
 
-        delta_composition = sum((mod_to_composition[k] * v for k, v in mods_of_interest.items()), Composition())
+        delta_composition = sum(
+            (mod_to_composition[k] * v for k, v in mods_of_interest.items()), Composition())
         base_composition = self.composition - delta_composition
 
         n_cores = mods_of_interest.pop(_n_glycosylation, 0)
-        mods_of_interest[_modificaiton_hexnac] += n_cores * 2  # Allow partial destruction of N-glycan core
+        o_cores = mods_of_interest.pop(_o_glycosylation, 0)
+        # Allow partial destruction of N-glycan core
+        mods_of_interest[_modification_hexnac] += n_cores * 2 + o_cores
 
         other_mods = {k: v for k, v in mods.items() if k not in modifications}
         for varied_modifications in descending_combination_counter(mods_of_interest):
             updated_mods = other_mods.copy()
-            updated_mods.update({k: v for k, v in varied_modifications.items() if v != 0})
+            updated_mods.update(
+                {k: v for k, v in varied_modifications.items() if v != 0})
 
             extra_composition = Composition()
             for mod, mod_count in varied_modifications.items():
@@ -250,10 +286,6 @@ class PeptideFragment(FragmentBase):
                 golden_pairs=self.golden_pairs,
                 flanking_amino_acids=self.flanking_amino_acids,
                 composition=base_composition + extra_composition)
-
-    @property
-    def name(self):
-        return self.get_fragment_name()
 
     def __repr__(self):
         return ("PeptideFragment(%(type)s %(position)s %(mass)s "
@@ -268,6 +300,8 @@ class SimpleFragment(FragmentBase):
     __slots__ = ["name", "mass", "kind", "composition", "neutral_loss"]
 
     def __init__(self, name, mass, kind, composition, neutral_loss=None):
+        self._name = None
+        self._hash = None
         self.name = name
         self.mass = mass
         self.kind = kind
@@ -294,7 +328,54 @@ class SimpleFragment(FragmentBase):
         return self.kind
 
 
+monosaccharide_to_losses = {
+    "HexNAc": [
+        ("C2H6O3", Composition("C2H6O3")),
+        ("CH603", Composition("CH603")),
+        ("C2H4O2", Composition("C2H4O2")),
+    ]
+}
+
+
+def make_monosaccharide_loss_set(monosaccharide):
+    k = monosaccharide
+    key = str(k)
+    mass = k.mass()
+    composition = k.total_composition()
+    water = Composition("H2O")
+    water2 = water * 2
+    oxonium_ion_series = IonSeries.oxonium_ion
+    yield SimpleFragment(
+        name=key, mass=mass,
+        composition=composition,
+        kind=oxonium_ion_series)
+    yield SimpleFragment(
+        name=key + "-H2O", mass=mass - water.mass,
+        composition=composition - water,
+        kind=oxonium_ion_series)
+    yield SimpleFragment(
+        name=key + "-H4O2", mass=mass - water2.mass,
+        composition=composition - (
+            water2), kind=oxonium_ion_series)
+    if key in monosaccharide_to_losses:
+        for name, loss in monosaccharide_to_losses[key]:
+            yield SimpleFragment(
+                name="%s-%s" % (key, name),
+                composition=composition - loss,
+                mass=mass - loss.mass,
+                kind=oxonium_ion_series)
+
+
+monosaccharide_oxonium_ion_limits = defaultdict(lambda: float('inf'), {
+    "Neu5Ac": 1,
+    "Fuc": 1,
+    "dHex": 1,
+    "Neu5Gc": 1
+})
+
+
 class MemoizedIonSeriesMetaclass(type):
+
     def __call__(self, name=None, *args, **kwargs):
         if not hasattr(self, "_cache"):
             self._cache = dict()
@@ -335,7 +416,8 @@ class IonSeries(object):
         self.includes_peptide = includes_peptide
         self.mass_shift = mass_shift
         self.regex = re.compile(regex) if regex is not None else regex
-        self.composition_shift = fragment_shift_composition.get(self.name, Composition())
+        self.composition_shift = fragment_shift_composition.get(
+            self.name, Composition())
 
     def __hash__(self):
         return hash(self.name)
