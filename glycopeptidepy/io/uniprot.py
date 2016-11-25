@@ -67,15 +67,20 @@ class Domain(UniProtFeatureBase):
     def fromxml(cls, feature):
         known = True
         try:
-            begin = int(feature.find(".//{http://uniprot.org/uniprot}begin").attrib['position'])
-        except KeyError:
-            begin = 0
-            known = False
-        try:
-            end = int(feature.find(".//{http://uniprot.org/uniprot}end").attrib['position'])
-        except KeyError:
-            end = float('inf')
-            known = False
+            try:
+                begin = int(feature.find(".//{http://uniprot.org/uniprot}begin").attrib['position'])
+            except KeyError:
+                begin = 0
+                known = False
+            try:
+                end = int(feature.find(".//{http://uniprot.org/uniprot}end").attrib['position'])
+            except KeyError:
+                end = float('inf')
+                known = False
+        except AttributeError:
+            begin = int(feature.find(".//{http://uniprot.org/uniprot}position").attrib['position'])
+            end = begin + 1
+
         description = feature.attrib.get("description")
         return cls(description, begin, end, known)
 
@@ -151,7 +156,7 @@ class GlycosylationSite(UniProtFeatureBase):
         return cls(position, glycosylation_type)
 
 
-UniProtProtein = make_struct("UniProtProtein", ("sequence", "features", "names", "accessions"))
+UniProtProtein = make_struct("UniProtProtein", ("sequence", "features", "recommended_name", "gene_name", "names", "accessions"))
 
 
 def get_etree_for(accession):
@@ -159,14 +164,31 @@ def get_etree_for(accession):
     return tree
 
 
-def get_features_for(accession):
+def get_features_for(accession, error=False):
     tree = etree.parse(uri_template.format(accession=accession))
     seq = tree.find(".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}sequence").text.replace("\n", '')
     names = [el.text for el in tree.findall(
         ".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}fullName")]
+    recommended_name_tag = tree.find(".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}recommendedName")
+    if recommended_name_tag is not None:
+        if recommended_name_tag.text.strip():
+            recommended_name = recommended_name_tag.text.strip()
+        else:
+            recommended_name = ' '.join(c.text for c in recommended_name_tag)
+    else:
+        try:
+            recommended_name = names[0]
+        except:
+            recommended_name = ""
+    gene_name_tag = tree.find(".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}name")
+    if gene_name_tag is not None:
+        gene_name = gene_name_tag.text
+    else:
+        gene_name = ""
     accessions = [el.text for el in tree.findall(
         ".//{http://uniprot.org/uniprot}accession")]
     features = []
+    exc_type = Exception if not error else KeyboardInterrupt
     for tag in tree.findall(".//{http://uniprot.org/uniprot}feature"):
         feature_type = tag.attrib['type']
         try:
@@ -184,9 +206,9 @@ def get_features_for(accession):
                 features.append(DisulfideBond.fromxml(tag))
             elif feature_type == "site":
                 features.append(Site.fromxml(tag))
-        except Exception as e:
+        except exc_type as e:
             print(e, feature_type, accession, etree.tostring(tag))
-    return UniProtProtein(seq, features, names, accessions)
+    return UniProtProtein(seq, features, recommended_name, gene_name, names, accessions)
 
 
 get = get_features_for
@@ -208,7 +230,7 @@ class ProteinDownloader(object):
         def task(name):
             try:
                 feat = get_features_for(name)
-                results.append((name, feat))
+                results.append(feat)
             except Exception as e:
                 print(e, name)
 
@@ -232,6 +254,18 @@ class ProteinDownloader(object):
 
     def __call__(self, *args, **kwargs):
         return self.download(*args, **kwargs)
+
+    @classmethod
+    def to_fasta_file(cls, accession_iterable, file_handle, chunk_size=15):
+        from .fasta import FastaFileWriter
+        proteins = cls.download(accession_iterable, chunk_size=chunk_size)
+        writer = FastaFileWriter(file_handle)
+        for protein in proteins:
+            defline = ">sp|%s|%s %s" % (protein.accessions[0], protein.gene_name, protein.recommended_name)
+            defline = defline.replace("\n", " ")
+            seq = protein.sequence
+            writer.write(defline, seq)
+        return file_handle
 
 
 class _UniProtPTMListParser(object):
