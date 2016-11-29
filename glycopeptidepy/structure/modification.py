@@ -590,6 +590,7 @@ class AminoAcidSubstitution(AnonymousModificationRule):
 
 _hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
 _hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
+_xylose = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
 
 
 hexnac_modification = ModificationRule.from_unimod({
@@ -601,8 +602,6 @@ hexnac_modification = ModificationRule.from_unimod({
         "N": 1
     },
     "mono_mass": 203.079373,
-    "date_time_posted": 1029784631000,
-    "date_time_modified": 1396608093000,
     "full_name": "N-Acetylhexosamine",
     "specificity": [{
         "position": "Anywhere",
@@ -622,6 +621,27 @@ hexnac_modification = ModificationRule.from_unimod({
         "site": "N",
         "classification": "N-linked glycosylation",
         "spec_group": 1
+    }],
+})
+
+
+xylose_modification = ModificationRule.from_unimod({
+    "title": "Xyl",
+    "composition": dict(_xylose.total_composition()),
+    "mono_mass": _xylose.mass(),
+    "full_name": "Xylose",
+    "specificity": [{
+        "position": "Anywhere",
+        "hidden": True,
+        "site": "T",
+        "classification": "Other glycosylation",
+        "spec_group": 3
+    }, {
+        "position": "Anywhere",
+        "hidden": True,
+        "site": "S",
+        "classification": "Other glycosylation",
+        "spec_group": 2
     }],
 })
 
@@ -747,7 +767,7 @@ class GlycosaminoglycanLinkerGlycosylation(Glycosylation):
         "{Xyl:1; Hex:2; HexA:1}",
     }}
 
-    def __init__(self, base_mass=_hexnac.mass()):
+    def __init__(self, base_mass=_xylose.mass()):
         self.common_name = "GlycosaminoglycanLinkerGlycosylation"
         self.mass = base_mass
         self.title = "Glycosaminoglycan Linker Glycosylation"
@@ -865,6 +885,7 @@ class ModificationTable(ModificationSource):
 
     other_modifications = {
         "HexNAc": hexnac_modification,
+        "Xyl": xylose_modification,
         "N-Glycosylation": NGlycanCoreGlycosylation(),
         "O-Glycosylation": OGlycanCoreGlycosylation(),
         "GAG-Linker": GlycosaminoglycanLinkerGlycosylation(),

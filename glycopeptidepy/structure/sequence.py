@@ -16,7 +16,8 @@ from .residue import Residue
 
 from glypy import GlycanComposition, Glycan, ReducedEnd
 from glypy.composition.glycan_composition import (
-    FrozenGlycanComposition, FrozenMonosaccharideResidue)
+    FrozenGlycanComposition, FrozenMonosaccharideResidue,
+    MonosaccharideResidue)
 
 from .parser import sequence_tokenizer
 
@@ -75,9 +76,9 @@ def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
 def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
     try:
         iter(allow_modified)
-        allow_modified = set(allow_modified) | {Modification("HexNAc"), Modification(_n_glycosylation)}
+        allow_modified = set(allow_modified) | {Modification("HexNAc"), Modification(_o_glycosylation)}
     except:
-        allow_modified = (Modification("HexNAc"), Modification(_n_glycosylation))
+        allow_modified = (Modification("HexNAc"), Modification(_o_glycosylation))
     state = "seek"  # [seek, n, ^p, st]
     if isinstance(sequence, basestring):
         sequence = PeptideSequence(sequence)
@@ -120,9 +121,9 @@ def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
 def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()):
     try:
         iter(allow_modified)
-        allow_modified = set(allow_modified) | {Modification("HexNAc"), Modification(_n_glycosylation)}
+        allow_modified = set(allow_modified) | {Modification("Xyl"), Modification(_gag_linker_glycosylation)}
     except:
-        allow_modified = (Modification("HexNAc"), Modification(_n_glycosylation))
+        allow_modified = (Modification("Xyl"), Modification(_gag_linker_glycosylation))
     state = "seek"  # [seek, s, g1, x, g2]
     ser = Residue("Ser")
     gly = Residue("Gly")
@@ -136,28 +137,9 @@ def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()):
     while(i < len(sequence)):
         next_pos = sequence[i]
         if state == "seek":
-            # A sequon starts with an Asn residue without modifications, or for counting
-            # purposes one that has already been glycosylated
             if next_pos[0] == ser:
                 if ((len(next_pos[1]) == 0) or next_pos[1][0] in allow_modified):
-                    s_position = i
-                    state = "s"
-        elif state == "s":
-            if next_pos[0] == gly:
-                state = 'g1'
-            else:
-                state = "seek"
-                i = s_position
-                s_position = None
-        elif state == 'g1':
-            # Anything will satisfy this position pattern
-            state = 'x'
-        elif state == "x":
-            if next_pos[0] == gly:
-                positions.append(s_position)
-            state = "seek"
-            i = s_position
-            s_position = None
+                    positions.append(i)
         i += 1
     return positions
 
@@ -806,7 +788,7 @@ class PeptideSequence(PeptideSequenceBase):
         elif o_glycan:
             return self.o_glycan_stub_fragments(extended=extended)
         elif gag_linker:
-            raise NotImplementedError()
+            return self.gag_linker_stub_fragments(extended=extended)
         else:
             raise ValueError("No Glycan Class Detected")
 
@@ -844,7 +826,7 @@ class PeptideSequence(PeptideSequenceBase):
                     shift = {
                         "mass": 0,
                         "composition": Composition(),
-                        "key": ""
+                        "key": {}
                     }
                     core_shifts.append(shift)
                 elif hexnac_count == 1:
@@ -1000,6 +982,91 @@ class PeptideSequence(PeptideSequenceBase):
                 key_base = "%s+%s" % (key_base, extended_key)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
 
+    def gag_linker_stub_fragments(self, extended=False):
+        if isinstance(self.glycan, Glycan):
+            glycan = GlycanComposition.from_glycan(self.glycan)
+        elif isinstance(self.glycan, GlycanComposition):
+            glycan = self.glycan
+        else:
+            raise TypeError((
+                "Cannot infer monosaccharides from non-Glycan"
+                " or GlycanComposition {}").format(self.glycan))
+        fucose_count = glycan['Fuc'] or glycan['dHex']
+        core_count = self.modification_index[_gag_linker_glycosylation]
+
+        per_site_shifts = []
+        hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
+        hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
+        fucose = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
+        xyl = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
+        hexa = FrozenMonosaccharideResidue.from_iupac_lite("HexA")
+
+        base_composition = self.peptide_composition()
+        base_mass = base_composition.mass
+        for i in range(core_count):
+            core_shifts = []
+            for xyl_count in range(2):
+                if xyl_count == 0:
+                    shift = {
+                        "mass": 0,
+                        "composition": Composition(),
+                        "key": ""
+                    }
+                    core_shifts.append(shift)
+                else:
+                    shift = {
+                        "mass": xyl.mass() * xyl_count,
+                        "composition": xyl.total_composition() * xyl_count,
+                        "key": {
+                            xyl: xyl_count
+                        }
+                    }
+                    core_shifts.append(shift)
+                if xyl_count > 0:
+                    # TODO: Handle modified Hexose residues here too.
+                    for hexose_count in range(1, 3):
+                        shift = {
+                            "mass": ((xyl.mass() * xyl_count) + (
+                                hexose.mass() * hexose_count)),
+                            "composition": (
+                                (xyl.total_composition() * xyl_count) + (
+                                    hexose.total_composition() * hexose_count)),
+                            "key":  {
+                                xyl: xyl_count,
+                                hexose: hexose_count
+                            }
+                        }
+                        core_shifts.append(shift)
+                        if hexose_count == 2:
+                            shift = {
+                                "mass": ((xyl.mass() * xyl_count) + (
+                                    hexose.mass() * hexose_count) + hexa.mass()),
+                                "composition": (
+                                    (xyl.total_composition() * xyl_count) + (
+                                        hexose.total_composition() * hexose_count) + hexa.total_composition()),
+                                "key":  {
+                                    xyl: xyl_count,
+                                    hexose: hexose_count,
+                                    hexa: 1
+                                }
+                            }
+                            core_shifts.append(shift)
+            per_site_shifts.append(core_shifts)
+        for positions in itertools.product(*per_site_shifts):
+            key_base = 'peptide'
+            names = Counter()
+            mass = base_mass
+            composition = base_composition.clone()
+            for site in positions:
+                mass += site['mass']
+                names += Counter(site['key'])
+                composition += site['composition']
+            extended_key = ''.join("%s%d" % kv for kv in names.items())
+            if len(extended_key) > 0:
+                key_base = "%s+%s" % (key_base, extended_key)
+            yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
+
+
     def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,
                          include_large_glycan_fragments=True, maximum_fragment_size=5):
         r'''
@@ -1026,6 +1093,15 @@ class PeptideSequence(PeptideSequenceBase):
         _neuac = FrozenMonosaccharideResidue.from_iupac_lite("NeuAc")
 
         if oxonium:
+            def remove_labile_modifications(residue):
+                has_copied = False
+                for position, substituent in residue.substituents():
+                    if substituent.name in ("sulfate", "phosphate"):
+                        if not has_copied:
+                            residue = residue.clone(monosaccharide_type=MonosaccharideResidue)
+                        residue.drop_substituent(position, substituent)
+                return residue
+
             glycan = None
             if isinstance(self.glycan, Glycan):
                 glycan = FrozenGlycanComposition.from_glycan(self.glycan)
@@ -1036,6 +1112,7 @@ class PeptideSequence(PeptideSequenceBase):
                     "Cannot infer monosaccharides from non-Glycan or GlycanComposition {}".format(
                         self.glycan))
             for k in glycan:
+                k = remove_labile_modifications(k)
                 key = str(k)
                 mass = k.mass()
                 composition = k.total_composition()
@@ -1061,6 +1138,7 @@ class PeptideSequence(PeptideSequenceBase):
                     for k, v in Counter(kk).items():
                         if glycan[k] < v:
                             continue
+                    kk = list(map(remove_labile_modifications, kk))
                     key = ''.join(map(str, kk))
                     mass = sum(k.mass() for k in kk)
                     composition = sum((k.total_composition() for k in kk), Composition())
@@ -1095,54 +1173,55 @@ class PeptideSequence(PeptideSequenceBase):
                         name=fragment.name, mass=fragment.mass, kind=oxonium_ion_series,
                         composition=fragment.composition)
         elif allow_ambiguous and all_series:
-            _offset = Composition()
-            total = FrozenGlycanComposition(self.glycan)
-            total_count = sum(total.values())
+            if self.modification_index[_n_glycosylation] > 0:
+                _offset = Composition()
+                total = FrozenGlycanComposition(self.glycan)
+                total_count = sum(total.values())
 
-            base = FrozenGlycanComposition(Hex=3, HexNAc=2)
-            remainder = total - base
+                base = FrozenGlycanComposition(Hex=3, HexNAc=2)
+                remainder = total - base
 
-            peptide_base_composition = self.total_composition() - self.glycan.total_composition()
-            stub_composition = peptide_base_composition + base.total_composition() - water
-            stub_mass = stub_composition.mass
+                peptide_base_composition = self.total_composition() - self.glycan.total_composition()
+                stub_composition = peptide_base_composition + base.total_composition() - water
+                stub_mass = stub_composition.mass
 
-            # GlycanComposition's clone semantics do not propagate the
-            # composition_offset attribute yet. Should it?
-            remainder.composition_offset = _offset
-            remainder_elemental_composition = remainder.total_composition()
-            remainder_mass = remainder.mass()
+                # GlycanComposition's clone semantics do not propagate the
+                # composition_offset attribute yet. Should it?
+                remainder.composition_offset = _offset
+                remainder_elemental_composition = remainder.total_composition()
+                remainder_mass = remainder.mass()
 
-            for composition in descending_combination_counter(remainder):
-                frag_size = sum(composition.values())
+                for composition in descending_combination_counter(remainder):
+                    frag_size = sum(composition.values())
 
-                # Don't waste time on compositions that are impossible under
-                # common enzymatic pathways in this already questionable stop-gap
-                if composition.get(_hexnac, 0) + composition.get(
-                        _hexose, 0) < composition.get(_neuac, 0):
-                    continue
+                    # Don't waste time on compositions that are impossible under
+                    # common enzymatic pathways in this already questionable stop-gap
+                    if composition.get(_hexnac, 0) + composition.get(
+                            _hexose, 0) < composition.get(_neuac, 0):
+                        continue
 
-                composition = FrozenGlycanComposition(composition)
-                composition.composition_offset = _offset
+                    composition = FrozenGlycanComposition(composition)
+                    composition.composition_offset = _offset
 
-                elemental_composition = composition.total_composition()
-                composition_mass = elemental_composition.mass
+                    elemental_composition = composition.total_composition()
+                    composition_mass = elemental_composition.mass
 
-                if frag_size > 2 and include_large_glycan_fragments and frag_size < maximum_fragment_size:
-                    string_form = composition.serialize()
-                    yield SimpleFragment(
-                        name=string_form, mass=composition_mass,
-                        composition=elemental_composition, kind=oxonium_ion_series)
-                    yield SimpleFragment(
-                        name=string_form + "-H2O", mass=composition_mass - water.mass,
-                        composition=elemental_composition - water, kind=oxonium_ion_series)
+                    if frag_size > 2 and include_large_glycan_fragments and frag_size < maximum_fragment_size:
+                        string_form = composition.serialize()
+                        yield SimpleFragment(
+                            name=string_form, mass=composition_mass,
+                            composition=elemental_composition, kind=oxonium_ion_series)
+                        yield SimpleFragment(
+                            name=string_form + "-H2O", mass=composition_mass - water.mass,
+                            composition=elemental_composition - water, kind=oxonium_ion_series)
 
-                if (total_count - frag_size) < (maximum_fragment_size + 4):
-                    f = SimpleFragment(
-                        name="peptide+" + str(total - composition),
-                        mass=stub_mass + remainder_mass - composition_mass,
-                        composition=stub_composition + remainder_elemental_composition - elemental_composition,
-                        kind=stub_glycopeptide_series)
-                    yield f
+                    if (total_count - frag_size) < (maximum_fragment_size + 4):
+                        f = SimpleFragment(
+                            name="peptide+" + str(total - composition),
+                            mass=stub_mass + remainder_mass - composition_mass,
+                            composition=stub_composition + remainder_elemental_composition - elemental_composition,
+                            kind=stub_glycopeptide_series)
+                        yield f
         elif all_series:
             raise TypeError("Cannot generate B/Y fragments from non-Glycan {}".format(self.glycan))
 

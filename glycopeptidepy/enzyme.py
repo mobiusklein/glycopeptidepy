@@ -64,6 +64,14 @@ class Protease(object):
                                          is not None else sequence_length(sequence)))
         return sorted(set(peptides), key=_get1)
 
+    @classmethod
+    def combine(cls, *names):
+        patterns = merge_enzyme_rules(names)
+        name = ' + '.join(names)
+        instance = cls(patterns)
+        instance.name = name
+        return instance
+
 
 expasy_rules = {'arg-c': 'R',
                 'asp-n': '\\w(?=D)',

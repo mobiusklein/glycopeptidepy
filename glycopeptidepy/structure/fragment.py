@@ -12,6 +12,7 @@ _n_glycosylation = NGlycanCoreGlycosylation()
 _o_glycosylation = OGlycanCoreGlycosylation()
 _gag_linker_glycosylation = GlycosaminoglycanLinkerGlycosylation()
 _modification_hexnac = Modification("HexNAc").rule
+_modification_xylose = Modification("Xyl").rule
 
 fragment_pairing = {
     "a": "x",
@@ -160,7 +161,8 @@ class FragmentBase(object):
 
 
 class PeptideFragment(FragmentBase):
-    concerned_mods = [_n_glycosylation, _modification_hexnac, _o_glycosylation, _gag_linker_glycosylation]
+    concerned_mods = set([_n_glycosylation, _modification_hexnac, _o_glycosylation, _gag_linker_glycosylation,
+                          _modification_xylose])
 
     __slots__ = ("type", "position", "modification_dict", "bare_mass",
                  "golden_pairs", "flanking_amino_acids", "glycosylation",
@@ -250,11 +252,20 @@ class PeptideFragment(FragmentBase):
         name = ''.join(fragment_name)
         return name
 
+    @property
+    def is_glycosylated(self):
+        if self.glycosylation is not None:
+            return True
+        else:
+            for mod in self.modification_dict:
+                if mod in self.concerned_mods:
+                    return True
+        return False
+
     def partial_loss(self, modifications=None):
         if modifications is None:
             modifications = self.concerned_mods
         modifications = list(modifications)
-        modifications.append(_modification_hexnac)
         mods = dict(self.modification_dict)
         mods_of_interest = defaultdict(
             int, {k: v for k, v in mods.items() if k in modifications})
@@ -268,8 +279,11 @@ class PeptideFragment(FragmentBase):
 
         n_cores = mods_of_interest.pop(_n_glycosylation, 0)
         o_cores = mods_of_interest.pop(_o_glycosylation, 0)
-        # Allow partial destruction of N-glycan core
+        gag_cores = mods_of_interest.pop(_gag_linker_glycosylation, 0)
+
+        # Allow partial destruction of glycan core
         mods_of_interest[_modification_hexnac] += n_cores * 2 + o_cores
+        mods_of_interest[_modification_xylose] += gag_cores            
 
         other_mods = {k: v for k, v in mods.items() if k not in modifications}
         for varied_modifications in descending_combination_counter(mods_of_interest):
