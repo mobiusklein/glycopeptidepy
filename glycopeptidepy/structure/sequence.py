@@ -35,6 +35,16 @@ oxonium_ion_series = IonSeries.oxonium_ion
 stub_glycopeptide_series = IonSeries.stub_glycopeptide
 
 
+def remove_labile_modifications(residue):
+    has_copied = False
+    for position, substituent in residue.substituents():
+        if substituent.name in ("sulfate", "phosphate"):
+            if not has_copied:
+                residue = residue.clone(monosaccharide_type=MonosaccharideResidue)
+            residue.drop_substituent(position, substituent)
+    return residue
+
+
 def list_to_sequence(seq_list, wrap=True):
     flat_chunks = []
     for chunk in seq_list:
@@ -906,7 +916,7 @@ class PeptideSequence(PeptideSequenceBase):
                 mass += site['mass']
                 names += Counter(site['key'])
                 composition += site['composition']
-            extended_key = ''.join("%s%d" % kv for kv in names.items())
+            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
@@ -977,7 +987,7 @@ class PeptideSequence(PeptideSequenceBase):
                 mass += site['mass']
                 names += Counter(site['key'])
                 composition += site['composition']
-            extended_key = ''.join("%s%d" % kv for kv in names.items())
+            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
@@ -1052,6 +1062,7 @@ class PeptideSequence(PeptideSequenceBase):
                             }
                             core_shifts.append(shift)
             per_site_shifts.append(core_shifts)
+        seen = set()
         for positions in itertools.product(*per_site_shifts):
             key_base = 'peptide'
             names = Counter()
@@ -1061,9 +1072,12 @@ class PeptideSequence(PeptideSequenceBase):
                 mass += site['mass']
                 names += Counter(site['key'])
                 composition += site['composition']
-            extended_key = ''.join("%s%d" % kv for kv in names.items())
+            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
+            if key_base in seen:
+                continue
+            seen.add(key_base)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
 
 
@@ -1093,15 +1107,6 @@ class PeptideSequence(PeptideSequenceBase):
         _neuac = FrozenMonosaccharideResidue.from_iupac_lite("NeuAc")
 
         if oxonium:
-            def remove_labile_modifications(residue):
-                has_copied = False
-                for position, substituent in residue.substituents():
-                    if substituent.name in ("sulfate", "phosphate"):
-                        if not has_copied:
-                            residue = residue.clone(monosaccharide_type=MonosaccharideResidue)
-                        residue.drop_substituent(position, substituent)
-                return residue
-
             glycan = None
             if isinstance(self.glycan, Glycan):
                 glycan = FrozenGlycanComposition.from_glycan(self.glycan)

@@ -42,7 +42,7 @@ class Protease(object):
             self.regex = re.compile(name)
 
     def __repr__(self):
-        return "Protease(%s, %s)" % (self.name, self.regex)
+        return "Protease(%s, %s)" % (self.name, self.regex.pattern)
 
     def missed_cleavages(self, sequence):
         if isinstance(sequence, PeptideSequence):

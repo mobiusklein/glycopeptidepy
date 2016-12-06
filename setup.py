@@ -18,6 +18,7 @@ def run_setup(include_cext=True):
         packages=find_packages(),
         install_requires=required,
         include_package_data=True,
+        zip_safe=False,
         package_data={
             'glycopeptidepy': ["*.csv", "*.xml", "*.json", "data/*.csv"],
             'glycopeptidepy.structure': ["structure/data/*.csv", "structure/data/*.json"]
