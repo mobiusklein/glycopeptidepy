@@ -1,5 +1,5 @@
 import itertools
-from collections import defaultdict, deque, Counter
+from collections import Counter
 
 from . import PeptideSequenceBase, MoleculeBase
 from . import constants as structure_constants
@@ -26,7 +26,8 @@ from .glycan import (
     glycosylation_site_detectors, GlycanCompositionProxy)
 
 from ..utils.iterators import peekable
-from ..utils.collectiontools import descending_combination_counter
+from ..utils.collectiontools import (
+    descending_combination_counter, _AccumulatorBag)
 
 
 b_series = IonSeries.b
@@ -136,12 +137,12 @@ def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()):
         allow_modified = (Modification("Xyl"), Modification(_gag_linker_glycosylation))
     state = "seek"  # [seek, s, g1, x, g2]
     ser = Residue("Ser")
-    gly = Residue("Gly")
+    # gly = Residue("Gly")
 
     i = 0
     positions = []
 
-    s_position = None
+    # s_position = None
     if isinstance(sequence, basestring):
         sequence = PeptideSequence(sequence)
     while(i < len(sequence)):
@@ -217,7 +218,7 @@ class PeptideSequence(PeptideSequenceBase):
     ----------
     sequence: list
         The underlying container for positions in the amino acid sequence
-    modification_index: defaultdict(int)
+    modification_index: ModificationIndex
         A count of different modifications attached to the amino acid sequence
     n_term: Modification or Composition
     c_term: Modification or Composition
@@ -784,7 +785,6 @@ class PeptideSequence(PeptideSequenceBase):
     @property
     def glycosylation_sites(self):
         sites = find_n_glycosylation_sequons(self, structure_constants.ALLOW_MODIFIED_ASPARAGINE)
-        # sites += find_o_glycosylation_sequons(self)
         return sites
 
     def stub_fragments(self, extended=False):
@@ -909,12 +909,12 @@ class PeptideSequence(PeptideSequenceBase):
             per_site_shifts.append(core_shifts)
         for positions in itertools.product(*per_site_shifts):
             key_base = 'peptide'
-            names = Counter()
+            names = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
             for site in positions:
                 mass += site['mass']
-                names += Counter(site['key'])
+                names += (site['key'])
                 composition += site['composition']
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
@@ -951,11 +951,13 @@ class PeptideSequence(PeptideSequenceBase):
         for i in range(core_count):
             core_shifts = []
             for hexnac_count in range(3):
+                if glycan[hexnac] < hexnac_count:
+                    continue
                 if hexnac_count == 0:
                     shift = {
                         "mass": 0,
                         "composition": Composition(),
-                        "key": ""
+                        "key": {}
                     }
                     core_shifts.append(shift)
                 elif hexnac_count == 1:
@@ -966,6 +968,8 @@ class PeptideSequence(PeptideSequenceBase):
                     }
                     core_shifts.append(shift)
                     for hexose_count in range(1, 2):
+                        if glycan[hexose] < hexose_count:
+                            continue
                         shift = {
                             "mass": (
                                 (hexnac_count) * hexnac.mass()) + (
@@ -978,18 +982,30 @@ class PeptideSequence(PeptideSequenceBase):
                         }
                         core_shifts.append(shift)
             per_site_shifts.append(core_shifts)
+        seen = set()
         for positions in itertools.product(*per_site_shifts):
             key_base = 'peptide'
-            names = Counter()
+            names = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
             for site in positions:
                 mass += site['mass']
-                names += Counter(site['key'])
+                names += (site['key'])
                 composition += site['composition']
+            invalid = False
+            for key, value in names.items():
+                if glycan[key] < value:
+                    invalid = True
+                    break
+            if invalid:
+                continue
+
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
+            if key_base in seen:
+                continue
+            seen.add(key_base)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
 
     def gag_linker_stub_fragments(self, extended=False):
@@ -1020,7 +1036,7 @@ class PeptideSequence(PeptideSequenceBase):
                     shift = {
                         "mass": 0,
                         "composition": Composition(),
-                        "key": ""
+                        "key": {}
                     }
                     core_shifts.append(shift)
                 else:
@@ -1065,12 +1081,12 @@ class PeptideSequence(PeptideSequenceBase):
         seen = set()
         for positions in itertools.product(*per_site_shifts):
             key_base = 'peptide'
-            names = Counter()
+            names = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
             for site in positions:
                 mass += site['mass']
-                names += Counter(site['key'])
+                names += (site['key'])
                 composition += site['composition']
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
@@ -1079,7 +1095,6 @@ class PeptideSequence(PeptideSequenceBase):
                 continue
             seen.add(key_base)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
-
 
     def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,
                          include_large_glycan_fragments=True, maximum_fragment_size=5):
@@ -1286,7 +1301,7 @@ class FragmentationState(object):
     def configure_from_sequence_segment(self, segment):
         mass = 0.
         composition = Composition()
-        modification_dict = Counter()
+        modification_dict = ModificationIndex()
         for residue, modifications in segment:
             mass += residue.mass
             composition += residue.composition

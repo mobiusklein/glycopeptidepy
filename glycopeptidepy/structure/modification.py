@@ -30,6 +30,7 @@ class ModificationIndex(dict):
         except KeyError:
             return 0
 
+
 class SequenceLocation(Enum):
     anywhere = None
     n_term = -1
