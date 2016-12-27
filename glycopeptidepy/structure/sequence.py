@@ -38,11 +38,14 @@ stub_glycopeptide_series = IonSeries.stub_glycopeptide
 
 def remove_labile_modifications(residue):
     has_copied = False
-    for position, substituent in residue.substituents():
-        if substituent.name in ("sulfate", "phosphate"):
-            if not has_copied:
-                residue = residue.clone(monosaccharide_type=MonosaccharideResidue)
-            residue.drop_substituent(position, substituent)
+    try:
+        for position, substituent in residue.substituents():
+            if substituent.name in ("sulfate", "phosphate"):
+                if not has_copied:
+                    residue = residue.clone(monosaccharide_type=MonosaccharideResidue)
+                residue.drop_substituent(position, substituent)
+    except AttributeError:
+        pass
     return residue
 
 
@@ -812,6 +815,8 @@ class PeptideSequence(PeptideSequenceBase):
                 "Cannot infer monosaccharides from non-Glycan"
                 " or GlycanComposition {}").format(self.glycan))
         fucose_count = glycan['Fuc'] or glycan['dHex']
+        hexnac_in_aggregate = glycan['HexNAc']
+        hexose_in_aggregate = glycan["Hex"]
         core_count = self.modification_index[_n_glycosylation]
 
         per_site_shifts = []
@@ -872,9 +877,13 @@ class PeptideSequence(PeptideSequenceBase):
                         if i < fucose_count:
                             fucosylated = fucosylate_increment(shift)
                             core_shifts.append(fucosylated)
-                        if hexose_count == 3 and glycan["HexNAc"] > 2 * core_count and extended:
+
+                        # After the core motif has been exhausted, speculatively add
+                        # on the remaining core monosaccharides sequentially until
+                        # exhausted.
+                        if hexose_count == 3 and hexnac_in_aggregate > 2 * core_count and extended:
                             for extra_hexnac_count in range(0, 3):
-                                if extra_hexnac_count + hexnac_count > glycan["HexNAc"]:
+                                if extra_hexnac_count + hexnac_count > hexnac_in_aggregate:
                                     continue
                                 shift = {
                                     "mass": (
@@ -890,7 +899,7 @@ class PeptideSequence(PeptideSequenceBase):
                                     fucosylated = fucosylate_increment(shift)
                                     core_shifts.append(fucosylated)
                                 for extra_hexose_count in range(1, 3):
-                                    if extra_hexose_count + hexose_count > glycan["Hex"]:
+                                    if extra_hexose_count + hexose_count > hexose_in_aggregate:
                                         continue
                                     shift = {
                                         "mass": (
@@ -916,6 +925,13 @@ class PeptideSequence(PeptideSequenceBase):
                 mass += site['mass']
                 names += (site['key'])
                 composition += site['composition']
+            invalid = False
+            for key, value in names.items():
+                if glycan[key] < value:
+                    invalid = True
+                    break
+            if invalid:
+                continue
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
@@ -940,6 +956,9 @@ class PeptideSequence(PeptideSequenceBase):
         base_composition = self.peptide_composition()
         base_mass = base_composition.mass
 
+        hexnac_in_aggregate = glycan[hexnac]
+        hexose_in_aggregate = glycan[hexose]
+
         def fucosylate_increment(shift):
             fucosylated = shift.copy()
             fucosylated['key'] = fucosylated['key'].copy()
@@ -951,7 +970,7 @@ class PeptideSequence(PeptideSequenceBase):
         for i in range(core_count):
             core_shifts = []
             for hexnac_count in range(3):
-                if glycan[hexnac] < hexnac_count:
+                if hexnac_in_aggregate < hexnac_count:
                     continue
                 if hexnac_count == 0:
                     shift = {
@@ -960,15 +979,18 @@ class PeptideSequence(PeptideSequenceBase):
                         "key": {}
                     }
                     core_shifts.append(shift)
-                elif hexnac_count == 1:
+                elif hexnac_count >= 1:
                     shift = {
                         "mass": (hexnac_count * hexnac.mass()),
                         "composition": hexnac_count * hexnac.total_composition(),
                         "key": {"HexNAc": hexnac_count}
                     }
                     core_shifts.append(shift)
-                    for hexose_count in range(1, 2):
-                        if glycan[hexose] < hexose_count:
+                    if i < fucose_count:
+                        fucosylated = fucosylate_increment(shift)
+                        core_shifts.append(fucosylated)
+                    for hexose_count in range(0, 2):
+                        if hexose_in_aggregate < hexose_count:
                             continue
                         shift = {
                             "mass": (
@@ -980,7 +1002,45 @@ class PeptideSequence(PeptideSequenceBase):
                             "key": {"HexNAc": hexnac_count, "Hex": (
                                 hexose_count)}
                         }
-                        core_shifts.append(shift)
+                        if hexose_count > 0:
+                            core_shifts.append(shift)
+                            if i < fucose_count:
+                                fucosylated = fucosylate_increment(shift)
+                                core_shifts.append(fucosylated)
+                        # After the core motif has been exhausted, speculatively add
+                        # on the remaining core monosaccharides sequentially until
+                        # exhausted.
+                        if extended and hexnac_in_aggregate - hexnac_count >= 0:
+                            for extra_hexnac_count in range(hexnac_in_aggregate - hexnac_count):
+                                shift = {
+                                    "mass": (
+                                        (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                        (hexose_count) * hexose.mass()),
+                                    "composition": (
+                                        (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                        (hexose_count) * hexose.total_composition()),
+                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                        hexose_count)}
+                                }
+                                if i < fucose_count:
+                                    fucosylated = fucosylate_increment(shift)
+                                    core_shifts.append(fucosylated)
+                                if hexose_in_aggregate > hexose_count:
+                                    for extra_hexose_count in range(hexose_in_aggregate - hexose_count):
+                                        shift = {
+                                            "mass": (
+                                                (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                                (hexose_count + extra_hexose_count) * hexose.mass()),
+                                            "composition": (
+                                                (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                                (hexose_count + extra_hexose_count) * hexose.total_composition()),
+                                            "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                                hexose_count + extra_hexose_count)}
+                                        }
+                                        if i < fucose_count:
+                                            fucosylated = fucosylate_increment(shift)
+                                            core_shifts.append(fucosylated)
+
             per_site_shifts.append(core_shifts)
         seen = set()
         for positions in itertools.product(*per_site_shifts):
@@ -1000,7 +1060,7 @@ class PeptideSequence(PeptideSequenceBase):
             if invalid:
                 continue
 
-            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
+            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()) if kv[1] > 0)
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
             if key_base in seen:
@@ -1088,6 +1148,13 @@ class PeptideSequence(PeptideSequenceBase):
                 mass += site['mass']
                 names += (site['key'])
                 composition += site['composition']
+            invalid = False
+            for key, value in names.items():
+                if glycan[key] < value:
+                    invalid = True
+                    break
+            if invalid:
+                continue
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
@@ -1311,7 +1378,7 @@ class FragmentationState(object):
                 modification_dict[mod.rule] += 1
         self.current_fragment_composition = composition
         self.current_fragment_mass = mass
-        self.current_fragment_modifications = dict(modification_dict)
+        self.current_fragment_modifications = ModificationIndex(modification_dict)
 
     def get_flanking_amino_acids(self, front, back):
         return front[-1][0], back[0][0]

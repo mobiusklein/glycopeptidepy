@@ -56,7 +56,10 @@ class TypedGlycanComposition(HashableGlycanComposition):
         super(TypedGlycanComposition).__init__(self, *args, **kwargs)
 
     def as_modification(self):
-        return AnonymousModificationRule("Glycan[{0}]".format(';'.join(self.serialize(), self.mass)))()
+        return AnonymousModificationRule("Glycan[{0}]".format(';'.join(
+            self.serialize(),
+            self.mass,
+            self.glycosylation_type.name)))()
 
     def is_type(self, glycosylation_type):
         return self.glycosylation_type is GlycosylationType[glycosylation_type]

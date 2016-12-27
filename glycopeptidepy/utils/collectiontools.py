@@ -59,3 +59,6 @@ class _AccumulatorBag(object):
 
     def items(self):
         return self.store.items()
+
+    def __repr__(self):
+        return "_AccumulatorBag(%r)" % dict(self.store)
