@@ -9,8 +9,8 @@ R = residue.Residue
 
 
 p1 = "PEPTIDE"
-p2 = "YPVLN(NGlycanCoreGlycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
-p3 = "NEEYN(NGlycanCoreGlycosylation)K{Hex:5; HexNAc:4; NeuAc:2}"
+p2 = "YPVLN(N-Glycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
+p3 = "NEEYN(N-Glycosylation)K{Hex:5; HexNAc:4; NeuAc:2}"
 hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 

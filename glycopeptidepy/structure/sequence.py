@@ -319,10 +319,10 @@ class PeptideSequence(PeptideSequenceBase):
         self._peptide_composition = None
 
     def _patch_glycan_composition(self):
-        occupied_sites = 0
-        for mod in (_n_glycosylation, _o_glycosylation, _gag_linker_glycosylation):
-            occupied_sites += self.modification_index[mod]
-        offset = Composition({"H": 2, "O": 1}) * occupied_sites
+        # occupied_sites = 0
+        # for mod in (_n_glycosylation, _o_glycosylation, _gag_linker_glycosylation):
+        #     occupied_sites += self.modification_index[mod]
+        offset = Composition({"H": 2, "O": 1}) * 1
         self.glycan.composition_offset -= offset
 
     def __repr__(self):
