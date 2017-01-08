@@ -319,9 +319,6 @@ class PeptideSequence(PeptideSequenceBase):
         self._peptide_composition = None
 
     def _patch_glycan_composition(self):
-        # occupied_sites = 0
-        # for mod in (_n_glycosylation, _o_glycosylation, _gag_linker_glycosylation):
-        #     occupied_sites += self.modification_index[mod]
         offset = Composition({"H": 2, "O": 1}) * 1
         self.glycan.composition_offset -= offset
 
@@ -491,6 +488,10 @@ class PeptideSequence(PeptideSequenceBase):
 
     def get_fragments(self, kind, neutral_losses=None, **kwargs):
         """Return a list of mass values for each fragment of `kind`"""
+        if kind == stub_glycopeptide_series:
+            for frag in self.stub_fragments(True):
+                yield [frag]
+            raise StopIteration()
 
         mass_shift = 0.0
 
@@ -662,15 +663,12 @@ class PeptideSequence(PeptideSequenceBase):
                     position = self._fragment_index[len(self) - frags[0].position]
                     position.append(frags)
 
-    def get_sequence(self, start=0, include_glycan=True, include_termini=True,
-                     implicit_n_term=None, implicit_c_term=None):
+    def get_sequence(self, include_glycan=True, include_termini=True, implicit_n_term=None, implicit_c_term=None):
         """
         Generate human readable sequence string. Called by :meth:`__str__`
 
         Parameters
         ----------
-        start: int
-            The position to start from
         include_glycan: bool
             Whether to include the glycan in the resulting string. Defaults to `True`
         include_termini: bool
@@ -688,7 +686,7 @@ class PeptideSequence(PeptideSequenceBase):
             implicit_c_term = structure_constants.C_TERM_DEFAULT
 
         seq_list = []
-        for x, y in self.sequence[start:]:
+        for x, y in self.sequence:
             mod_str = ''
             if y:
                 mod_str = '|'.join(mod.serialize() for mod in y)

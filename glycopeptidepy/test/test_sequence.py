@@ -4,7 +4,7 @@ from glycopeptidepy.structure import sequence, modification, residue, compositio
 from glypy import GlycanComposition, Glycan, MonosaccharideResidue
 
 
-PROTON = composition.Composition("H").mass
+HYDROGEN = composition.Composition("H").mass
 R = residue.Residue
 
 
@@ -30,13 +30,13 @@ class TestPeptideSequence(unittest.TestCase):
     def test_fragmentation(self):
         seq = sequence.parse(p1)
         mapping = {
-            "b3": 324.1554 - PROTON,
-            "b6": 653.3141 - PROTON,
-            "y2": 263.0874 - PROTON,
-            "y5": 574.2719 - PROTON,
-            "a4": 397.2082 - PROTON,
-            "a5": 510.2922 - PROTON,
-            "z3": 360.1527 - PROTON * 2,
+            "b3": 324.1554 - HYDROGEN,
+            "b6": 653.3141 - HYDROGEN,
+            "y2": 263.0874 - HYDROGEN,
+            "y5": 574.2719 - HYDROGEN,
+            "a4": 397.2082 - HYDROGEN,
+            "a5": 510.2922 - HYDROGEN,
+            "z3": 360.1527 - HYDROGEN * 2,
         }
         for fragment, mass in mapping.items():
             fmass = seq.fragment(fragment).mass
