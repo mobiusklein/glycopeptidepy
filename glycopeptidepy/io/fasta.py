@@ -1,6 +1,6 @@
 import re
 import textwrap
-
+import warnings
 from glycopeptidepy.structure.sequence import ProteinSequence
 
 
@@ -34,10 +34,13 @@ class FastaFileParser(object):
                     self.sequence_chunks.append(re.sub(r"[\n\r]", "", line))
                 else:
                     if self.defline is not None:
-                        yield self.process_result({
-                            "name": self.defline,
-                            "sequence": ''.join(self.sequence_chunks)
-                        })
+                        try:
+                            yield self.process_result({
+                                "name": self.defline,
+                                "sequence": ''.join(self.sequence_chunks)
+                            })
+                        except Exception as e:
+                            warnings.warn("%s occured for %s" % (e, self.defline))
                     self.sequence_chunks = []
                     self.defline = None
                     self.state = 'defline'
@@ -46,7 +49,10 @@ class FastaFileParser(object):
                         self.state = "sequence"
 
         if len(self.sequence_chunks) > 0:
-            yield self.process_result({"name": self.defline, "sequence": ''.join(self.sequence_chunks)})
+            try:
+                yield self.process_result({"name": self.defline, "sequence": ''.join(self.sequence_chunks)})
+            except Exception as e:
+                warnings.warn("%s occured for %s" % (e, self.defline))
 
 
 class ProteinFastaFileParser(FastaFileParser):
