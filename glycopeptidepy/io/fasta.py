@@ -11,6 +11,7 @@ def tryopen(path):
 
 
 class FastaFileParser(object):
+    handled_exceptions = (Exception)
 
     def __init__(self, path):
         self.state = "defline"
@@ -39,8 +40,8 @@ class FastaFileParser(object):
                                 "name": self.defline,
                                 "sequence": ''.join(self.sequence_chunks)
                             })
-                        except Exception as e:
-                            warnings.warn("%s occured for %s" % (e, self.defline))
+                        except self.handled_exceptions as e:
+                            pass
                     self.sequence_chunks = []
                     self.defline = None
                     self.state = 'defline'
@@ -51,8 +52,8 @@ class FastaFileParser(object):
         if len(self.sequence_chunks) > 0:
             try:
                 yield self.process_result({"name": self.defline, "sequence": ''.join(self.sequence_chunks)})
-            except Exception as e:
-                warnings.warn("%s occured for %s" % (e, self.defline))
+            except self.handled_exceptions as e:
+                pass
 
 
 class ProteinFastaFileParser(FastaFileParser):
