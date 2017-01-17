@@ -1220,9 +1220,13 @@ class PeptideSequence(PeptideSequenceBase):
                     kind=oxonium_ion_series)
             for i in range(2, 4):
                 for kk in itertools.combinations_with_replacement(sorted(glycan, key=str), i):
+                    invalid = False
                     for k, v in Counter(kk).items():
                         if glycan[k] < v:
-                            continue
+                            invalid = True
+                            break
+                    if invalid:
+                        continue
                     kk = list(map(remove_labile_modifications, kk))
                     key = ''.join(map(str, kk))
                     mass = sum(k.mass() for k in kk)

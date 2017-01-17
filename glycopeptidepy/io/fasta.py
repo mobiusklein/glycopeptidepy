@@ -1,6 +1,9 @@
 import re
 import textwrap
 import warnings
+
+from collections import OrderedDict
+
 from glycopeptidepy.structure.sequence import ProteinSequence
 
 
@@ -10,19 +13,149 @@ def tryopen(path):
     return open(path)
 
 
-class FastaFileParser(object):
-    handled_exceptions = (Exception)
+class FastaHeader(object):
+    def __init__(self, mapping, original=None):
+        self.mapping = mapping
+        if original is None:
+            self.defline = self._make_defline()
+        else:
+            self.defline = original
 
-    def __init__(self, path):
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __iter__(self):
+        return iter(self.mapping)
+
+    def items(self):
+        return self.mapping.items()
+
+    def keys(self):
+        return self.mapping.keys()
+
+    def __contains__(self, key):
+        return key in self.mapping
+
+    def __getattr__(self, key):
+        try:
+            return self.mapping[key]
+        except KeyError:
+            raise AttributeError(key)
+
+    def __str__(self):
+        return self.defline
+
+    def __repr__(self):
+        return "{self.__class__.__name__}({self.mapping})".format(self=self)
+
+    def _make_defline(self):
+        raise NotImplementedError()
+
+    def __hash__(self):
+        return hash(self.defline)
+
+    def __eq__(self, other):
+        return str(self) == str(other)
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class UnparsableDeflineError(Exception):
+    pass
+
+
+class DefLineParserBase(object):
+    def __call__(self, defline):
+        if defline.startswith(">"):
+            defline = defline[1:]
+        return FastaHeader(self.parse(defline), defline)
+
+    def parse(self, defline):
+        raise NotImplementedError()
+
+
+class CallableDefLineParser(DefLineParserBase):
+    def __init__(self, callable_obj):
+        self.callable_obj = callable_obj
+
+    def parse(self, defline):
+        return OrderedDict(enumerate(self.callable_obj(defline)))
+
+
+def split_on_whitespace(string):
+    return re.split("\s+", string)
+
+
+space_delim_parser = CallableDefLineParser(split_on_whitespace)
+
+
+class RegexDefLineParser(DefLineParserBase):
+    def __init__(self, pattern):
+        self.pattern = re.compile(pattern)
+        self._is_keyed = "?P<" in pattern
+
+    def parse(self, defline):
+        match = self.pattern.search(defline)
+        if match:
+            if not self._is_keyed:
+                return OrderedDict(enumerate(match.groups()))
+            else:
+                return (match.groupdict())
+        else:
+            raise UnparsableDeflineError(defline)
+
+
+class DispatchingDefLineParser(DefLineParserBase):
+    def __init__(self, patterns, graceful=False, header_type=FastaHeader):
+        self.parsers = patterns
+        self.graceful = graceful
+
+    def parse(self, defline):
+        for parser in self.parsers:
+            try:
+                parts = parser.parse(defline)
+                return parts
+            except UnparsableDeflineError:
+                continue
+        else:
+            if self.graceful:
+                return defline
+            else:
+                raise UnparsableDeflineError(defline)
+
+
+uniprot_regex = r"(?P<db>[a-z^\|]+)\|(?P<accession>[A-Z0-9]+)\|(?P<name>\S+)(?:\s(?P<description>.+))?"
+uniprot_parser = RegexDefLineParser(uniprot_regex)
+
+
+default_parser = DispatchingDefLineParser([uniprot_parser, space_delim_parser])
+
+
+class FastaFileParser(object):
+    def __init__(self, path, defline_parser=default_parser):
         self.state = "defline"
         self.handle = tryopen(path)
         self.defline = None
         self.sequence_chunks = []
+        self.defline_parser = defline_parser
+        self._generator = None
 
     def process_result(self, d):
         return d
 
     def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._generator is None:
+            self._generator = self._parse_lines()
+        return next(self._generator)
+
+    def next(self):
+        return self.__next__()
+
+    def _parse_lines(self):
         for line in self.handle:
             if self.state == 'defline':
                 if line[0] == ">":
@@ -37,10 +170,11 @@ class FastaFileParser(object):
                     if self.defline is not None:
                         try:
                             yield self.process_result({
-                                "name": self.defline,
+                                "name": self.defline_parser(self.defline),
                                 "sequence": ''.join(self.sequence_chunks)
                             })
-                        except self.handled_exceptions as e:
+                        except KeyError as e:
+                            print(e)
                             pass
                     self.sequence_chunks = []
                     self.defline = None
@@ -51,15 +185,15 @@ class FastaFileParser(object):
 
         if len(self.sequence_chunks) > 0:
             try:
-                yield self.process_result({"name": self.defline, "sequence": ''.join(self.sequence_chunks)})
-            except self.handled_exceptions as e:
+                yield self.process_result({"name": self.defline_parser(self.defline), "sequence": ''.join(self.sequence_chunks)})
+            except Exception as e:
                 pass
 
 
 class ProteinFastaFileParser(FastaFileParser):
 
-    def __init__(self, path):
-        super(ProteinFastaFileParser, self).__init__(path)
+    def __init__(self, path, defline_parser=default_parser):
+        super(ProteinFastaFileParser, self).__init__(path, defline_parser)
 
     def process_result(self, d):
         p = ProteinSequence(d['name'], d['sequence'])

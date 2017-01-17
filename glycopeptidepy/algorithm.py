@@ -55,5 +55,6 @@ def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=N
         rev_sequence = (list_to_sequence(pref + list(rot_body) + suf))
     rev_sequence.n_term = original.n_term
     rev_sequence.c_term = original.c_term
-    rev_sequence.glycan = original.glycan.clone(propogate_composition_offset=False)
+    if original.glycan:
+        rev_sequence.glycan = original.glycan.clone(propogate_composition_offset=False)
     return rev_sequence
