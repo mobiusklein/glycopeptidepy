@@ -499,7 +499,7 @@ class AnonymousModificationRule(ModificationRule):
     "...(@{name}-{mass})..."
 
     '''
-    parser = re.compile(r"@(?P<name>.+?)-(?P<mass>[0-9\.]+)")
+    parser = re.compile(r"@(?P<name>.+?)-(?P<mass>-?[0-9\.]+)")
 
     @classmethod
     def try_parse(cls, rule_string):
@@ -536,8 +536,7 @@ class AnonymousModificationRule(ModificationRule):
         return dup
 
     def __repr__(self):
-        rep = "{name}:{mass}".format(
-            **self.__dict__)
+        rep = "{name}:{mass}".format(name=self.name, mass=self.mass)
         return rep
 
 
