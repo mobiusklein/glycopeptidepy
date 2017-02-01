@@ -916,6 +916,17 @@ class ModificationTable(ModificationSource):
 
         self._include_other_rules()
 
+    def __len__(self):
+        return len(self.store) + len(self._custom_rules) + len(self.other_modifications)
+
+    def __iter__(self):
+        for key in iter(self.store):
+            yield key
+        for key in iter(self.other_modifications):
+            yield key
+        for key in iter(self._custom_rules):
+            yield key
+
     def _include_other_rules(self):
         for name, rule in self.other_modifications.items():
             self.add(rule)
