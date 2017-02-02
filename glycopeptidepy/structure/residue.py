@@ -247,7 +247,7 @@ class AminoAcidResidue(ResidueBase):
             return self.name != other and self.symbol != other
 
     def __getstate__(self):
-        return [self.name, self.symbol, self.mass, self.neutral_loss, self.composition]
+        return [self.name, self.symbol, self.mass, self.composition, self.neutral_loss]
 
     def __setstate__(self, state):
         self.name = state[0]

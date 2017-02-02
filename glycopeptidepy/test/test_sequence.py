@@ -1,4 +1,5 @@
 import unittest
+import pickle
 
 from glycopeptidepy.structure import sequence, modification, residue, composition
 from glypy import GlycanComposition, Glycan, MonosaccharideResidue
@@ -75,6 +76,13 @@ class TestPeptideSequence(unittest.TestCase):
         p.drop_modification(1, "Deamidated")
 
         self.assertAlmostEqual(p.mass, ref_mass, 5)
+
+    def test_picklability(self):
+        original = sequence.parse(p3)
+        duplicate = pickle.loads(pickle.dumps(original))
+        self.assertEqual(
+            sequence._total_composition(original),
+            sequence._total_composition(duplicate))
 
 
 if __name__ == '__main__':
