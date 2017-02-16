@@ -1,6 +1,8 @@
 import itertools
 from collections import Counter
 
+from six import string_types as basestring
+
 from . import PeptideSequenceBase, MoleculeBase
 from . import constants as structure_constants
 

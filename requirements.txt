@@ -1,2 +1,4 @@
 glypy
 pyteomics>=3.0
+six
+lxml

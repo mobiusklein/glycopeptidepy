@@ -92,7 +92,6 @@ class FragmentBase(object):
         The ion ladder this fragment is derived from
 
     """
-    _neutral_loss = None
 
     __slots__ = ("_neutral_loss", "_name", "_hash")
 
@@ -311,11 +310,12 @@ class PeptideFragment(FragmentBase):
 
 
 class SimpleFragment(FragmentBase):
-    __slots__ = ["name", "mass", "kind", "composition", "neutral_loss"]
+    __slots__ = ["name", "mass", "kind", "composition", "_neutral_loss"]
 
     def __init__(self, name, mass, kind, composition, neutral_loss=None):
         self._name = None
         self._hash = None
+        self._neutral_loss = None
         self.name = name
         self.mass = mass
         self.kind = kind

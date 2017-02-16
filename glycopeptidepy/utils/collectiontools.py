@@ -3,7 +3,7 @@ import itertools
 
 try:
     range = xrange
-except Exception, e:
+except Exception:
     pass
 
 

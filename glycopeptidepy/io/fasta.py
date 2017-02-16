@@ -15,30 +15,32 @@ def tryopen(path):
 
 class FastaHeader(object):
     def __init__(self, mapping, original=None):
-        self.mapping = mapping
+        self._mapping = mapping
         if original is None:
             self.defline = self._make_defline()
         else:
             self.defline = original
 
     def __getitem__(self, key):
-        return self.mapping[key]
+        return self._mapping[key]
 
     def __iter__(self):
-        return iter(self.mapping)
+        return iter(self._mapping)
 
     def items(self):
-        return self.mapping.items()
+        return self._mapping.items()
 
     def keys(self):
-        return self.mapping.keys()
+        return self._mapping.keys()
 
     def __contains__(self, key):
-        return key in self.mapping
+        return key in self._mapping
 
     def __getattr__(self, key):
+        if key == "_mapping":
+            raise AttributeError(key)
         try:
-            return self.mapping[key]
+            return self._mapping[key]
         except KeyError:
             raise AttributeError(key)
 
@@ -46,7 +48,7 @@ class FastaHeader(object):
         return self.defline
 
     def __repr__(self):
-        return "{self.__class__.__name__}({self.mapping})".format(self=self)
+        return "{self.__class__.__name__}({self._mapping})".format(self=self)
 
     def _make_defline(self):
         raise NotImplementedError()

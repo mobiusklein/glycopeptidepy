@@ -9,7 +9,7 @@ class peekable(Iterable):
     def __init__(self, iterable):
         self.iterable = iter(iterable)
         try:
-            self._lookahead = self.iterable.next()
+            self._lookahead = next(self.iterable)
         except StopIteration:
             self._lookahead = sentinel
 
@@ -31,7 +31,7 @@ class peekable(Iterable):
             self._lookahead = x
         if i > 0:
             yield val, x
-        raise StopIteration()
+        return
 
     @property
     def peek(self):

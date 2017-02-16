@@ -26,6 +26,13 @@ class UniProtFeatureBase(object):
         return self.description.split("; ")
 
 
+class Keyword(str):
+    def __new__(cls, content, idstr):
+        obj = str.__new__(cls, content)
+        obj.id = idstr
+        return obj
+
+
 class SignalPeptide(UniProtFeatureBase):
     feature_type = 'signal peptide'
 
@@ -156,7 +163,9 @@ class GlycosylationSite(UniProtFeatureBase):
         return cls(position, glycosylation_type)
 
 
-UniProtProtein = make_struct("UniProtProtein", ("sequence", "features", "recommended_name", "gene_name", "names", "accessions"))
+UniProtProtein = make_struct("UniProtProtein", (
+    "sequence", "features", "recommended_name", "gene_name", "names", "accessions",
+    "keywords"))
 
 
 def get_etree_for(accession):
@@ -208,7 +217,11 @@ def get_features_for(accession, error=False):
                 features.append(Site.fromxml(tag))
         except exc_type as e:
             print(e, feature_type, accession, etree.tostring(tag))
-    return UniProtProtein(seq, features, recommended_name, gene_name, names, accessions)
+    keywords = set()
+    for kw in tree.findall(".//{http://uniprot.org/uniprot}keyword"):
+        keywords.add(Keyword(kw.text, kw.attrib['id']))
+    return UniProtProtein(
+        seq, features, recommended_name, gene_name, names, accessions, keywords)
 
 
 get = get_features_for

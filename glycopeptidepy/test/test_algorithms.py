@@ -3,7 +3,7 @@ import unittest
 from glycopeptidepy.structure import sequence
 from glycopeptidepy.algorithm import reverse_preserve_sequon
 
-p2 = "YPVLN(NGlycanCoreGlycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
+p2 = "YPVLN(N-Glycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
 
 
 class TestReversePreserveSequonTarget(unittest.TestCase):

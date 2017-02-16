@@ -21,8 +21,8 @@ def pair_rotate(sequence):
     while True:
         chunk = []
         try:
-            chunk = [gen.next()]
-            chunk.append(gen.next())
+            chunk = [next(gen)]
+            chunk.append(next(gen))
             chunks.append(chunk)
         except StopIteration:
             if len(chunk) > 0:

@@ -4,6 +4,9 @@ from copy import deepcopy
 import re
 from pkg_resources import resource_stream
 
+from six import string_types as basestring
+from io import StringIO
+
 from collections import defaultdict
 from collections import Iterable
 from glypy.composition.glycan_composition import (
@@ -133,7 +136,7 @@ def get_position_modifier_rules_dict(sequence):
     ------
     defaultdict
     '''
-    return defaultdict(lambda: SequenceLocation.anywhere, **{
+    return defaultdict(lambda: SequenceLocation.anywhere, {
         0: SequenceLocation.n_term,
         (len(sequence) - 1): SequenceLocation.c_term
     })
@@ -822,14 +825,16 @@ def load_from_csv(stream):
 
 def load_from_json(stream):
     modification_definitions = []
-    modification_definitions = map(ModificationRule.from_unimod, json.load(stream))
+    modification_definitions = list(map(ModificationRule.from_unimod, json.load(stream)))
     return modification_definitions
 
 
 class ModificationSource(object):
-    _table_definition_file = staticmethod(lambda: resource_stream(__name__,
-                                                                  "data/ProteinProspectorModifications-for_gly2.csv"))
-    _unimod_definitions = staticmethod(lambda: resource_stream(__name__, "data/unimod.json"))
+    _table_definition_file = staticmethod(lambda: StringIO(
+        resource_stream(__name__, "data/ProteinProspectorModifications-for_gly2.csv").read(
+        ).decode("utf-8")))
+    _unimod_definitions = staticmethod(lambda: StringIO(
+        resource_stream(__name__, "data/unimod.json").read().decode('utf-8')))
 
     use_protein_prospector = True
 
