@@ -46,6 +46,7 @@ class TestPeptideSequence(unittest.TestCase):
 
     def test_stub_ions(self):
         peptide = sequence.parse(p3)
+        composition = peptide.total_composition()
         stubs = sorted({f.mass for f in peptide.stub_fragments()})
         self.assertAlmostEqual(stubs[0], 795.3399, 3)
         self.assertAlmostEqual(stubs[1], 998.4193, 3)
@@ -53,6 +54,7 @@ class TestPeptideSequence(unittest.TestCase):
         self.assertAlmostEqual(stubs[3], 1363.5515, 3)
         self.assertAlmostEqual(stubs[4], 1525.6043, 3)
         self.assertAlmostEqual(stubs[5], 1687.6571, 3)
+        self.assertEqual(composition, peptide.total_composition())
 
     def test_glycan_fragments_stubs(self):
         peptide = sequence.parse(p3)

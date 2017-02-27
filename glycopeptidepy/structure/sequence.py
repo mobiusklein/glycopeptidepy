@@ -708,7 +708,8 @@ class PeptideSequence(PeptideSequenceBase):
                 rep += str(self._glycan)
         return rep
 
-    __str__ = get_sequence
+    def __str__(self):
+        return self.get_sequence()
 
     def clone(self):
         inst = self.__class__()
@@ -1318,7 +1319,11 @@ class PeptideSequence(PeptideSequenceBase):
 
     def peptide_composition(self):
         if self._peptide_composition is None:
-            self._peptide_base_composition = self.total_composition() - self.glycan.total_composition()
+            if self.glycan is None:
+                glycan_composition = Composition()
+            else:
+                glycan_composition = self.glycan.total_composition()
+            self._peptide_base_composition = self.total_composition() - glycan_composition
         return self._peptide_base_composition
 
     def total_composition(self):

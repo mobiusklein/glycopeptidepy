@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-
+from six import add_metaclass
 from .modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation)
@@ -282,7 +282,7 @@ class PeptideFragment(FragmentBase):
 
         # Allow partial destruction of glycan core
         mods_of_interest[_modification_hexnac] += n_cores * 2 + o_cores
-        mods_of_interest[_modification_xylose] += gag_cores            
+        mods_of_interest[_modification_xylose] += gag_cores
 
         other_mods = {k: v for k, v in mods.items() if k not in modifications}
         for varied_modifications in descending_combination_counter(mods_of_interest):
@@ -407,8 +407,9 @@ class MemoizedIonSeriesMetaclass(type):
                 raise KeyError("Cannot find an IonSeries for %r" % (name))
 
 
+@add_metaclass(MemoizedIonSeriesMetaclass)
 class IonSeries(object):
-    __metaclass__ = MemoizedIonSeriesMetaclass
+    # __metaclass__ = MemoizedIonSeriesMetaclass
 
     @classmethod
     def get(cls, name):
