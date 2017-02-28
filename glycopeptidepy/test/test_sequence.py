@@ -16,7 +16,7 @@ hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
 
-class TestPeptideSequence(unittest.TestCase):
+class TestSequenceParser(unittest.TestCase):
     def test_parser(self):
         chunks, mods, glycan, n_term, c_term = sequence.sequence_tokenizer(p1)
         self.assertEqual(len(mods), 0)
@@ -28,8 +28,13 @@ class TestPeptideSequence(unittest.TestCase):
         self.assertEqual(len(mods), 2)
         self.assertEqual(len(chunks), 16)
 
+
+class PeptideSequenceSuiteBase(object):
+    def parse_sequence(self, seqstr):
+        raise NotImplementedError()
+
     def test_fragmentation(self):
-        seq = sequence.parse(p1)
+        seq = self.parse_sequence(p1)
         mapping = {
             "b3": 324.1554 - HYDROGEN,
             "b6": 653.3141 - HYDROGEN,
@@ -45,7 +50,7 @@ class TestPeptideSequence(unittest.TestCase):
             self.assertAlmostEqual(mass, seq.fragment(fragment).total_composition().mass, 2, (mass, fmass, fragment))
 
     def test_stub_ions(self):
-        peptide = sequence.parse(p3)
+        peptide = self.parse_sequence(p3)
         composition = peptide.total_composition()
         stubs = sorted({f.mass for f in peptide.stub_fragments()})
         self.assertAlmostEqual(stubs[0], 795.3399, 3)
@@ -57,7 +62,7 @@ class TestPeptideSequence(unittest.TestCase):
         self.assertEqual(composition, peptide.total_composition())
 
     def test_glycan_fragments_stubs(self):
-        peptide = sequence.parse(p3)
+        peptide = self.parse_sequence(p3)
         stubs = {f.name: f.mass for f in peptide.glycan_fragments(all_series=True, allow_ambiguous=True)}
         self.assertAlmostEqual(stubs["peptide+{Hex:3; HexNAc:2}"], 1687.6571, 3)
         self.assertAlmostEqual(stubs["peptide+{Hex:3; HexNAc:3}"],
@@ -66,25 +71,42 @@ class TestPeptideSequence(unittest.TestCase):
                                1687.6571 + hexnac_mass + hexose_mass, 3)
 
     def test_clone(self):
-        peptide = sequence.parse(p3)
+        peptide = self.parse_sequence(p3)
         self.assertEqual(peptide, peptide.clone())
+        self.assertEqual(peptide.total_mass, peptide.clone().total_mass)
+        self.assertEqual(peptide.total_composition(), peptide.clone().total_composition())
+        self.assertTrue(peptide.full_structure_equality(peptide.clone()))
 
     def test_add_remove_modification(self):
-        p = sequence.parse("ENGTISR")
+        p = self.parse_sequence("ENGTISR")
         ref_mass = p.mass
         p.add_modification(1, "Deamidated")
-        self.assertAlmostEqual(sequence.parse(str(p)).mass, p.mass, 5)
+        self.assertAlmostEqual(self.parse_sequence(str(p)).mass, p.mass, 5)
 
         p.drop_modification(1, "Deamidated")
 
         self.assertAlmostEqual(p.mass, ref_mass, 5)
 
     def test_picklability(self):
-        original = sequence.parse(p3)
+        original = self.parse_sequence(p3)
         duplicate = pickle.loads(pickle.dumps(original))
         self.assertEqual(
             sequence._total_composition(original),
             sequence._total_composition(duplicate))
+        self.assertEqual(original, duplicate)
+        self.assertEqual(original.total_mass, duplicate.total_mass)
+        self.assertEqual(original.total_composition(), duplicate.total_composition())
+        self.assertTrue(original.full_structure_equality(duplicate))
+
+
+class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
+    def parse_sequence(self, seqstr):
+        return sequence.PeptideSequence(seqstr)
+
+
+class TestNamedSequence(PeptideSequenceSuiteBase, unittest.TestCase):
+    def parse_sequence(self, seqstr):
+        return sequence.NamedSequence("spam", seqstr)
 
 
 if __name__ == '__main__':

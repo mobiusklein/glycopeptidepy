@@ -712,13 +712,7 @@ class PeptideSequence(PeptideSequenceBase):
         return self.get_sequence()
 
     def clone(self):
-        inst = self.__class__()
-        inst.n_term = self.n_term.clone()
-        inst.c_term = self.c_term.clone()
-        inst.sequence = [self.position_class([o[0], list(o[1])]) for o in self]
-        inst.mass = self.mass
-        if self.glycan is not None:
-            inst.glycan = self.glycan.clone()
+        inst = self.__class__(sequence=str(self))
         return inst
 
     def insert(self, position, residue, modifications=None):
