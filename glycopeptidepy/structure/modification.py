@@ -58,8 +58,36 @@ SequenceLocation.protein_c_term.add_name("Protein C-Term")
 
 
 class ModificationCategory(Enum):
+    unknown = None
     glycosylation = 1
     artefact = 2
+    substitution = 3
+    chemical_derivative = 4
+    non_standard_residue = 5
+    isotopic_label = 6
+    post_translational = 7
+    other = 8
+    other_glycosylation = 9
+    multiple = 10
+    pre_translational = 11
+    co_translational = 12
+    synthetic_peptide_protect = 13
+
+
+ModificationCategory.substitution.add_name("AA substitution")
+ModificationCategory.other_glycosylation.add_name("Other glycosylation")
+ModificationCategory.glycosylation.add_name("N-linked glycosylation")
+ModificationCategory.glycosylation.add_name("O-linked glycosylation")
+ModificationCategory.chemical_derivative.add_name("Chemical derivative")
+ModificationCategory.post_translational.add_name("Post-translational")
+ModificationCategory.multiple.add_name("Multiple")
+ModificationCategory.artefact.add_name("Artefact")
+ModificationCategory.isotopic_label.add_name("Isotopic label")
+ModificationCategory.other.add_name("Other")
+ModificationCategory.pre_translational.add_name("Pre-translational")
+ModificationCategory.non_standard_residue.add_name("Non-standard residue")
+ModificationCategory.co_translational.add_name("Co-translational")
+ModificationCategory.synthetic_peptide_protect.add_name("Synth. pep. protect. gp.")
 
 
 def composition_delta_parser(formula):
@@ -168,19 +196,26 @@ class ModificationTarget(object):
         else:
             amino_acid = {Residue(amino_acid)}
         position_modifier = specificity["position"]
+        nterm = ("Protein N-term", "Any N-term", "N-term")
+        cterm = ("Protein C-term", "Any C-term", "C-term")
+        site = specificity["site"]
+        classification = ModificationCategory[specificity.get("classification")]
         if position_modifier == "Anywhere":
             position_modifier = SequenceLocation.anywhere
-        elif position_modifier == "Protein N-term" or position_modifier == "Any N-term":
+        if position_modifier in nterm or site in nterm:
             position_modifier = SequenceLocation.n_term
-        elif position_modifier == "Protein C-term" or position_modifier == "Any C-term":
+        elif position_modifier in cterm or site in cterm:
             position_modifier = SequenceLocation.c_term
-        else:
-            raise Exception("Undefined Position, " + position_modifier)
-        return cls(amino_acid, position_modifier)
+        # elif position_modifier :
+        #     raise Exception("Undefined Position, " + str(position_modifier))
+        return cls(amino_acid, position_modifier, [classification])
 
-    def __init__(self, site_targets=None, position_modifier=None):
-        self.amino_acid_targets = site_targets
+    def __init__(self, site_targets=None, position_modifier=None, classification=None):
+        if classification is None:
+            classification = []
+        self.amino_acid_targets = frozenset(map(Residue, site_targets)) if site_targets is not None else None
         self.position_modifier = position_modifier
+        self.classification = classification
 
     def valid_site(self, amino_acid=None, position_modifier=SequenceLocation.anywhere):
         '''Return if a given residue at a sequence position (N-term, C-term, None)
@@ -208,8 +243,10 @@ class ModificationTarget(object):
         return self.valid_site(amino_acid, position_modifier)
 
     def __repr__(self):
+        amino_acid_components = "{%s}" % ', '.join(map(str, self.amino_acid_targets or ()))
         rep = "{amino_acid_targets}@{position_modifier}".format(
-            **self.__dict__)
+            amino_acid_targets=amino_acid_components,
+            position_modifier=self.position_modifier)
         return rep
 
     def __eq__(self, other):
@@ -226,6 +263,29 @@ class ModificationTarget(object):
         if self.amino_acid_targets is not None:
             amino_acid_targets_count = len(self.amino_acid_targets)
         return amino_acid_targets_count + position_modifiers_count
+
+    def serialize(self):
+        parts = []
+        if self.amino_acid_targets is not None:
+            parts.append(''.join(aa.symbol for aa in self.amino_acid_targets))
+            if self.position_modifier == SequenceLocation.anywhere:
+                pass
+            else:
+                parts.append("@")
+        if self.position_modifier in (SequenceLocation.protein_n_term, SequenceLocation.n_term):
+            parts.append("N-term")
+        if self.position_modifier in (SequenceLocation.protein_c_term, SequenceLocation.c_term):
+            parts.append("C-term")
+        return " ".join(parts)
+
+
+class ModificationNeutralLoss(object):
+    def __init__(self, composition):
+        self.composition = Composition(composition)
+        self.mass = self.composition.mass
+
+    def __repr__(self):
+        return "ModificationNeutralLoss(%s)" % self.composition
 
 
 class ModificationRule(object):
@@ -276,7 +336,10 @@ class ModificationRule(object):
 
     @classmethod
     def from_protein_prospector(cls, amino_acid_specificity, modification_name,
-                                title=None, monoisotopic_mass=None):
+                                title=None, monoisotopic_mass=None,
+                                neutral_losses=None):
+        if neutral_losses is None:
+            neutral_losses = []
         # If the specificity is a string, parse it into rules
         targets = None
         if isinstance(amino_acid_specificity, basestring):
@@ -296,7 +359,8 @@ class ModificationRule(object):
                 isinstance(iter(amino_acid_specificity).next(), ModificationTarget):
             targets = set(amino_acid_specificity)
 
-        return cls(targets, modification_name, title, monoisotopic_mass)
+        return cls(targets, modification_name, title, monoisotopic_mass,
+                   neutral_losses=neutral_losses)
 
     @classmethod
     def from_unimod(cls, unimod_entry):
@@ -313,12 +377,17 @@ class ModificationRule(object):
 
     def __init__(self, amino_acid_specificity, modification_name,
                  title=None, monoisotopic_mass=None, composition=None,
-                 categories=None, alt_names=None, **kwargs):
+                 categories=None, alt_names=None, neutral_losses=None,
+                 **kwargs):
+        if neutral_losses is None:
+            neutral_losses = []
+        if categories is None:
+            categories = []
         # Attempt to parse the protein prospector name which contains the
         # target in
         try:
             self.common_name = title_cleaner.search(title).groupdict()['name']
-        except:
+        except Exception:
             self.common_name = modification_name
 
         if alt_names is None:
@@ -329,7 +398,7 @@ class ModificationRule(object):
         self.title = title if title is not None else modification_name
         self.composition = composition
         self.names = {self.unimod_name, self.common_name, self.title} | alt_names
-        self.categories = categories or []
+        self.categories = set(categories)
         self.options = kwargs
         self._n_term_target = None
         self._c_term_target = None
@@ -358,6 +427,10 @@ class ModificationRule(object):
         else:
             raise ValueError("Could not interpret target specificity from %r" % (
                 amino_acid_specificity,))
+        self.neutral_losses = neutral_losses
+        for target in self.targets:
+            self.categories.update(
+                target.classification)
 
     @property
     def name(self):
@@ -491,6 +564,10 @@ class ModificationRule(object):
     def losses(self):
         yield self.preferred_name, self.composition.clone()
 
+    def as_spec_strings(self):
+        for target in self.targets:
+            yield "%s (%s)" % (self.title, target.serialize())
+
 
 class AnonymousModificationRule(ModificationRule):
     '''
@@ -582,7 +659,7 @@ class AminoAcidSubstitution(AnonymousModificationRule):
         self.preferred_name = self.common_name
         self.names = {self.common_name}
         self.options = kwargs
-        self.categories = ['substitution']
+        self.categories = [ModificationCategory['substitution']]
 
     def serialize(self):
         return "@" + self.name
@@ -776,7 +853,7 @@ class GlycosaminoglycanLinkerGlycosylation(Glycosylation):
         self.title = "Glycosaminoglycan Linker Glycosylation"
         self.unimod_name = "GAG-Linker"
         self.preferred_name = self.unimod_name
-        self.targets = [ModificationTarget("S"),]
+        self.targets = [ModificationTarget("S")]
         self.composition = _hexnac.total_composition().clone()
         self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
         self.options = {}
