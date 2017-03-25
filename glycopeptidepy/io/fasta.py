@@ -228,3 +228,7 @@ class ProteinFastaFileWriter(FastaFileWriter):
     def writelines(self, iterable):
         for protein in iterable:
             self.write(protein)
+
+
+def read(f, defline_parser=default_parser, reader_type=ProteinFastaFileParser):
+    return reader_type(f, defline_parser=defline_parser)

@@ -398,13 +398,14 @@ class ModificationRule(object):
         self.title = title if title is not None else modification_name
         self.composition = composition
         self.names = {self.unimod_name, self.common_name, self.title} | alt_names
+        for name in list(self.names):
+            self.names.update(name.split(" or "))
         self.categories = set(categories)
         self.options = kwargs
         self._n_term_target = None
         self._c_term_target = None
         self.fragile = kwargs.get('fragile', False)
-
-        self.preferred_name = min(self.unimod_name, self.title, self.common_name, key=len)
+        self.preferred_name = min(self.names, key=len)
 
         # The type of the parameter passed for amino_acid_specificity is variable
         # so select the method correct for the passed type
@@ -758,7 +759,7 @@ class Glycosylation(ModificationRule):
             glycosylation = cls.parser.search(rule_string)
             glycosylation = FrozenGlycanComposition.parse(glycosylation.group(0))
             return cls(glycosylation)
-        except:
+        except Exception:
             return None
 
     def __init__(self, glycan_composition):
