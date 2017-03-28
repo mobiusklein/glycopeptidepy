@@ -305,6 +305,8 @@ class ModificationRule(object):
     names : set
         The set of all names used to refer to this modification, beyond those
         commonly used and those for display purposes.
+    aliases : set
+        The set of all names that are allowed to be used to display this modification
     options : dict
         Arbitrary information from external sources about this modification
         rule and its phenomena.
@@ -378,11 +380,14 @@ class ModificationRule(object):
     def __init__(self, amino_acid_specificity, modification_name,
                  title=None, monoisotopic_mass=None, composition=None,
                  categories=None, alt_names=None, neutral_losses=None,
+                 aliases=None,
                  **kwargs):
         if neutral_losses is None:
             neutral_losses = []
         if categories is None:
             categories = []
+        if aliases is None:
+            aliases = set()
         # Attempt to parse the protein prospector name which contains the
         # target in
         try:
@@ -406,7 +411,7 @@ class ModificationRule(object):
         self._c_term_target = None
         self.fragile = kwargs.get('fragile', False)
         self.preferred_name = min(self.names, key=len)
-
+        self.aliases = aliases
         # The type of the parameter passed for amino_acid_specificity is variable
         # so select the method correct for the passed type
 
@@ -504,6 +509,7 @@ class ModificationRule(object):
                 new_composition = self.composition
             dup.composition = new_composition
             dup.names = self.names | other.names
+            dup.aliases = self.aliases | other.aliases
             dup.preferred_name = min(dup.names, key=len)
             dup.options.update(other.options)
             return dup
@@ -661,6 +667,7 @@ class AminoAcidSubstitution(AnonymousModificationRule):
         self.names = {self.common_name}
         self.options = kwargs
         self.categories = [ModificationCategory['substitution']]
+        self.aliases = set()
 
     def serialize(self):
         return "@" + self.name
@@ -774,6 +781,7 @@ class Glycosylation(ModificationRule):
         self.preferred_name = self.common_name
         self.categories = [ModificationCategory.glycosylation]
         self.names = {self.common_name, self.title, self.preferred_name}
+        self.aliases = set()
         self.options = {}
         self.fragile = True
 
@@ -804,6 +812,7 @@ class NGlycanCoreGlycosylation(Glycosylation):
         self.composition = _hexnac.total_composition().clone()
         self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
         self.options = {}
+        self.aliases = set()
         self.categories = [ModificationCategory.glycosylation]
 
     def losses(self):
@@ -830,6 +839,7 @@ class OGlycanCoreGlycosylation(Glycosylation):
         self.composition = _hexnac.total_composition().clone()
         self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
         self.options = {}
+        self.aliases = set()
         self.categories = [ModificationCategory.glycosylation]
 
     def losses(self):
@@ -858,6 +868,7 @@ class GlycosaminoglycanLinkerGlycosylation(Glycosylation):
         self.composition = _hexnac.total_composition().clone()
         self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
         self.options = {}
+        self.aliases = set()
         self.categories = [ModificationCategory.glycosylation]
 
     def losses(self):
@@ -885,6 +896,7 @@ class OGlcNAcylation(Glycosylation):
         self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
         self.categories = [ModificationCategory.glycosylation]
         self.options = {}
+        self.aliases = set()
 
     def losses(self):
         for label_loss in self.mass_ladder.items():
@@ -1014,14 +1026,27 @@ class ModificationTable(ModificationSource):
         for name, rule in self.other_modifications.items():
             self.add(rule)
 
+    def register_alias(self, name, alias):
+        rule = self[name]
+        rule.aliases.add(alias)
+
     def rules(self):
         return set(self.store.values()) | set(self._custom_rules.values())
 
     def __getitem__(self, key):
         try:
-            return self.store[key]
+            # First try the key in the normal mapping
+            out = self.store[key]
+            try:
+                # If the key worked, check if it has been overriden by
+                # a custom modification rule, and return that instead.
+                return self._custom_rules[key]
+            except KeyError:
+                # If there's no custom rule, return the standard rule
+                return out
         except KeyError:
             try:
+                # Clean the key in case it is decorated with extra target information
                 name = title_cleaner.search(key).groupdict()["name"]
             except (AttributeError):
                 raise ModificationStringParseError("Could not parse {0}".format(key))
@@ -1070,7 +1095,7 @@ class RestrictedModificationTable(ModificationTable):
             try:
                 target = extract_targets_from_string(title_cleaner.search(name).groupdict()["target"])
                 mod.targets = {target}
-            except:
+            except Exception:
                 pass
             if mod.name in modifications:
                 modifications[mod.name] += mod
@@ -1118,9 +1143,15 @@ class Modification(ModificationBase):
         return mass
 
     def __init__(self, rule, mod_pos=-1, mod_num=1):
+        name = None
         if(isinstance(rule, basestring)):
             try:
+                _rule_string = rule
                 rule = Modification._table[rule]
+                if _rule_string in rule.aliases:
+                    name = _rule_string
+                else:
+                    name = rule.preferred_name
             except ModificationStringParseError:
                 anon = AnonymousModificationRule.try_parse(rule)
                 if anon is None:
@@ -1135,19 +1166,22 @@ class Modification(ModificationBase):
                         rule = aa_sub
                 else:
                     rule = anon
+        else:
+            name = rule.preferred_name
 
-        self.name = rule.preferred_name
+        self.name = name
         self.mass = rule.mass
         self.position = mod_pos
         self.number = mod_num
         self.rule = rule
+
         try:
             self.composition = rule.composition
-        except:
+        except AttributeError:
             self.composition = None
 
     def serialize(self):
-        rep = self.rule.serialize()
+        rep = str(self.name)
         if self.number > 1:
             # Numbers large than 1 will cause errors in lookup. Need
             # to incorporate a method for inferring number from string
