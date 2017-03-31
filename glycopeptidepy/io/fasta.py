@@ -130,8 +130,10 @@ class DispatchingDefLineParser(DefLineParserBase):
 uniprot_regex = r"(?P<db>[a-z^\|]+)\|(?P<accession>[A-Z0-9]+)\|(?P<name>\S+)(?:\s(?P<description>.+))?"
 uniprot_parser = RegexDefLineParser(uniprot_regex)
 
+partial_uniprot_regex = r"(?P<accession>[A-Z0-9]+)\|(?P<name>\S+)"
+partial_uniprot_parser = RegexDefLineParser(partial_uniprot_regex)
 
-default_parser = DispatchingDefLineParser([uniprot_parser, space_delim_parser])
+default_parser = DispatchingDefLineParser([uniprot_parser, partial_uniprot_parser, space_delim_parser])
 
 
 class FastaFileParser(object):
