@@ -439,6 +439,10 @@ class ModificationRule(object):
                 target.classification)
 
     @property
+    def is_standard(self):
+        return True
+
+    @property
     def name(self):
         return self.preferred_name
 
@@ -606,6 +610,10 @@ class AnonymousModificationRule(ModificationRule):
                 "", name, name, mass)
         except AttributeError:
             pass
+
+    @property
+    def is_standard(self):
+        return False
 
     def valid_site(self, *args, **kwargs):
         raise TypeError(
@@ -1112,7 +1120,7 @@ class ModificationStringParseError(Exception):
     pass
 
 
-class ModificationNameResolutionError(Exception):
+class ModificationNameResolutionError(KeyError):
     pass
 
 
@@ -1166,6 +1174,7 @@ class Modification(ModificationBase):
                         rule = aa_sub
                 else:
                     rule = anon
+                name = rule.name
         else:
             name = rule.preferred_name
 
@@ -1181,7 +1190,10 @@ class Modification(ModificationBase):
             self.composition = None
 
     def serialize(self):
-        rep = str(self.name)
+        if self.rule.is_standard:
+            rep = str(self.name)
+        else:
+            rep = self.rule.serialize()
         if self.number > 1:
             # Numbers large than 1 will cause errors in lookup. Need
             # to incorporate a method for inferring number from string

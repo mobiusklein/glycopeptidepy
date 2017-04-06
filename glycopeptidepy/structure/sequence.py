@@ -606,7 +606,7 @@ class PeptideSequence(PeptideSequenceBase):
             return
 
         for i, mod in enumerate(self.sequence[position][1]):
-            if modification_type == mod.name:
+            if modification_type == mod.rule:
                 dropped_index = i
                 break
         try:
