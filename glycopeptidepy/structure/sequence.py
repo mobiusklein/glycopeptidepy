@@ -67,7 +67,7 @@ def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification("HexNAc")}
-    except:
+    except TypeError:
         allow_modified = (Modification("HexNAc"),)
 
     positions = []
@@ -93,7 +93,7 @@ def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification("HexNAc"), Modification(_o_glycosylation)}
-    except:
+    except TypeError:
         allow_modified = (Modification("HexNAc"), Modification(_o_glycosylation))
     state = "seek"  # [seek, n, ^p, st]
     if isinstance(sequence, basestring):
@@ -138,7 +138,7 @@ def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()):
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification("Xyl"), Modification(_gag_linker_glycosylation)}
-    except:
+    except TypeError:
         allow_modified = (Modification("Xyl"), Modification(_gag_linker_glycosylation))
     state = "seek"  # [seek, s, g1, x, g2]
     ser = Residue("Ser")
@@ -193,11 +193,12 @@ def _total_composition(sequence):
 def _calculate_mass(sequence):
     glycan = sequence.glycan
     total = 0
+    cores = (_n_glycosylation, _o_glycosylation, _gag_linker_glycosylation)
     if glycan is not None:
         for position in sequence:
             total += position[0].mass
             for mod in position[1]:
-                if mod.name == "HexNAc":
+                if mod.name in cores:
                     continue
                 total += mod.mass
         total += sequence.n_term.mass
@@ -354,7 +355,7 @@ class PeptideSequence(PeptideSequenceBase):
 
     @property
     def total_mass(self):
-        return self.total_composition().mass
+        return _calculate_mass(self)
 
     @property
     def glycan(self):
@@ -390,13 +391,13 @@ class PeptideSequence(PeptideSequenceBase):
         reset_mass = 0
         try:
             reset_mass = self._n_term.mass
-        except:
+        except AttributeError:
             pass
         self._n_term = value
         new_mass = 0
         try:
             new_mass = value.mass
-        except:
+        except AttributeError:
             pass
         self.mass += new_mass - reset_mass
 
@@ -410,13 +411,13 @@ class PeptideSequence(PeptideSequenceBase):
         reset_mass = 0
         try:
             reset_mass = self._c_term.mass
-        except:
+        except AttributeError:
             pass
         self._c_term = value
         new_mass = 0
         try:
             new_mass = value.mass
-        except:
+        except AttributeError:
             pass
         self.mass += new_mass - reset_mass
 
@@ -646,7 +647,10 @@ class PeptideSequence(PeptideSequenceBase):
             for group in self.get_fragments(key[0]):
                 for frag in group:
                     self._fragments_map[frag.name] = frag
-            return self._fragments_map[key]
+            try:
+                return self._fragments_map[key]
+            except KeyError:
+                raise KeyError("Unknown Fragment %r" % (key,))
 
     def _build_fragment_index(self, types=tuple('by'), neutral_losses=None):
         self._fragment_index = [[] for i in range(len(self) + 1)]

@@ -98,6 +98,10 @@ class PeptideSequenceSuiteBase(object):
         self.assertEqual(original.total_composition(), duplicate.total_composition())
         self.assertTrue(original.full_structure_equality(duplicate))
 
+    def test_total_mass(self):
+        seq = self.parse_sequence(p3)
+        self.assertAlmostEqual(seq.total_mass, 3000.1123374719496, 3)
+
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
     def parse_sequence(self, seqstr):
