@@ -1053,6 +1053,12 @@ class ModificationTable(ModificationSource):
                 # If there's no custom rule, return the standard rule
                 return out
         except KeyError:
+            # If the key failed to look up in the standard mapping,
+            # try the custom rule lookup
+            try:
+                return self._custom_rules[key]
+            except KeyError:
+                pass
             try:
                 # Clean the key in case it is decorated with extra target information
                 name = title_cleaner.search(key).groupdict()["name"]
