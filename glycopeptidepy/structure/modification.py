@@ -1007,6 +1007,13 @@ class ModificationTable(ModificationSource):
     def register_new_rule(cls, rule):
         cls._custom_rules[rule.preferred_name] = rule
 
+    @classmethod
+    def remove_rule(cls, rule):
+        try:
+            cls._custom_rules.pop(rule.preferred_name)
+        except AttributeError:
+            cls._custom_rules.pop(rule)
+
     def __init__(self, rules=None):
         if rules is None:
             rules = self._definitions_from_stream_default()
@@ -1043,22 +1050,13 @@ class ModificationTable(ModificationSource):
 
     def __getitem__(self, key):
         try:
-            # First try the key in the normal mapping
-            out = self.store[key]
             try:
-                # If the key worked, check if it has been overriden by
-                # a custom modification rule, and return that instead.
+                # First try the key in the custom mapping
                 return self._custom_rules[key]
             except KeyError:
-                # If there's no custom rule, return the standard rule
-                return out
+                # Next try the normal store
+                return self.store[key]
         except KeyError:
-            # If the key failed to look up in the standard mapping,
-            # try the custom rule lookup
-            try:
-                return self._custom_rules[key]
-            except KeyError:
-                pass
             try:
                 # Clean the key in case it is decorated with extra target information
                 name = title_cleaner.search(key).groupdict()["name"]
