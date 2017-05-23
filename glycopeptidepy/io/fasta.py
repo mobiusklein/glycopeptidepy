@@ -127,7 +127,7 @@ class DispatchingDefLineParser(DefLineParserBase):
                 raise UnparsableDeflineError(defline)
 
 
-uniprot_regex = r"(?P<db>[a-z^\|]+)\|(?P<accession>[A-Z0-9]+)\|(?P<name>\S+)(?:\s(?P<description>.+))?"
+uniprot_regex = r"(?P<db>[a-z^\|]+)\|(?P<accession>[A-Z0-9\-]+)\|(?P<name>\S*)(?:\s(?P<description>.+))?"
 uniprot_parser = RegexDefLineParser(uniprot_regex)
 
 partial_uniprot_regex = r"(?P<accession>[A-Z0-9]+)\|(?P<name>\S+)"
