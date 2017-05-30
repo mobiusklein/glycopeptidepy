@@ -13,6 +13,8 @@ p1 = "PEPTIDE"
 p2 = "YPVLN(N-Glycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
 p3 = "NEEYN(N-Glycosylation)K{Hex:5; HexNAc:4; NeuAc:2}"
 p4 = "TVDGT(O-Glycosylation)AR{Fuc:1; Hex:1; HexNAc:1; Neu5Ac:1}"
+p5 = "(Carbamidomethyl)-FFYFTPNK"
+p6 = "NEEYN(N-Glycosylation)K{Fuc:1; Hex:5; HexNAc:4; NeuAc:2}"
 hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
@@ -117,6 +119,36 @@ class PeptideSequenceSuiteBase(object):
         ]
         for i, stub in enumerate(self.parse_sequence(p4).stub_fragments()):
             self.assertAlmostEqual(masses[i], stub.mass, 3)
+
+    def test_composition(self):
+        for p in [p1, p2, p3, p4, p5]:
+            seq = self.parse_sequence(p)
+            self.assertAlmostEqual(seq.total_mass, seq.total_composition().mass, 4)
+
+    def test_repr_(self):
+        seq = self.parse_sequence(p5)
+        self.assertTrue("(Carbamidomethyl)" in (repr(seq).split('-')[0]))
+
+    def test_glycan_composition(self):
+        seq = self.parse_sequence(p3)
+        self.assertEqual(seq.glycan_composition, GlycanComposition(Hex=5, HexNAc=4, NeuAc=2))
+
+    def test_delete(self):
+        seq = self.parse_sequence(p1)
+        ref = self.parse_sequence(p1)
+        seq.delete(0)
+        proline = R("P")
+        self.assertAlmostEqual(
+            seq.total_mass, ref.total_mass - proline.mass, 4)
+
+    def test_fucosylated_stubs(self):
+        seq = self.parse_sequence(p6)
+
+        had_fucose = False
+        for stub in seq.stub_fragments(extended=1):
+            if "Fuc" in stub.name:
+                had_fucose = True
+        self.assertTrue(had_fucose)
 
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
