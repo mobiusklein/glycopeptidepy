@@ -6,6 +6,7 @@ from .modification import AnonymousModificationRule
 import glypy
 from glypy.structure.glycan import NamedGlycan
 from glypy import Composition
+from glypy.composition.glycan_composition import HashableGlycanComposition
 
 
 class allset(object):
@@ -39,14 +40,6 @@ glycosylation_site_detectors = decoratordict({
     GlycosylationType.o_linked: lambda x: [],
     GlycosylationType.glycosaminoglycan: lambda x: []
 })
-
-
-class HashableGlycanComposition(glypy.glycan_composition.FrozenGlycanComposition):
-    def __hash__(self):
-        return hash(str(self))
-
-    def __eq__(self, other):
-        return str(self) == str(other)
 
 
 class TypedGlycanComposition(HashableGlycanComposition):
