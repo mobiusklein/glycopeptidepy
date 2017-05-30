@@ -175,10 +175,13 @@ def get_etree_for(accession):
 
 def get_features_for(accession, error=False):
     tree = etree.parse(uri_template.format(accession=accession))
-    seq = tree.find(".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}sequence").text.replace("\n", '')
+    seq = tree.find(
+        ".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}sequence").text.replace(
+        "\n", '')
     names = [el.text for el in tree.findall(
         ".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}fullName")]
-    recommended_name_tag = tree.find(".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}recommendedName")
+    recommended_name_tag = tree.find(
+        ".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}recommendedName")
     if recommended_name_tag is not None:
         if recommended_name_tag.text.strip():
             recommended_name = recommended_name_tag.text.strip()
@@ -187,7 +190,7 @@ def get_features_for(accession, error=False):
     else:
         try:
             recommended_name = names[0]
-        except:
+        except IndexError:
             recommended_name = ""
     gene_name_tag = tree.find(".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}name")
     if gene_name_tag is not None:
