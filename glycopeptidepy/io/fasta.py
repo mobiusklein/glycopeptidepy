@@ -1,19 +1,29 @@
 import re
 import textwrap
-import warnings
 
 from collections import OrderedDict
+try:
+    from collections.abc import Mapping, Sequence as SequenceABC
+except ImportError:
+    from collections import Mapping, Sequence as SequenceABC
 
 from glycopeptidepy.structure.sequence import ProteinSequence
+from glypy.utils.base import opener
 
 
-def tryopen(path):
-    if hasattr(path, 'read'):
-        return path
-    return open(path)
+class FastaHeader(Mapping):
+    """Hold parsed properties of a FASTA sequence's
+    definition line.
 
+    This object supports the :class:`Mapping` interface, and
+    keys may be accessed by attribute access notation.
 
-class FastaHeader(object):
+    Attributes
+    ----------
+    defline : str
+        The textual representation of definition line which
+        lead to the collection of attributes stored therein.
+    """
     def __init__(self, mapping, original=None):
         self._mapping = mapping
         if original is None:
@@ -32,6 +42,12 @@ class FastaHeader(object):
 
     def keys(self):
         return self._mapping.keys()
+
+    def values(self):
+        return self._mapping.values()
+
+    def __len__(self):
+        return len(self._mapping)
 
     def __contains__(self, key):
         return key in self._mapping
@@ -62,27 +78,62 @@ class FastaHeader(object):
     def __ne__(self, other):
         return not (self == other)
 
+    def __dir__(self):
+        base = set(dir(super(FastaHeader, self)))
+        keys = set(self._mapping.keys())
+        return list(base | keys)
+
 
 class UnparsableDeflineError(Exception):
+    """Indicate that a definition line could
+    not be parsed by the current parser.
+    """
     pass
 
 
 class DefLineParserBase(object):
+    """A base class for definition line parser, providing
+    some common machinery in the :meth:`__call__` method.
+
+    This class requires that the subclass provide a :meth:`parse`
+    method to convert a string (without a ">" prefix). and return
+    an instance of :class:`.OrderedDict`.
+    """
     def __call__(self, defline):
         if defline.startswith(">"):
             defline = defline[1:]
-        return FastaHeader(self.parse(defline), defline)
+        return self._make_header(self.parse(defline), defline)
+
+    def _make_header(self, mapping, defline):
+        return FastaHeader(mapping, defline)
 
     def parse(self, defline):
         raise NotImplementedError()
 
 
 class CallableDefLineParser(DefLineParserBase):
+    """Parse a definition line using an arbitrary
+    provided :class:`.Callable`.
+
+    Attributes
+    ----------
+    callable_obj : Callable
+    """
     def __init__(self, callable_obj):
+        if not callable(callable_obj):
+            raise TypeError("Must provide a callable object.")
         self.callable_obj = callable_obj
 
     def parse(self, defline):
-        return OrderedDict(enumerate(self.callable_obj(defline)))
+        result = self.callable_obj(defline)
+        if isinstance(result, Mapping):
+            return OrderedDict(result.items())
+        elif isinstance(result, SequenceABC):
+            return OrderedDict(enumerate(result))
+        else:
+            raise UnparsableDeflineError(
+                "Failed to parse {:r} using {:r} (return value: {:r})".format(
+                    defline, self, result))
 
 
 def split_on_whitespace(string):
@@ -93,6 +144,18 @@ space_delim_parser = CallableDefLineParser(split_on_whitespace)
 
 
 class RegexDefLineParser(DefLineParserBase):
+    """Parse a definition line using a provided
+    regular expression.
+
+    If :attr:`pattern` contains named groups, this will
+    produce a :class:`OrderedDict` where the group names
+    are keys, otherwise their index will be used as the
+    key.
+
+    Attributes
+    ----------
+    pattern : re.pattern
+    """
     def __init__(self, pattern):
         self.pattern = re.compile(pattern)
         self._is_keyed = "?P<" in pattern
@@ -105,13 +168,34 @@ class RegexDefLineParser(DefLineParserBase):
             else:
                 return (match.groupdict())
         else:
-            raise UnparsableDeflineError(defline)
+            raise UnparsableDeflineError(
+                "Failed to parse {:r} using {:r}".format(
+                    defline, self))
 
 
 class DispatchingDefLineParser(DefLineParserBase):
-    def __init__(self, patterns, graceful=False, header_type=FastaHeader):
-        self.parsers = patterns
+    """Attempt to parse a definition line using one of many
+    :class:`DeflineParserBase` instances.
+
+    Attributes
+    ----------
+    graceful : bool
+        If :attr:`graceful`, failure to parse a defline
+        with all of :attr:`parsers` results in a :class:`FastaHeader`
+        no properties other than *defline*
+    header_type : type
+        The type to use to contain the result of parsing.
+        Defaults to :class:`FastaHeader`.
+    parsers : list
+        A :class:`list` of :class:`DeflineParserBase` instances
+    """
+    def __init__(self, parsers, graceful=False, header_type=FastaHeader):
+        self.parsers = list(parsers)
         self.graceful = graceful
+        self.header_type = header_type
+
+    def _make_header(self, mapping, defline):
+        return self.header_type(mapping, defline)
 
     def parse(self, defline):
         for parser in self.parsers:
@@ -122,9 +206,11 @@ class DispatchingDefLineParser(DefLineParserBase):
                 continue
         else:
             if self.graceful:
-                return defline
+                return FastaHeader({}, defline)
             else:
-                raise UnparsableDeflineError(defline)
+                raise UnparsableDeflineError(
+                    "Failed to parse {:r} using {:r}".format(
+                        defline, self))
 
 
 uniprot_regex = r"(?P<db>[a-z^\|]+)\|(?P<accession>[A-Z0-9\-]+)\|(?P<name>\S*)(?:\s(?P<description>.+))?"
@@ -139,7 +225,7 @@ default_parser = DispatchingDefLineParser([uniprot_parser, partial_uniprot_parse
 class FastaFileParser(object):
     def __init__(self, path, defline_parser=default_parser):
         self.state = "defline"
-        self.handle = tryopen(path)
+        self.handle = opener(path)
         self.defline = None
         self.sequence_chunks = []
         self.defline_parser = defline_parser
@@ -189,7 +275,11 @@ class FastaFileParser(object):
 
         if len(self.sequence_chunks) > 0:
             try:
-                yield self.process_result({"name": self.defline_parser(self.defline), "sequence": ''.join(self.sequence_chunks)})
+                yield self.process_result(
+                    {
+                        "name": self.defline_parser(self.defline),
+                        "sequence": ''.join(self.sequence_chunks)
+                    })
             except Exception as e:
                 pass
 
