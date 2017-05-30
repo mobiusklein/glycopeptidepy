@@ -12,6 +12,7 @@ R = residue.Residue
 p1 = "PEPTIDE"
 p2 = "YPVLN(N-Glycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
 p3 = "NEEYN(N-Glycosylation)K{Hex:5; HexNAc:4; NeuAc:2}"
+p4 = "TVDGT(O-Glycosylation)AR{Fuc:1; Hex:1; HexNAc:1; Neu5Ac:1}"
 hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
@@ -101,6 +102,21 @@ class PeptideSequenceSuiteBase(object):
     def test_total_mass(self):
         seq = self.parse_sequence(p3)
         self.assertAlmostEqual(seq.total_mass, 3000.1123374719496, 3)
+
+    def test_n_glycan_sequons(self):
+        seq = self.parse_sequence(p2).deglycosylate()
+        self.assertTrue(4 in seq.n_glycan_sequon_sites)
+
+    def test_o_glycopeptide(self):
+        masses = [
+            718.36096708622,
+            921.44033960573,
+            1067.49824840467,
+            1083.49316302423,
+            1229.5510718231699
+        ]
+        for i, stub in enumerate(self.parse_sequence(p4).stub_fragments()):
+            self.assertAlmostEqual(masses[i], stub.mass, 3)
 
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):

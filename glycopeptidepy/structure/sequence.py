@@ -1334,7 +1334,7 @@ Sequence = PeptideSequence
 parse = Sequence
 
 
-class FragmentationStrategyBase(object):
+class FragmentationStrategyBase(object):  # pragma:no cover
     def __init__(self, name, *args, **kwargs):
         self.name = name
 
@@ -1345,7 +1345,7 @@ class FragmentationStrategyBase(object):
         raise NotImplementedError()
 
 
-class FragmentationState(object):
+class FragmentationState(object):  # pragma:no cover
     def __init__(self, peptide):
         self.peptide = peptide
 
@@ -1427,7 +1427,7 @@ class FragmentationState(object):
             composition=self.current_fragment_composition)
 
 
-class HCDFragmentationStrategy(FragmentationStrategyBase):
+class HCDFragmentationStrategy(FragmentationStrategyBase):  # pragma:no cover
     _name = "HCDFragmentationStrategy"
 
     def __init__(self):
@@ -1437,7 +1437,7 @@ class HCDFragmentationStrategy(FragmentationStrategyBase):
         pass
 
 
-class ExDFragmentationStrategy(FragmentationStrategyBase):
+class ExDFragmentationStrategy(FragmentationStrategyBase):  # pragma:no covers
 
     def __init__(self):
         super(ExDFragmentationStrategy, self).__init__("ExDFragmentationStrategy")
