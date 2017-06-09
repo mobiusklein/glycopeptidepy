@@ -132,7 +132,7 @@ class CallableDefLineParser(DefLineParserBase):
             return OrderedDict(enumerate(result))
         else:
             raise UnparsableDeflineError(
-                "Failed to parse {:r} using {:r} (return value: {:r})".format(
+                "Failed to parse {!r} using {!r} (return value: {!r})".format(
                     defline, self, result))
 
 
@@ -169,7 +169,7 @@ class RegexDefLineParser(DefLineParserBase):
                 return (match.groupdict())
         else:
             raise UnparsableDeflineError(
-                "Failed to parse {:r} using {:r}".format(
+                "Failed to parse {!r} using {!r}".format(
                     defline, self))
 
 
@@ -300,6 +300,9 @@ class FastaFileWriter(object):
         self.handle = handle
 
     def write(self, defline, sequence):
+        defline = str(defline)
+        if not defline.startswith(">"):
+            defline = ">" + defline
         self.handle.write(defline)
         self.handle.write("\n")
         self.handle.write(sequence)
