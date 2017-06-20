@@ -247,15 +247,16 @@ class FastaFileParser(object):
 
     def _parse_lines(self):
         for line in self.handle:
+            line = line.strip()
             if self.state == 'defline':
-                if line[0] == ">":
-                    self.defline = re.sub(r"[\n\r]", "", line[1:])
+                if line.startswith(">"):
+                    self.defline = line[1:]
                     self.state = "sequence"
                 else:
                     continue
             else:
                 if not re.match(r"^(\s+|>)", line):
-                    self.sequence_chunks.append(re.sub(r"[\n\r]", "", line))
+                    self.sequence_chunks.append(line)
                 else:
                     if self.defline is not None:
                         try:
@@ -290,7 +291,7 @@ class ProteinFastaFileParser(FastaFileParser):
         super(ProteinFastaFileParser, self).__init__(path, defline_parser)
 
     def process_result(self, d):
-        p = ProteinSequence(d['name'], d['sequence'])
+        p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
         return p
 
 
