@@ -44,7 +44,7 @@ class AminoAcidSequenceBuildingBlock(object):
     def __eq__(self, other):
         try:
             return self.residue is other.residue and self.modifications == other.modifications
-        except:
+        except AttributeError:
             return other == str(self)
 
     def __ne__(self, other):
@@ -83,7 +83,7 @@ class AminoAcidSequenceBuildingBlock(object):
     def clone(self):
         return self.__class__(self.residue, tuple(self.modifications))
 
-    def add_modification(self, modification):
+    def _add_modification(self, modification):
         # This method invalidates hashes. Only use during initialization
         mods = list(self.modifications)
         mods.append(modification)
@@ -116,13 +116,13 @@ class ModificationBuildingBlock(object):
     def __eq__(self, other):
         try:
             return self.modification == other.modification
-        except:
+        except AttributeError:
             return str(self) == str(other)
 
     def __ne__(self, other):
         try:
             return self.modification != other.modification
-        except:
+        except AttributeError:
             return str(self) != str(other)
 
     def __hash__(self):
