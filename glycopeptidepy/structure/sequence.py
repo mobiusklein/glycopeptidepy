@@ -880,7 +880,7 @@ class PeptideSequence(PeptideSequenceBase):
                         # After the core motif has been exhausted, speculatively add
                         # on the remaining core monosaccharides sequentially until
                         # exhausted.
-                        if hexose_count == 3 and hexnac_in_aggregate > 2 * core_count and extended:
+                        if hexose_count == 3 and hexnac_in_aggregate >= 2 * core_count and extended:
                             for extra_hexnac_count in range(0, 3):
                                 if extra_hexnac_count + hexnac_count > hexnac_in_aggregate:
                                     continue
@@ -1461,5 +1461,25 @@ class NamedSequence(PeptideSequence):
         return ">%s\n%s" % (self.name, string)
 
 
-class ProteinSequence(NamedSequence):
+class AnnotatedSequence(NamedSequence):
+    def __init__(self, name=None, sequence=None, parser_function=None, annotations=None,
+                 **kwargs):
+        super(AnnotatedSequence, self).__init__(
+            name, sequence, parser_function=parser_function, **kwargs)
+        self.annotations = self._prepare_annotations(annotations)
+
+    @staticmethod
+    def _prepare_annotations(annotation_data):
+        if annotation_data:
+            return dict(annotation_data)
+        else:
+            return dict()
+
+    def clone(self):
+        dup = super(AnnotatedSequence, self).clone()
+        dup.annotations = self._prepare_annotations(self.annotations)
+        return dup
+
+
+class ProteinSequence(AnnotatedSequence):
     pass

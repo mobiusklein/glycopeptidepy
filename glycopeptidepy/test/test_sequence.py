@@ -150,6 +150,12 @@ class PeptideSequenceSuiteBase(object):
                 had_fucose = True
         self.assertTrue(had_fucose)
 
+    def test_multiply_glycosylated_stubs(self):
+        seq = self.parse_sequence("N(N-Glycosylation)ITEIVYLTN(N-Glycosylation)TTIEK{Hex:14; HexNAc:4}")
+        stubs = list(seq.stub_fragments(extended=True))
+        name_set = {f.name for f in stubs}
+        self.assertTrue("peptide+Hex4HexNAc2" in name_set)
+
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
     def parse_sequence(self, seqstr):
@@ -159,6 +165,11 @@ class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
 class TestNamedSequence(PeptideSequenceSuiteBase, unittest.TestCase):
     def parse_sequence(self, seqstr):
         return sequence.NamedSequence("spam", seqstr)
+
+
+class TestAnnotatedSequence(PeptideSequenceSuiteBase, unittest.TestCase):
+    def parse_sequence(self, seqstr):
+        return sequence.AnnotatedSequence("spam", seqstr, annotations={"color": "green"})
 
 
 if __name__ == '__main__':
