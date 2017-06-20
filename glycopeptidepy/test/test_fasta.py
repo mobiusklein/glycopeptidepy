@@ -1,4 +1,3 @@
-import os
 import unittest
 
 from glycopeptidepy.io import fasta
