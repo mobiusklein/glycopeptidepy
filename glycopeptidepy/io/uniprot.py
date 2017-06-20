@@ -1,13 +1,12 @@
 import re
 import threading
-import urllib2
 
 from lxml import etree
-from glycopeptidepy.structure import glycan
 from glycopeptidepy.structure.modification import ModificationRule
 from glycopeptidepy.utils import simple_repr
 from glypy import Composition
 from glypy.utils import make_struct
+from glypy.io.glyspace import UniprotRDFClient
 
 
 uri_template = "http://www.uniprot.org/uniprot/{accession}.xml"
@@ -316,7 +315,7 @@ class _UniProtPTMListParser(object):
     def parse_entry(self):
         ptm_id = None
         accession = None
-        feature_key = None
+        # feature_key = None
         mass_difference = None
         correction_formula = None
         keywords = []
@@ -328,7 +327,8 @@ class _UniProtPTMListParser(object):
             elif typecode == "AC":
                 accession = line
             elif typecode == "FT":
-                feature_key = line
+                # feature_key = line
+                pass
             elif typecode == "CF":
                 correction_formula = self._formula_parser(line)
             elif typecode == "MM":
@@ -357,3 +357,6 @@ class _UniProtPTMListParser(object):
             except StopIteration:
                 break
         return table
+
+
+rdf = UniprotRDFClient()
