@@ -15,6 +15,7 @@ p3 = "NEEYN(N-Glycosylation)K{Hex:5; HexNAc:4; NeuAc:2}"
 p4 = "TVDGT(O-Glycosylation)AR{Fuc:1; Hex:1; HexNAc:1; Neu5Ac:1}"
 p5 = "(Carbamidomethyl)-FFYFTPNK"
 p6 = "NEEYN(N-Glycosylation)K{Fuc:1; Hex:5; HexNAc:4; NeuAc:2}"
+p7 = 'ISASGVEDIS(GAG-Linker)R{Xyl:1; a,enHex:1; aHex:1; Hex:1; HexS:1; HexNAc(S):1}'
 hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
@@ -155,6 +156,12 @@ class PeptideSequenceSuiteBase(object):
         stubs = list(seq.stub_fragments(extended=True))
         name_set = {f.name for f in stubs}
         self.assertTrue("peptide+Hex4HexNAc2" in name_set)
+
+    def test_gag_linker_peptide(self):
+        seq = self.parse_sequence(p7)
+        self.assertAlmostEqual(seq.total_mass, 2285.766, 2)
+        ox_map = {f.name: f for f in seq.glycan_fragments()}
+        self.assertAlmostEqual(ox_map["HexNAca,enHex"].mass, 361.10089, 3)
 
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
