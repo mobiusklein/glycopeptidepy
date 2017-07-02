@@ -66,7 +66,8 @@ class Protease(object):
 
     @classmethod
     def combine(cls, *names):
-        patterns = merge_enzyme_rules(names)
+        members = [Protease(name) if not isinstance(name, Protease) else name for name in names]
+        patterns = merge_enzyme_rules([member.regex for member in members])
         name = ' + '.join(names)
         instance = cls(patterns)
         instance.name = name
@@ -109,8 +110,8 @@ expasy_rules = {'arg-c': 'R',
                 'trypsin': '([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))'}
 
 
-def merge_enzyme_rules(enzyme_names):
-    rules = ["(" + expasy_rules[name] + ")" for name in enzyme_names]
+def merge_enzyme_rules(enzyme_patterns):
+    rules = ["(" + pattern + ")" for pattern in enzyme_patterns]
     return "|".join(rules)
 
 
