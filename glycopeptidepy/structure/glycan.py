@@ -7,6 +7,7 @@ import glypy
 from glypy.structure.glycan import NamedGlycan
 from glypy import Composition
 from glypy.composition.glycan_composition import HashableGlycanComposition
+from glypy.io import glycoct, iupac, linear_code
 
 
 class allset(object):
@@ -97,6 +98,15 @@ class GlycanCompositionProxy(object):
 
     def __ne__(self, other):
         return not (self.obj == other)
+
+    def __add__(self, other):
+        return self.obj + other
+
+    def __sub__(self, other):
+        return self.obj - other
+
+    def __mul__(self, other):
+        return self.obj * other
 
 
 class TypedGlycan(NamedGlycan):
