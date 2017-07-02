@@ -9,9 +9,13 @@ from io import StringIO
 
 from collections import defaultdict
 from collections import Iterable
+
 from glypy.composition.glycan_composition import (
-    FrozenMonosaccharideResidue, FrozenGlycanComposition)
+    FrozenMonosaccharideResidue, FrozenGlycanComposition,
+    HashableGlycanComposition)
 from glypy.utils import Enum
+from glypy.io import glycoct, iupac, linear_code
+from glypy import Glycan, ReducedEnd
 
 from .residue import Residue
 from .composition import Composition
@@ -742,6 +746,21 @@ xylose_modification = ModificationRule.from_unimod({
 })
 
 
+glycan_resolvers = dict()
+glycan_resolvers['glycoct'] = glycoct.loads
+glycan_resolvers['iupac'] = iupac.loads
+glycan_resolvers['linear_code'] = linear_code.loads
+glycan_resolvers['iupaclite'] = HashableGlycanComposition.parse
+
+
+def parse_glycan(glycan_format, encoded_string):
+    try:
+        parser = glycan_resolvers[glycan_format]
+        return parser(encoded_string)
+    except KeyError:
+        raise KeyError("Could not resolve glycan parser for %r (%r)" % (glycan_format, encoded_string))
+
+
 class Glycosylation(ModificationRule):
     """
     Incubator Idea - Represent occupied glycosylation sites
@@ -769,22 +788,55 @@ class Glycosylation(ModificationRule):
     parser = re.compile(r"@(?P<glycan_composition>\{[^\}]+\})")
 
     @classmethod
+    def _parse(cls, rule_string):
+        if rule_string.startswith("@"):
+            rule_string = rule_string[1:]
+        format_type = "iupaclite"
+        glycan_definition = rule_string
+        if rule_string.startswith(":"):
+            match = re.search(r":([^:]+?):(.+)", rule_string, re.DOTALL)
+            if match:
+                metadata = match.group(1).split(",")
+                format_type = metadata[0]
+                glycan_definition = match.group(2)
+            else:
+                raise ValueError("Cannot recognize glycan format %r" % (rule_string,))
+        return parse_glycan(format_type, glycan_definition), format_type, metadata
+
+    @classmethod
     def try_parse(cls, rule_string):
         try:
-            glycosylation = cls.parser.search(rule_string)
-            glycosylation = FrozenGlycanComposition.parse(glycosylation.group(0))
-            return cls(glycosylation)
+            glycan, encoding_format, metadata = cls._parse(rule_string)
+            return cls(glycan, encoding_format, metadata)
         except Exception:
             return None
 
-    def __init__(self, glycan_composition):
-        if isinstance(glycan_composition, basestring):
-            glycan_composition = FrozenGlycanComposition.parse(glycan_composition)
+    def __init__(self, glycan, encoding_format=None, metadata=None):
+        if metadata is None:
+            metadata = {}
+        if isinstance(glycan, basestring):
+            if encoding_format is None:
+                glycan, encoding_format, _metadata = self._parse(glycan)
+                metadata.update(_metadata)
+            else:
+                glycan = parse_glycan(encoding_format, glycan)
+        else:
+            glycan = glycan.clone()
 
-        glycan_composition.composition_offset = Composition()
-
-        self.common_name = "@" + str(glycan_composition)
-        self.mass = glycan_composition.mass()
+        if isinstance(glycan, Glycan):
+            self.common_name = "@:glycoct:" + glycan.serialize("glycoct")
+            self._is_composition = False
+            if encoding_format is None:
+                encoding_format = "glycoct"
+        else:
+            self.common_name = "@:iupaclite:" + glycan.serialize()
+            self._is_composition = True
+            encoding_format = "iupaclite"
+        self.encoding_format = encoding_format
+        self.metadata = metadata
+        self.glycan = glycan
+        self._patch_dehydration()
+        self.mass = self.glycan.mass()
         self.title = self.common_name
         self.preferred_name = self.common_name
         self.categories = [ModificationCategory.glycosylation]
@@ -792,6 +844,16 @@ class Glycosylation(ModificationRule):
         self.aliases = set()
         self.options = {}
         self.fragile = True
+
+    @property
+    def is_composition(self):
+        return self._is_composition
+
+    def _patch_dehydration(self):
+        if self.is_composition:
+            self.glycan.composition_offset = Composition()
+        else:
+            self.glycan.set_reducing_end(ReducedEnd("O-1H-2"))
 
     def losses(self):
         for i in []:
