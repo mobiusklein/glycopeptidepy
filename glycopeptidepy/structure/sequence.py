@@ -373,7 +373,7 @@ class PeptideSequence(PeptideSequenceBase):
 
     @property
     def glycan_composition(self):
-        if self._glycan_composition is None:
+        if self._glycan_composition is None and self.glycan is not None:
             if isinstance(self.glycan, GlycanComposition):
                 self._glycan_composition = GlycanCompositionProxy(self.glycan)
             else:
