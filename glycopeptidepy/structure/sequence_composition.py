@@ -21,14 +21,14 @@ class AminoAcidSequenceBuildingBlock(object):
                     residues.remove(degen)
         return map(cls, residues)
 
-    def __init__(self, residue_, modifications=None, neutral_mass=None):
+    def __init__(self, residue_, modifications=None, mass=None):
         if modifications is None:
             modifications = ()
         self.residue = residue_
         self.modifications = tuple(modifications)
-        if neutral_mass is None:
-            neutral_mass = residue_.mass + sum(m.mass for m in modifications)
-        self.neutral_mass = neutral_mass
+        if mass is None:
+            mass = residue_.mass + sum(m.mass for m in modifications)
+        self.mass = mass
         self._string = None
 
     def __iter__(self):
@@ -51,7 +51,7 @@ class AminoAcidSequenceBuildingBlock(object):
         return not self == other
 
     def __repr__(self):
-        return "({}, {}):{:.2f}".format(self.residue.symbol, self.modifications, self.neutral_mass)
+        return "({}, {}):{:.2f}".format(self.residue.symbol, self.modifications, self.mass)
 
     def __str__(self):
         if self._string is None:
@@ -88,7 +88,7 @@ class AminoAcidSequenceBuildingBlock(object):
         mods = list(self.modifications)
         mods.append(modification)
         self.modifications = tuple(mods)
-        self.neutral_mass += modification.mass
+        self.mass += modification.mass
         return self
 
 
@@ -107,7 +107,7 @@ class ModificationBuildingBlock(object):
         except AttributeError:
             self.name = self.sigil + str(name)
             self.modification = name
-        self.neutral_mass = self.modification.mass
+        self.mass = self.modification.mass
         self._hash = hash(self.modification)
 
     def __repr__(self):
@@ -196,11 +196,9 @@ class SequenceComposition(dict):
             return self._mass
         mass = self._composition_offset.mass
         for residue_type, count in self.items():
-            mass += residue_type.neutral_mass * count
+            mass += residue_type.mass * count
         self._mass = mass
         return mass
-
-    neutral_mass = mass
 
     def extend(self, *args):
         for residue in args:
@@ -277,7 +275,7 @@ class SequenceComposition(dict):
 
     def serialize(self):
         return "{%s}" % '; '.join("{}:{}".format(str(k), v) for k, v in sorted(
-            self.items(), key=lambda x: x[0].neutral_mass))
+            self.items(), key=lambda x: x[0].mass))
 
     __str__ = serialize
 
