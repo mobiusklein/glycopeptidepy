@@ -67,8 +67,8 @@ class Protease(object):
     @classmethod
     def combine(cls, *names):
         members = [Protease(name) if not isinstance(name, Protease) else name for name in names]
-        patterns = merge_enzyme_rules([member.regex for member in members])
-        name = ' + '.join(names)
+        patterns = merge_enzyme_rules([member.regex.pattern for member in members])
+        name = ' + '.join([member.name for member in members])
         instance = cls(patterns)
         instance.name = name
         return instance

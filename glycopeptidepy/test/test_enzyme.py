@@ -38,6 +38,14 @@ class TestProtease(unittest.TestCase):
         else:
             raise AssertionError("Did not produce overlapped digest")
 
+    def test_combine(self):
+        trypsin = enzyme.Protease("trypsin")
+        gluc = enzyme.Protease("glutamyl endopeptidase")
+        seq = "PEPTIDER"
+        self.assertEqual(trypsin.missed_cleavages(seq), 0)
+        self.assertEqual(gluc.missed_cleavages(seq), 2)
+        merged = enzyme.Protease.combine(trypsin, gluc)
+        self.assertEqual(merged.missed_cleavages(seq), 2)
 
 if __name__ == '__main__':
     unittest.main()
