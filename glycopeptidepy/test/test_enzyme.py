@@ -32,6 +32,7 @@ class TestProtease(unittest.TestCase):
     def test_digest(self):
         trypsin = enzyme.Protease("trypsin")
         for peptide, start, stop, missed in trypsin.cleave(heparanase, 2):
+            assert missed < 3
             if peptide == "KFKNSTYSR":
                 break
         else:

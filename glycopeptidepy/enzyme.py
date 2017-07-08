@@ -87,7 +87,7 @@ class Protease(object):
                         end_position = cleavage_sites[-1]
                         if end_position is None:
                             end_position = sequence_length(sequence)
-                        # Store
+                        # Store the sequence, start position, end position, and # of missed cleavages
                         peptides.append((seq, start_position, end_position, missed_cleavages - j))
         # Deduplicate and sort by starting postion
         return sorted(set(peptides), key=_get1)
