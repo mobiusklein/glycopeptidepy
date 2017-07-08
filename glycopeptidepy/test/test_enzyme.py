@@ -2,10 +2,9 @@ import unittest
 
 try:
     from StringIO import StringIO
-except:
+except ImportError:
     from io import StringIO
 
-from glycopeptidepy.structure import sequence, modification, residue, composition
 from glycopeptidepy import enzyme
 from glycopeptidepy.io.fasta import ProteinFastaFileParser
 
@@ -32,7 +31,7 @@ heparanase = next(iter(ProteinFastaFileParser(StringIO(_protein_fasta))))
 class TestProtease(unittest.TestCase):
     def test_digest(self):
         trypsin = enzyme.Protease("trypsin")
-        for peptide, start, stop in trypsin.cleave(heparanase, 2):
+        for peptide, start, stop, missed in trypsin.cleave(heparanase, 2):
             if peptide == "KFKNSTYSR":
                 break
         else:
@@ -46,6 +45,7 @@ class TestProtease(unittest.TestCase):
         self.assertEqual(gluc.missed_cleavages(seq), 2)
         merged = enzyme.Protease.combine(trypsin, gluc)
         self.assertEqual(merged.missed_cleavages(seq), 2)
+
 
 if __name__ == '__main__':
     unittest.main()
