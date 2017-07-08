@@ -8,10 +8,36 @@ from glypy import Composition
 from glypy.utils import make_struct
 from glypy.io.glyspace import UniprotRDFClient
 
+from six import add_metaclass
 
 uri_template = "http://www.uniprot.org/uniprot/{accession}.xml"
+nsmap = {"up": "http://uniprot.org/uniprot"}
 
 
+class UniProtFeatureMeta(type):
+    _cache = {}
+
+    def __new__(cls, name, parents, attrs):
+        new_type = type.__new__(cls, name, parents, attrs)
+        try:
+            cls._cache[new_type.feature_type] = new_type
+        except AttributeError:
+            pass
+        return new_type
+
+    def feature_type(self, feature_type):
+        return self._cache[feature_type]
+
+    def handle_tag(self, tag):
+        feature_type = tag.attrib['type']
+        try:
+            feature_type_t = self.feature_type(feature_type)
+            return feature_type_t.fromxml(tag)
+        except KeyError:
+            return None
+
+
+@add_metaclass(UniProtFeatureMeta)
 class UniProtFeatureBase(object):
     __repr__ = simple_repr
 
@@ -24,6 +50,10 @@ class UniProtFeatureBase(object):
     def describe(self):
         return self.description.split("; ")
 
+    @property
+    def name(self):
+        return self.feature_type
+
 
 class Keyword(str):
     def __new__(cls, content, idstr):
@@ -32,8 +62,7 @@ class Keyword(str):
         return obj
 
 
-class SignalPeptide(UniProtFeatureBase):
-    feature_type = 'signal peptide'
+class PeptideBase(UniProtFeatureBase):
 
     def __init__(self, start, end, known=True):
         self.start = start
@@ -44,20 +73,32 @@ class SignalPeptide(UniProtFeatureBase):
     def fromxml(cls, feature):
         known = True
         try:
-            begin = int(feature.find(".//{http://uniprot.org/uniprot}begin").attrib['position'])
+            begin = int(feature.find(".//{http://uniprot.org/uniprot}begin", nsmap).attrib['position']) - 1
         except KeyError:
             begin = 0
             known = False
         try:
-            end = int(feature.find(".//{http://uniprot.org/uniprot}end").attrib['position'])
+            end = int(feature.find(".//{http://uniprot.org/uniprot}end", nsmap).attrib['position'])
         except KeyError:
             end = float('inf')
             known = False
         return cls(begin, end, known)
 
-    @property
-    def name(self):
-        return "signal peptide"
+
+class SignalPeptide(PeptideBase):
+    feature_type = 'signal peptide'
+
+
+class Propeptide(PeptideBase):
+    feature_type = 'propeptide'
+
+
+class TransitPeptide(PeptideBase):
+    feature_type = "transit peptide"
+
+
+class Peptide(PeptideBase):
+    feature_type = 'peptide'
 
 
 class Domain(UniProtFeatureBase):
@@ -74,25 +115,40 @@ class Domain(UniProtFeatureBase):
         known = True
         try:
             try:
-                begin = int(feature.find(".//{http://uniprot.org/uniprot}begin").attrib['position'])
+                begin = int(feature.find(
+                    ".//up:begin", nsmap).attrib['position']) - 1
             except KeyError:
                 begin = 0
                 known = False
             try:
-                end = int(feature.find(".//{http://uniprot.org/uniprot}end").attrib['position'])
+                end = int(feature.find(
+                    ".//up:end", nsmap).attrib['position'])
             except KeyError:
                 end = float('inf')
                 known = False
         except AttributeError:
-            begin = int(feature.find(".//{http://uniprot.org/uniprot}position").attrib['position'])
+            begin = int(feature.find(
+                ".//up:position", nsmap).attrib['position']) - 1
             end = begin + 1
 
         description = feature.attrib.get("description")
         return cls(description, begin, end, known)
 
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        self._name = value
+
 
 class RegionOfInterest(Domain):
     feature_type = 'region of interest'
+
+
+class InitiatorMethionine(Domain):
+    feature_type = "initiator methionine"
 
 
 class DisulfideBond(Domain):
@@ -104,17 +160,20 @@ class DisulfideBond(Domain):
         known = True
         try:
             try:
-                begin = int(feature.find(".//{http://uniprot.org/uniprot}begin").attrib['position'])
+                begin = int(feature.find(
+                    ".//up:begin", nsmap).attrib['position']) - 1
             except KeyError:
                 begin = 0
                 known = False
             try:
-                end = int(feature.find(".//{http://uniprot.org/uniprot}end").attrib['position'])
+                end = int(feature.find(
+                    ".//up:end", nsmap).attrib['position'])
             except KeyError:
                 end = float('inf')
                 known = False
         except AttributeError:
-            begin = end = int(feature.find(".//{http://uniprot.org/uniprot}position").attrib['position'])
+            begin = end = int(feature.find(
+                ".//up:position", nsmap).attrib['position'])
         return cls(name, begin, end, known)
 
 
@@ -128,7 +187,8 @@ class ModifiedResidue(UniProtFeatureBase):
     @classmethod
     def fromxml(cls, feature):
         return cls(
-            int(feature.find(".//{http://uniprot.org/uniprot}position").attrib['position']),
+            int(feature.find(
+                ".//up:position", nsmap).attrib['position']) - 1,
             feature.attrib["description"])
 
 
@@ -157,7 +217,8 @@ class GlycosylationSite(UniProtFeatureBase):
 
     @classmethod
     def fromxml(cls, feature):
-        position = int(feature.find(".//{http://uniprot.org/uniprot}position").attrib['position'])
+        position = int(feature.find(
+            ".//up:position", nsmap).attrib['position']) - 1
         glycosylation_type = feature.attrib["description"].split(" ")[0]
         return cls(position, glycosylation_type)
 
@@ -175,12 +236,12 @@ def get_etree_for(accession):
 def get_features_for(accession, error=False):
     tree = etree.parse(uri_template.format(accession=accession))
     seq = tree.find(
-        ".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}sequence").text.replace(
+        ".//up:entry/up:sequence", nsmap).text.replace(
         "\n", '')
     names = [el.text for el in tree.findall(
-        ".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}fullName")]
+        ".//up:protein/*/up:fullName", nsmap)]
     recommended_name_tag = tree.find(
-        ".//{http://uniprot.org/uniprot}protein/*/{http://uniprot.org/uniprot}recommendedName")
+        ".//up:protein/*/up:recommendedName", nsmap)
     if recommended_name_tag is not None:
         if recommended_name_tag.text.strip():
             recommended_name = recommended_name_tag.text.strip()
@@ -191,36 +252,25 @@ def get_features_for(accession, error=False):
             recommended_name = names[0]
         except IndexError:
             recommended_name = ""
-    gene_name_tag = tree.find(".//{http://uniprot.org/uniprot}entry/{http://uniprot.org/uniprot}name")
+    gene_name_tag = tree.find(".//up:entry/up:name", nsmap)
     if gene_name_tag is not None:
         gene_name = gene_name_tag.text
     else:
         gene_name = ""
     accessions = [el.text for el in tree.findall(
-        ".//{http://uniprot.org/uniprot}accession")]
+        ".//up:accession", nsmap)]
     features = []
     exc_type = Exception if not error else KeyboardInterrupt
-    for tag in tree.findall(".//{http://uniprot.org/uniprot}feature"):
+    for tag in tree.findall(".//up:feature", nsmap):
         feature_type = tag.attrib['type']
         try:
-            if feature_type == 'signal peptide':
-                features.append(SignalPeptide.fromxml(tag))
-            elif feature_type == "modified residue":
-                features.append(ModifiedResidue.fromxml(tag))
-            elif feature_type == "glycosylation site":
-                features.append(GlycosylationSite.fromxml(tag))
-            elif feature_type == 'domain':
-                features.append(Domain.fromxml(tag))
-            elif feature_type == 'region of interest':
-                features.append(RegionOfInterest.fromxml(tag))
-            elif feature_type == 'disulfide bond':
-                features.append(DisulfideBond.fromxml(tag))
-            elif feature_type == "site":
-                features.append(Site.fromxml(tag))
+            feature_obj = UniProtFeatureBase.handle_tag(tag)
+            if feature_obj is not None:
+                features.append(feature_obj)
         except exc_type as e:
             print(e, feature_type, accession, etree.tostring(tag))
     keywords = set()
-    for kw in tree.findall(".//{http://uniprot.org/uniprot}keyword"):
+    for kw in tree.findall(".//up:keyword", nsmap):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
     return UniProtProtein(
         seq, features, recommended_name, gene_name, names, accessions, keywords)
