@@ -84,7 +84,7 @@ class FastaHeader(Mapping):
         return list(base | keys)
 
 
-class UnparsableDeflineError(Exception):
+class UnparsableDeflineError(ValueError):
     """Indicate that a definition line could
     not be parsed by the current parser.
     """
