@@ -1,5 +1,6 @@
 import csv
 import json
+import string
 from copy import deepcopy
 import re
 from pkg_resources import resource_stream
@@ -23,7 +24,12 @@ from . import ModificationBase
 
 
 target_string_pattern = re.compile(
-    r'(?P<amino_acid>[A-Z]+)?([@ ]?(?P<n_term>[Nn][-_][tT]erm)|(?P<c_term>[Cc][-_][tT]erm))?')
+    r'''(?P<amino_acid>[A-Z]+)?
+        (@
+            (?P<n_term>[Nn][-_][tT]erm)|
+            (?P<c_term>[Cc][-_][tT]erm)
+        )?''',
+    re.VERBOSE)
 title_cleaner = re.compile(
     r'(?P<name>.*)\s\((?P<target>.+)\)$')
 
@@ -121,36 +127,74 @@ def composition_delta_parser(formula):
 
 
 def extract_targets_from_string(target_string):
-    '''Parses the Protein Prospector modification name string to
-    extract the modification target specificity
-
-    Format:
-
-    `"Modification Name (Residues Targeted)"`
-
-    Parameters
-    ----------
-    target_string: str
-
-    Return
-    ------
-    :class:`ModificationTarget`
-
-    '''
     position_only = re.search(r"^([NnCc][-_][tT]erm)", target_string)
     if position_only:
         return ModificationTarget(None, SequenceLocation[position_only.groups()[0]])
     else:
-        amino_acid_and_position = re.search(
-            r'(?P<amino_acid>[A-Z]+)([@ ]?(?P<n_term>[Nn][-_][tT]erm)|(?P<c_term>[Cc][-_][tT]erm))?', target_string)
-        params = amino_acid_and_position.groupdict()
-        aa = list(map(Residue, params["amino_acid"]))
-        if params['n_term']:
-            return ModificationTarget(aa, SequenceLocation.n_term)
-        elif params['c_term']:
-            return ModificationTarget(aa, SequenceLocation.c_term)
+        state = 'aa'
+        amino_acids = []
+        position = []
+        
+        i = 0
+        n = len(target_string)
+        while i < n:
+            c = target_string[i]
+
+            if c == " ":
+                if state == 'aa':
+                    state = "aa-space"
+                elif state == 'position-begin':
+                    pass
+                else:
+                    raise ValueError(target_string)
+            elif c == "@":
+                if state == 'aa':
+                    state = 'position-begin'
+                elif state == 'aa-space':
+                    state = 'position-begin'
+                else:
+                    raise ValueError("Found @ not between amino acids and position")
+            elif c in string.ascii_uppercase:
+                if state == 'aa':
+                    amino_acids.append(c)
+                elif state == 'position-begin':
+                    if c in "NC":
+                        position.append(c)
+                        state = 'position'
+                elif state == 'position':
+                    if c == 'T':
+                        position.append(c)
+                    else:
+                        raise ValueError("Invalid position specification")
+            elif c in string.ascii_lowercase:
+                if state == 'aa':
+                    amino_acids.append(c.upper())
+                elif state == 'position-begin':
+                    if c in 'nc':
+                        position.append(c)
+                        state = 'position'
+                elif state == 'position':
+                    position.append(c)
+            elif c in '-_':
+                if state == 'position':
+                    position.append(c)
+                else:
+                    raise ValueError("Found - not in position specification")
+            i += 1
+            
+        position = ''.join(position)
+        position = position.lower().replace("-", "_").strip()
+
+        amino_acids = list(map(Residue, amino_acids))
+        if position == "":
+            position = SequenceLocation.anywhere
+        elif position == "n_term":
+            position = SequenceLocation.n_term
+        elif position == "c_term":
+            position = SequenceLocation.c_term
         else:
-            return ModificationTarget(aa, SequenceLocation.anywhere)
+            raise ValueError("Unrecognized position specification {}".format(position))
+        return ModificationTarget(amino_acids, position)
 
 
 def get_position_modifier_rules_dict(sequence):

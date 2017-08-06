@@ -19,6 +19,15 @@ class TestModifcationTarget(unittest.TestCase):
         sites = deamidated.find_valid_sites(peptide)
         self.assertEqual(sites, [0, 3, 5, 7])
 
+    def test_parse_target(self):
+        spaced = 'Q @ N-term'
+        part_spaced = 'Q @N-Term'
+        part_spaced2 = 'Q@ n-term'
+        no_space = 'Q@N-term'
+        spaced_parsed = modification.extract_targets_from_string(spaced)
+        self.assertEqual(spaced_parsed, modification.extract_targets_from_string(part_spaced))
+        self.assertEqual(spaced_parsed, modification.extract_targets_from_string(part_spaced2))
+        self.assertEqual(spaced_parsed, modification.extract_targets_from_string(no_space))
 
 class TestGlycosylationRule(unittest.TestCase):
     def test_parse(self):
