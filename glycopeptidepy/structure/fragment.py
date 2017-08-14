@@ -4,7 +4,7 @@ from six import add_metaclass
 from .modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
-from .composition import Composition
+from .composition import Composition, formula
 from ..utils.collectiontools import descending_combination_counter
 from ..utils import simple_repr
 
@@ -53,6 +53,10 @@ generic_neutral_losses_composition = {
     "-H2O-H2O": -Composition("(H2O)2"),
     "-NH3-H2O": -Composition("NH3H2O")
 }
+
+
+def format_negative_composition(composition):
+    return "-%s" % formula({k: -v for k, v in composition.items()})
 
 
 class NeutralLoss(object):
