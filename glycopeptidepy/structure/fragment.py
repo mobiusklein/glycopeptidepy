@@ -3,7 +3,7 @@ from collections import defaultdict
 from six import add_metaclass
 from .modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
-    GlycosaminoglycanLinkerGlycosylation)
+    GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
 from .composition import Composition
 from ..utils.collectiontools import descending_combination_counter
 from ..utils import simple_repr
@@ -79,7 +79,7 @@ class NeutralLoss(object):
 class FragmentBase(object):
     """Base class for all Fragment types. Defines basic
     name generation and neutral loss handling functions.
-    
+
     Attributes
     ----------
     neutral_loss : NeutralLoss
@@ -160,8 +160,12 @@ class FragmentBase(object):
 
 
 class PeptideFragment(FragmentBase):
-    concerned_mods = set([_n_glycosylation, _modification_hexnac, _o_glycosylation, _gag_linker_glycosylation,
-                          _modification_xylose])
+    concerned_modifications = set(
+        [_n_glycosylation,
+         _modification_hexnac,
+         _o_glycosylation,
+         _gag_linker_glycosylation,
+         _modification_xylose])
 
     __slots__ = ("type", "position", "modification_dict", "bare_mass",
                  "golden_pairs", "flanking_amino_acids", "glycosylation",
@@ -236,12 +240,12 @@ class PeptideFragment(FragmentBase):
         fragment_name.append(str(self.position))
 
         # Only concerned modifications are reported.
-        for mod_rule in self.concerned_mods:
-            if mod_rule in self.modification_dict:
-                if self.modification_dict[mod_rule] > 1:
+        for mod_rule, count in self.modification_dict.items():
+            if mod_rule in self.concerned_modifications or mod_rule.is_a(ModificationCategory.glycosylation):
+                if count > 1:
                     fragment_name.extend(
-                        ['+', str(self.modification_dict[mod_rule]), (mod_rule.name)])
-                elif self.modification_dict[mod_rule] == 1:
+                        ['+', str(count), (mod_rule.name)])
+                elif count == 1:
                     fragment_name.extend(['+', (mod_rule.name)])
                 else:
                     pass
@@ -253,17 +257,17 @@ class PeptideFragment(FragmentBase):
 
     @property
     def is_glycosylated(self):
-        if self.glycosylation is not None:
+        if self.glycosylation:
             return True
         else:
             for mod in self.modification_dict:
-                if mod in self.concerned_mods:
+                if mod in self.concerned_modifications:
                     return True
         return False
 
     def partial_loss(self, modifications=None):
         if modifications is None:
-            modifications = self.concerned_mods
+            modifications = self.concerned_modifications
         modifications = list(modifications)
         mods = dict(self.modification_dict)
         mods_of_interest = defaultdict(
