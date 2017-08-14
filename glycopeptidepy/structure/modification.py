@@ -834,7 +834,7 @@ class Glycosylation(ModificationRule):
 
     @classmethod
     def _parse(cls, rule_string):
-        if rule_string.startswith("@"):
+        if rule_string.startswith("#"):
             rule_string = rule_string[1:]
         format_type = "iupaclite"
         glycan_definition = rule_string
@@ -906,7 +906,7 @@ class Glycosylation(ModificationRule):
         self.fragile = True
 
     def _make_string(self):
-        template = "@:{}:{}"
+        template = "#:{}:{}"
         metadata = ",".join("%s=%s" % (k, v) for k, v in self.metadata.items())
         if metadata:
             metadata = "{},{}".format(self.encoding_format, metadata)
