@@ -83,21 +83,21 @@ residue_chemical_property_group = {
 
 residue_to_neutral_loss = MultiMap()
 residue_to_neutral_loss.update({
-    "Ser": -Composition("H2O"),
-    "Thr": -Composition("H2O"),
-    "Glu": -Composition("H2O"),
-    "Asp": -Composition("H2O"),
+    "Ser": [-Composition("H2O")],
+    "Thr": [-Composition("H2O")],
+    "Glu": [-Composition("H2O")],
+    "Asp": [-Composition("H2O")],
 
-    "Arg": -Composition("NH3"),
-    "Lys": -Composition("NH3"),
-    "Gln": -Composition("NH3"),
-    "Asn": -Composition("NH3"),
+    "Arg": [-Composition("NH3")],
+    "Lys": [-Composition("NH3")],
+    "Gln": [-Composition("NH3")],
+    "Asn": [-Composition("NH3")],
 })
 
 residue_to_neutral_loss.update({
-    "Arg": -Composition("H2O"),
-    "His": -Composition("H2O"),
-    "Lys": -Composition("H2O")
+    "Arg": [-Composition("H2O")],
+    "His": [-Composition("H2O")],
+    "Lys": [-Composition("H2O")]
 })
 
 
