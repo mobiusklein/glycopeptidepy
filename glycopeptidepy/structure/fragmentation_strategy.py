@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
-from itertools import product
+from itertools import product, combinations
 
 from glycopeptidepy.utils.collectiontools import descending_combination_counter
 from glycopeptidepy.structure import constants as structure_constants
@@ -20,8 +20,12 @@ from glycopeptidepy.structure.glycan import (
 from glycopeptidepy.structure.fragment import (
     IonSeries,
     PeptideFragment,
+    format_negative_composition,
     NeutralLoss)
-from glycopeptidepy.structure.residue import AminoAcidResidue as R
+from glycopeptidepy.structure.residue import (
+    AminoAcidResidue as R,
+    residue_to_neutral_loss as _residue_to_neutral_loss)
+from ..utils.collectiontools import _AccumulatorBag
 
 
 _n_glycosylation = NGlycanCoreGlycosylation()
@@ -38,19 +42,15 @@ glycosylation_type_to_core = {
 }
 
 
-class SimpleCounter(dict):
-    def __getitem__(self, key):
-        try:
-            return dict.__getitem__(self, key)
-        except KeyError:
-            return 0
-
-
 class FragmentationStrategyBase(object):
 
-    def __init__(self, peptide, series):
+    def __init__(self, peptide, series, neutral_losses=None, max_losses=1):
+        if neutral_losses is None:
+            neutral_losses = dict()
         self.peptide = peptide
         self.series = IonSeries(series)
+        self.neutral_loss_rules = defaultdict(list, neutral_losses)
+        self.max_losses = max_losses
 
         # Null Values
         self.running_mass = 0
@@ -59,7 +59,7 @@ class FragmentationStrategyBase(object):
         self.size = len(self.peptide)
         self.modification_index = ModificationIndex()
         self.glycosylation_manager = GlycosylationManager(self.peptide)
-        self.amino_acids_counter = SimpleCounter()
+        self.amino_acids_counter = _AccumulatorBag()
 
         self.running_mass += self.series.mass_shift
         self.running_composition += self.series.composition_shift
@@ -68,6 +68,22 @@ class FragmentationStrategyBase(object):
     @property
     def direction(self):
         return self.series.direction
+
+    def _get_viable_loss_combinations(self):
+        losses = []
+        if not self.neutral_loss_rules:
+            return [None]
+        for residue, count in self.amino_acids_counter.items():
+            loss_composition = self.neutral_loss_rules[residue]
+            if loss_composition:
+                for i in range(count):
+                    losses.append(loss_composition + [Composition()])
+        loss_composition_combinations = {}
+        for comb in combinations(losses, self.max_losses):
+            for prod in product(*comb):
+                loss_composition = sum(prod, Composition())
+                loss_composition_combinations[format_negative_composition(loss_composition)] = loss_composition
+        return [NeutralLoss(k, v) for k, v in loss_composition_combinations.items() if v]
 
     def _initialize_start_terminal(self):
         if self.direction > 0:
@@ -145,7 +161,13 @@ class FragmentationStrategyBase(object):
             glycosylation=self.glycosylation_manager.copy(),
             flanking_amino_acids=self.flanking_residues(),
             composition=self.running_composition)
-        fragments_from_site.extend(self.partial_loss(frag))
+        losses = self._get_viable_loss_combinations()
+        for fragment in self.partial_loss(frag):
+            fragments_from_site.append(fragment)
+            for loss in losses:
+                f = fragment.clone()
+                f.neutral_loss = loss
+                fragments_from_site.append(f)
         return fragments_from_site
 
     def step(self):
@@ -255,23 +277,26 @@ class HCDFragmentationStrategy(FragmentationStrategyBase):
 # Characterization of amino acid side chain losses in electron capture dissociation.
 # Journal of the American Society for Mass Spectrometry, 13(3), 241–249.
 # https://doi.org/10.1016/S1044-0305(01)00357-9
-exd_sidechain_losses = {
-    R("His"): [Composition("H6C4N2")],
-    R("Arg"): [Composition("CH5N3"),
-               Composition("C4H11N3"),
-               Composition("C1N2H4"),
-               Composition("N2H6")],
-    R("Asn"): [Composition("CONH3")],
-    R("Gln"): [Composition("CONH3")],
-    R("Met"): [Composition("C3H6S")]
-}
+exd_sidechain_losses = defaultdict(list, {
+    R("His"): [-Composition("H6C4N2")],
+    R("Arg"): [-Composition("CH5N3"),
+               -Composition("C4H11N3"),
+               -Composition("C1N2H4"),
+               -Composition("N2H6")],
+    R("Asn"): [-Composition("CONH3")],
+    R("Gln"): [-Composition("CONH3")],
+    R("Met"): [-Composition("C3H6S")]
+})
+
+for key, value in _residue_to_neutral_loss.items():
+    exd_sidechain_losses[R(key)].extend(value)
 
 
 class EXDFragmentationStrategy(FragmentationStrategyBase):
     glycan_fragment_ladder = "Y"
 
-    def __init__(self, peptide, series, max_glycan_cleavages=2):
-        super(EXDFragmentationStrategy, self).__init__(peptide, series)
+    def __init__(self, peptide, series, neutral_losses=None, max_losses=1, max_glycan_cleavages=2):
+        super(EXDFragmentationStrategy, self).__init__(peptide, series, neutral_losses, max_losses)
         self.max_glycan_cleavages = max_glycan_cleavages
 
     def _strip_glycosylation_from_modification_dict(self, modification_dict):
