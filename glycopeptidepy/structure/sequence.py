@@ -8,7 +8,7 @@ from . import constants as structure_constants
 
 from .composition import Composition
 from .fragment import (
-    PeptideFragment, fragment_shift, fragment_shift_composition,
+    PeptideFragment,
     SimpleFragment, IonSeries, _n_glycosylation, _o_glycosylation,
     _gag_linker_glycosylation)
 from .modification import (
@@ -26,7 +26,7 @@ from glypy.composition.glycan_composition import (
 from .parser import sequence_tokenizer
 
 from .glycan import (
-    GlycosylationType, GlycosylationManager, GlycosylationSite,
+    GlycosylationType, GlycosylationManager,
     glycosylation_site_detectors, GlycanCompositionProxy)
 
 from ..utils.iterators import peekable
@@ -250,7 +250,7 @@ class PeptideSequence(PeptideSequenceBase):
 
     @classmethod
     def from_iterable(cls, iterable):
-        seq = cls("")
+        seq = cls(None)
         n_term = structure_constants.N_TERM_DEFAULT
         c_term = structure_constants.C_TERM_DEFAULT
         i = 0
@@ -274,6 +274,8 @@ class PeptideSequence(PeptideSequenceBase):
                     continue
                 if not isinstance(mod, Modification):
                     mod = Modification(mod)
+                if mod.is_a(ModificationCategory.glycosylation):
+                    seq._glycosylation_manager[i] = mod
                 mod_list.append(mod)
                 seq.mass += mod.mass
                 seq.modification_index[mod.name] += 1
@@ -302,6 +304,7 @@ class PeptideSequence(PeptideSequenceBase):
         self._n_term = None
         self._c_term = None
 
+        self._fragments_map = {}
         self._total_composition = None
         self._peptide_composition = None
 
@@ -334,7 +337,6 @@ class PeptideSequence(PeptideSequenceBase):
                 n_term, basestring) else n_term
             self.c_term = Modification(c_term) if isinstance(
                 c_term, basestring) else c_term
-        self._fragments_map = {}
 
     def _invalidate(self):
         self._total_composition = None
@@ -1020,13 +1022,13 @@ class PeptideSequence(PeptideSequenceBase):
             raise TypeError((
                 "Cannot infer monosaccharides from non-Glycan"
                 " or GlycanComposition {}").format(self.glycan))
-        fucose_count = glycan['Fuc'] or glycan['dHex']
+        # fucose_count = glycan['Fuc'] or glycan['dHex']
         core_count = self.modification_index[_gag_linker_glycosylation]
 
         per_site_shifts = []
         hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
-        hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
-        fucose = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
+        # hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
+        # fucose = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
         xyl = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
         hexa = FrozenMonosaccharideResidue.from_iupac_lite("HexA")
 
