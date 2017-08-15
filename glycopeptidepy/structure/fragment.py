@@ -269,45 +269,6 @@ class PeptideFragment(FragmentBase):
                     return True
         return False
 
-    def partial_loss(self, modifications=None):
-        if modifications is None:
-            modifications = self.concerned_modifications
-        modifications = list(modifications)
-        mods = dict(self.modification_dict)
-        mods_of_interest = defaultdict(
-            int, {k: v for k, v in mods.items() if k in modifications})
-
-        mod_to_composition = {k: Modification(
-            k).composition for k in modifications}
-
-        delta_composition = sum(
-            (mod_to_composition[k] * v for k, v in mods_of_interest.items()), Composition())
-        base_composition = self.composition - delta_composition
-
-        n_cores = mods_of_interest.pop(_n_glycosylation, 0)
-        o_cores = mods_of_interest.pop(_o_glycosylation, 0)
-        gag_cores = mods_of_interest.pop(_gag_linker_glycosylation, 0)
-
-        # Allow partial destruction of glycan core
-        mods_of_interest[_modification_hexnac] += n_cores * 2 + o_cores
-        mods_of_interest[_modification_xylose] += gag_cores
-
-        other_mods = {k: v for k, v in mods.items() if k not in modifications}
-        for varied_modifications in descending_combination_counter(mods_of_interest):
-            updated_mods = other_mods.copy()
-            updated_mods.update(
-                {k: v for k, v in varied_modifications.items() if v != 0})
-
-            extra_composition = Composition()
-            for mod, mod_count in varied_modifications.items():
-                extra_composition += mod_to_composition[mod] * mod_count
-
-            yield PeptideFragment(
-                self.series, self.position, dict(updated_mods), self.bare_mass,
-                golden_pairs=self.golden_pairs,
-                flanking_amino_acids=self.flanking_amino_acids,
-                composition=base_composition + extra_composition)
-
     def __repr__(self):
         return ("PeptideFragment(%(type)s %(position)s %(mass)s "
                 "%(modification_dict)s %(flanking_amino_acids)s %(neutral_loss)r)") % {

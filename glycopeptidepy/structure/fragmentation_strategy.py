@@ -72,7 +72,7 @@ class FragmentationStrategyBase(object):
     def _get_viable_loss_combinations(self):
         losses = []
         if not self.neutral_loss_rules:
-            return [None]
+            return losses
         for residue, count in self.amino_acids_counter.items():
             loss_composition = self.neutral_loss_rules[residue]
             if loss_composition:

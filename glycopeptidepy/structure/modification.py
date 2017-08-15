@@ -1098,36 +1098,6 @@ class OGlcNAcylation(CoreGlycosylation):
         return self.__class__(self.mass)
 
 
-class HexNAcylation(CoreGlycosylation):
-    def __init__(self):
-        self.common_name = "HexNAc"
-        self.title = "N-Acetylhexosamine"
-        self.preferred_name = self.common_name
-        self.unimod_name = self.common_name
-        self.categories = [ModificationCategory.glycosylation]
-        self.composition = _hexnac.total_composition().clone()
-        self.targets = [
-            ModificationTarget("S"),
-            ModificationTarget("T"),
-            ModificationTarget("N")
-        ]
-        self.mass = _hexnac.mass()
-        self._common_init()
-
-
-class Xylation(CoreGlycosylation):
-    def __init__(self):
-        self.common_name = "Xyl"
-        self.title = "Xylose"
-        self.preferred_name = self.common_name
-        self.unimod_name = self.common_name
-        self.categories = [ModificationCategory.glycosylation]
-        self.targets = [ModificationTarget("S"), ModificationTarget("T")]
-        self.composition = _xylose.total_composition().clone()
-        self.mass = _xylose.mass()
-        self._common_init()
-
-
 class GlycanFragment(Glycosylation):
     @property
     def is_composition(self):

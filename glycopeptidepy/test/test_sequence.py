@@ -135,6 +135,11 @@ class PeptideSequenceSuiteBase(object):
         for i, stub in enumerate(self.parse_sequence(p4).stub_fragments()):
             self.assertAlmostEqual(masses[i], stub.mass, 3)
 
+    def test_sequon_finding(self):
+        seq = self.parse_sequence("PEPTIDES")
+        self.assertIn(3, seq.o_glycan_sequon_sites)
+        self.assertNotIn(3, seq.glycosaminoglycan_sequon_sites)
+
     def test_composition(self):
         for p in [p1, p2, p3, p4, p5]:
             seq = self.parse_sequence(p)
@@ -188,6 +193,12 @@ class PeptideSequenceSuiteBase(object):
         t2 = self.parse_sequence("PEPT(N-Glycosylation)IDE{HexNAc:1}")
         self.assertAlmostEqual(t1.total_mass, t2.total_mass, 3)
         self.assertNotAlmostEqual(t1.peptide_composition().mass, t2.peptide_composition().mass, 3)
+
+    def test_equalities(self):
+        t1 = self.parse_sequence("PEPT(HexNAc)IDE")
+        t2 = self.parse_sequence("PEPT(N-Glycosylation)IDE{HexNAc:1}")
+        self.assertTrue(t1.base_sequence_equality(t2))
+        self.assertFalse(t1.modified_sequence_equality(t2))
 
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):

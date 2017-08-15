@@ -86,7 +86,7 @@ def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
     for i, position in enumerate(sequence):
         if position[0] in site_set:
             if ((len(position[1]) == 0) or position[1][0] in allow_modified) and not (
-                    sequence[i - 2][0] == asn):
+                    i - 2 >= 0 and sequence[i - 2][0] == asn):
                 positions.append(i)
     return positions
 
@@ -323,10 +323,6 @@ class PeptideSequence(PeptideSequenceBase):
         self._total_composition = None
         self._peptide_composition = None
 
-    def _patch_glycan_composition(self):
-        offset = Composition({"H": 2, "O": 1}) * 1
-        self.glycan.composition_offset -= offset
-
     def __repr__(self):
         n_term = ""
         if self.n_term is not None:
@@ -446,6 +442,13 @@ class PeptideSequence(PeptideSequenceBase):
 
     def __eq__(self, other):
         return str(self) == str(other)
+
+    def _retrack_sequence(self):
+        self._glycosylation_manager.clear()
+        for i, position in enumerate(self):
+            for mod in position[1]:
+                if mod.is_tracked_for(ModificationCategory.glycosylation):
+                    self._glycosylation_manager[i] = mod
 
     def base_sequence_equality(self, other):
         if len(self) != len(other):
@@ -649,6 +652,7 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass += residue.mass
         for mod in modifications:
             self.mass += mod.mass
+        self._retrack_sequence()
 
     def delete(self, position):
         self._invalidate()
@@ -656,6 +660,7 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass -= residue.mass
         for mod in mods:
             self.mass -= mod.mass
+        self._retrack_sequence()
 
     def substitute(self, position, residue):
         old_residue = self.sequence[position][0]
@@ -663,6 +668,7 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass += residue.mass
         self.sequence[position][0] = residue
         self._invalidate()
+        self._retrack_sequence()
 
     def append(self, residue, modification=None):
         self._invalidate()
@@ -675,6 +681,7 @@ class PeptideSequence(PeptideSequenceBase):
             self.mass += modification.mass
             self.modification_index[modification.name] += 1
         self.sequence.append(self.position_class(next_pos))
+        self._retrack_sequence()
 
     def extend(self, sequence):
         self._invalidate()
@@ -684,6 +691,7 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass += sequence.mass - sequence.n_term.mass - sequence.c_term.mass
         for mod, count in sequence.modification_index.items():
             self.modification_index[mod] += count
+        self._retrack_sequence()
 
     def leading_extend(self, sequence):
         self._invalidate()
@@ -693,6 +701,7 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass += sequence.mass - sequence.n_term.mass - sequence.c_term.mass
         for mod, count in sequence.modification_index.items():
             self.modification_index[mod] += count
+        self._retrack_sequence()
 
     @property
     def n_glycan_sequon_sites(self):
@@ -708,9 +717,7 @@ class PeptideSequence(PeptideSequenceBase):
 
     @property
     def glycosylation_sites(self):
-        sites = find_n_glycosylation_sequons(
-            self, structure_constants.ALLOW_MODIFIED_ASPARAGINE)
-        return sites
+        return self.n_glycan_sequon_sites
 
     def stub_fragments(self, extended=False):
         n_glycan = self.modification_index[_n_glycosylation] > 0
