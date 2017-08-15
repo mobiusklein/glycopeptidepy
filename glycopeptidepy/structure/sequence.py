@@ -177,7 +177,7 @@ def _total_composition(sequence):
     for position in sequence:
         total += position[0].composition
         for mod in position[1]:
-            if mod.is_a(ModificationCategory.glycosylation):
+            if mod.is_tracked_for(ModificationCategory.glycosylation):
                 continue
             total += mod.composition
     total += sequence.n_term.composition
@@ -192,7 +192,7 @@ def _calculate_mass(sequence):
     for position in sequence:
         total += position[0].mass
         for mod in position[1]:
-            if mod.is_a(ModificationCategory.glycosylation):
+            if mod.is_tracked_for(ModificationCategory.glycosylation):
                 continue
             total += mod.mass
     total += sequence.n_term.mass
@@ -255,7 +255,7 @@ class PeptideSequence(PeptideSequenceBase):
                     continue
                 if not isinstance(mod, Modification):
                     mod = Modification(mod)
-                if mod.is_a(ModificationCategory.glycosylation):
+                if mod.is_tracked_for(ModificationCategory.glycosylation):
                     seq._glycosylation_manager[i] = mod
                 mod_list.append(mod)
                 seq.mass += mod.mass
@@ -302,7 +302,7 @@ class PeptideSequence(PeptideSequenceBase):
                 for mod in item[1]:
                     if mod != '':
                         mod = Modification(mod)
-                        if mod.is_a(ModificationCategory.glycosylation):
+                        if mod.is_tracked_for(ModificationCategory.glycosylation):
                             self._glycosylation_manager[i] = mod
                         mods.append(mod)
                         self.modification_index[mod] += 1
@@ -530,7 +530,7 @@ class PeptideSequence(PeptideSequenceBase):
             drop_mod = self.sequence[position][1].pop(dropped_index)
             self.mass -= drop_mod.mass
             self.modification_index[drop_mod.name] -= 1
-            if drop_mod.is_a(ModificationCategory.glycosylation):
+            if drop_mod.is_tracked_for(ModificationCategory.glycosylation):
                 self._glycosylation_manager.pop(position)
         except (IndexError, ValueError):
             raise ValueError("Modification not found! %s @ %s" %
@@ -558,7 +558,7 @@ class PeptideSequence(PeptideSequenceBase):
             self.sequence[position][1].append(mod)
             self.mass += mod.mass
             self.modification_index[mod.name] += 1
-            if mod.is_a(ModificationCategory.glycosylation):
+            if mod.is_tracked_for(ModificationCategory.glycosylation):
                 self._glycosylation_manager[position] = mod
 
     def fragment(self, key):

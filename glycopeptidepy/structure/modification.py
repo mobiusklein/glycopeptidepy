@@ -633,6 +633,10 @@ class ModificationRule(object):
     def is_core(self):
         return True
 
+    def is_tracked_for(self, category):
+        return False
+
+
 
 class AnonymousModificationRule(ModificationRule):
     '''
@@ -947,6 +951,9 @@ class Glycosylation(ModificationRule):
         return self.__class__(
             self._original, self.encoding_format, self.metadata)
 
+    def is_tracked_for(self, category):
+        return category == ModificationCategory.glycosylation
+
     def get_fragments(self, *args, **kwargs):
         if self.is_composition:
             raise TypeError("Cannot generate fragments from composition")
@@ -1220,8 +1227,10 @@ class ModificationSource(object):
 class ModificationTable(ModificationSource):
 
     other_modifications = {
-        "HexNAc": HexNAcylation(),
-        "Xyl": Xylation(),
+        # "HexNAc": HexNAcylation(),
+        # "Xyl": Xylation(),
+        "HexNAc": hexnac_modification,
+        "Xyl": xylose_modification,
         "N-Glycosylation": NGlycanCoreGlycosylation(),
         "O-Glycosylation": OGlycanCoreGlycosylation(),
         "GAG-Linker": GlycosaminoglycanLinkerGlycosylation(),
@@ -1475,3 +1484,6 @@ class Modification(ModificationBase):
 
     def is_a(self, category):
         return self.rule.is_a(category)
+
+    def is_tracked_for(self, category):
+        return self.rule.is_tracked_for(category)

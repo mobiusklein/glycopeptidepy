@@ -183,6 +183,12 @@ class PeptideSequenceSuiteBase(object):
         self.assertAlmostEqual(t1.total_mass, t2.total_mass, 4)
         self.assertEqual(t1.clone().deglycosylate(), t2.clone().deglycosylate())
 
+    def test_glycan_tracking(self):
+        t1 = self.parse_sequence("PEPT(HexNAc)IDE")
+        t2 = self.parse_sequence("PEPT(N-Glycosylation)IDE{HexNAc:1}")
+        self.assertAlmostEqual(t1.total_mass, t2.total_mass, 3)
+        self.assertNotAlmostEqual(t1.peptide_composition().mass, t2.peptide_composition().mass, 3)
+
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
     def parse_sequence(self, seqstr):

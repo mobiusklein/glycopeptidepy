@@ -142,7 +142,7 @@ class FragmentationStrategyBase(object):
         self.index += self.direction
         residue, modifications = self.peptide[self.index]
         for mod in modifications:
-            if mod.is_a(ModificationCategory.glycosylation):
+            if mod.is_tracked_for(ModificationCategory.glycosylation):
                 self.track_glycosylation(self.index, mod)
             else:
                 self.modification_index[mod] += 1
@@ -207,7 +207,7 @@ class HCDFragmentationStrategy(FragmentationStrategyBase):
     def composition_of(self, residue, modifications):
         composition = Composition(residue.composition)
         for mod in modifications:
-            if mod.is_a(ModificationCategory.glycosylation):
+            if mod.is_tracked_for(ModificationCategory.glycosylation):
                 mod = self._get_core_for(mod)
             composition += mod.composition
         return composition
@@ -305,7 +305,7 @@ class EXDFragmentationStrategy(FragmentationStrategyBase):
         for position, glycosylation in sorted(self.glycosylation_manager.items()):
             glycosylations.append(glycosylation)
         for modification, count in modification_dict.items():
-            if modification.is_a(ModificationCategory.glycosylation):
+            if modification.is_tracked_for(ModificationCategory.glycosylation):
                 continue
             stripped_modifications[modification] = count
         return glycosylations, stripped_modifications
