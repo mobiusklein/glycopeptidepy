@@ -16,6 +16,15 @@ p4 = "TVDGT(O-Glycosylation)AR{Fuc:1; Hex:1; HexNAc:1; Neu5Ac:1}"
 p5 = "(Carbamidomethyl)-FFYFTPNK"
 p6 = "NEEYN(N-Glycosylation)K{Fuc:1; Hex:5; HexNAc:4; NeuAc:2}"
 p7 = 'ISASGVEDIS(GAG-Linker)R{Xyl:1; a,enHex:1; aHex:1; Hex:1; HexS:1; HexNAc(S):1}'
+p8 = ('QQQHLFGSN(#:iupac,glycosylation_type=n_linked:b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-2)'
+      '-a-D-Manp-(1-6)-[b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-4)-a-D-Manp-(1-3)]b-D-Manp-(1-4)'
+      '-b-D-Glcp2NAc-(1-4)-?-D-Glcp2NAc)VTDC(Carbamidomethyl)SGNFCLFR')
+p9 = "N(N-Glycosylation)ITEIVYLTN(N-Glycosylation)TTIEK{Hex:10; HexNAc:8}"
+p10 = ('N(#:iupac,glycosylation_type=n_linked:b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-2)-a-D-Manp'
+       '-(1-6)-[b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-4)-a-D-Manp-(1-3)]b-D-Manp-(1-4)-b-D-Glcp2NAc'
+       '-(1-4)-?-D-Glcp2NAc)ITEIVYLTN(#:iupac,glycosylation_type=n_linked:b-D-Galp-(1-4)'
+       '-b-D-Glcp2NAc-(1-2)-a-D-Manp-(1-6)-[b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-4)-a-D-Manp-(1-3)]'
+       'b-D-Manp-(1-4)-b-D-Glcp2NAc-(1-4)-?-D-Glcp2NAc)TTIEK')
 hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
@@ -76,6 +85,11 @@ class PeptideSequenceSuiteBase(object):
 
     def test_clone(self):
         peptide = self.parse_sequence(p3)
+        self.assertEqual(peptide, peptide.clone())
+        self.assertEqual(peptide.total_mass, peptide.clone().total_mass)
+        self.assertEqual(peptide.total_composition(), peptide.clone().total_composition())
+        self.assertTrue(peptide.full_structure_equality(peptide.clone()))
+        peptide = self.parse_sequence(p8)
         self.assertEqual(peptide, peptide.clone())
         self.assertEqual(peptide.total_mass, peptide.clone().total_mass)
         self.assertEqual(peptide.total_composition(), peptide.clone().total_composition())
@@ -162,6 +176,12 @@ class PeptideSequenceSuiteBase(object):
         self.assertAlmostEqual(seq.total_mass, 2285.766, 2)
         ox_map = {f.name: f for f in seq.glycan_fragments()}
         self.assertAlmostEqual(ox_map["HexNAca,enHex"].mass, 361.10089, 3)
+
+    def test_glycan_representations(self):
+        t1 = self.parse_sequence(p9)
+        t2 = self.parse_sequence(p10)
+        self.assertAlmostEqual(t1.total_mass, t2.total_mass, 4)
+        self.assertEqual(t1.clone().deglycosylate(), t2.clone().deglycosylate())
 
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):

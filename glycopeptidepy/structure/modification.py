@@ -629,6 +629,10 @@ class ModificationRule(object):
         for target in self.targets:
             yield "%s (%s)" % (self.title, target.serialize())
 
+    @property
+    def is_core(self):
+        return True
+
 
 class AnonymousModificationRule(ModificationRule):
     '''
@@ -962,6 +966,15 @@ class CoreGlycosylation(Glycosylation):
     def get_fragments(self, *args, **kwargs):
         return []
 
+    def _common_init(self):
+        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
+        self.options = {}
+        self.aliases = set()
+        self.categories = [ModificationCategory.glycosylation]
+
+    def clone(self):
+        return self.__class__()
+
 
 class NGlycanCoreGlycosylation(CoreGlycosylation):
     mass_ladder = {k: FrozenGlycanComposition.parse(k).total_composition() - Composition("H2O") for k in {
@@ -980,10 +993,7 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.preferred_name = self.unimod_name
         self.targets = [(ModificationTarget("N"))]
         self.composition = _hexnac.total_composition().clone()
-        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
-        self.options = {}
-        self.aliases = set()
-        self.categories = [ModificationCategory.glycosylation]
+        self._common_init()
 
     def losses(self):
         for label_loss in self.mass_ladder.items():
@@ -1011,10 +1021,7 @@ class OGlycanCoreGlycosylation(CoreGlycosylation):
         self.preferred_name = self.unimod_name
         self.targets = [ModificationTarget("S"), ModificationTarget("T")]
         self.composition = _hexnac.total_composition().clone()
-        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
-        self.options = {}
-        self.aliases = set()
-        self.categories = [ModificationCategory.glycosylation]
+        self._common_init()
 
     @property
     def glycosylation_type(self):
@@ -1070,15 +1077,11 @@ class OGlcNAcylation(CoreGlycosylation):
         self.common_name = "O-GlcNAc"
         self.preferred_name = self.common_name
         self.mass = base_mass
-        self.title = "O-GlcNAc"
-        self.unimod_name = "O-GlcNAc"
+        self.title = self.common_name
+        self.unimod_name = self.common_name
         self.targets = [ModificationTarget("S"), ModificationTarget("T")]
         self.composition = _hexnac.total_composition().clone()
-        self.title = self.common_name
-        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
-        self.categories = [ModificationCategory.glycosylation]
-        self.options = {}
-        self.aliases = set()
+        self._common_init()
 
     def losses(self):
         for label_loss in self.mass_ladder.items():
@@ -1086,6 +1089,36 @@ class OGlcNAcylation(CoreGlycosylation):
 
     def clone(self):
         return self.__class__(self.mass)
+
+
+class HexNAcylation(CoreGlycosylation):
+    def __init__(self):
+        self.common_name = "HexNAc"
+        self.title = "N-Acetylhexosamine"
+        self.preferred_name = self.common_name
+        self.unimod_name = self.common_name
+        self.categories = [ModificationCategory.glycosylation]
+        self.composition = _hexnac.total_composition().clone()
+        self.targets = [
+            ModificationTarget("S"),
+            ModificationTarget("T"),
+            ModificationTarget("N")
+        ]
+        self.mass = _hexnac.mass()
+        self._common_init()
+
+
+class Xylation(CoreGlycosylation):
+    def __init__(self):
+        self.common_name = "Xyl"
+        self.title = "Xylose"
+        self.preferred_name = self.common_name
+        self.unimod_name = self.common_name
+        self.categories = [ModificationCategory.glycosylation]
+        self.targets = [ModificationTarget("S"), ModificationTarget("T")]
+        self.composition = _xylose.total_composition().clone()
+        self.mass = _xylose.mass()
+        self._common_init()
 
 
 class GlycanFragment(Glycosylation):
@@ -1187,8 +1220,8 @@ class ModificationSource(object):
 class ModificationTable(ModificationSource):
 
     other_modifications = {
-        "HexNAc": hexnac_modification,
-        "Xyl": xylose_modification,
+        "HexNAc": HexNAcylation(),
+        "Xyl": Xylation(),
         "N-Glycosylation": NGlycanCoreGlycosylation(),
         "O-Glycosylation": OGlycanCoreGlycosylation(),
         "GAG-Linker": GlycosaminoglycanLinkerGlycosylation(),
@@ -1222,6 +1255,8 @@ class ModificationTable(ModificationSource):
         for rule in rules:
             if not isinstance(rule, ModificationRule):
                 rule = ModificationRule(**rule)
+            if rule.name in self.other_modifications:
+                continue
             self.add(rule)
 
         self._include_other_rules()
