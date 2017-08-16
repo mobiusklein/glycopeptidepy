@@ -2,3 +2,5 @@ glypy
 pyteomics>=3.0
 six
 lxml
+rdflib
+SPARQLWrapper
