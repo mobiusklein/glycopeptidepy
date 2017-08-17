@@ -862,7 +862,7 @@ class Glycosylation(ModificationRule):
         try:
             glycan, encoding_format, metadata = cls._parse(rule_string)
             return cls(glycan, encoding_format, metadata)
-        except KeyboardInterrupt:
+        except Exception:
             return None
 
     def __init__(self, glycan, encoding_format=None, metadata=None):
