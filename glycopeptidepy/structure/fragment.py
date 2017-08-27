@@ -5,7 +5,6 @@ from .modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
 from .composition import Composition, formula
-from ..utils.collectiontools import descending_combination_counter
 from ..utils import simple_repr
 
 _n_glycosylation = NGlycanCoreGlycosylation()
