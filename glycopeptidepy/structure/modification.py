@@ -1002,7 +1002,7 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
 
-    def losses(self):
+    def get_fragments(self):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1034,7 +1034,7 @@ class OGlycanCoreGlycosylation(CoreGlycosylation):
     def glycosylation_type(self):
         return GlycosylationType.o_linked
 
-    def losses(self):
+    def get_fragments(self):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1067,7 +1067,7 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
     def glycosylation_type(self):
         return GlycosylationType.glycosaminoglycan
 
-    def losses(self):
+    def get_fragments(self):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1090,7 +1090,7 @@ class OGlcNAcylation(CoreGlycosylation):
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
 
-    def losses(self):
+    def get_fragments(self):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1457,3 +1457,6 @@ class Modification(ModificationBase):
 
     def is_tracked_for(self, category):
         return self.rule.is_tracked_for(category)
+
+    def get_fragments(self, *args, **kwargs):
+        return self.rule.get_fragments(*args, **kwargs)
