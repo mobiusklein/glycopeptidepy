@@ -170,16 +170,16 @@ class PeptideFragment(FragmentBase):
          _gag_linker_glycosylation,
          _modification_xylose])
 
-    __slots__ = ("type", "position", "modification_dict", "bare_mass",
+    __slots__ = ("kind", "position", "modification_dict", "bare_mass",
                  "golden_pairs", "flanking_amino_acids", "glycosylation",
                  "_neutral_loss", "composition", 'mass')
 
-    def __init__(self, frag_type, position, modification_dict, mass, golden_pairs=None,
+    def __init__(self, kind, position, modification_dict, mass, golden_pairs=None,
                  flanking_amino_acids=None, glycosylation=None, neutral_loss=None,
                  composition=None):
         if golden_pairs is None:
             golden_pairs = []
-        self.type = frag_type
+        self.kind = kind
 
         # The mass value is the bare backbone's mass
         self.bare_mass = mass
@@ -206,7 +206,7 @@ class PeptideFragment(FragmentBase):
             self.mass += self.neutral_loss.mass
 
     def get_series(self):
-        return self.type
+        return self.kind
 
     def clone(self):
         return self.__class__(
@@ -226,7 +226,7 @@ class PeptideFragment(FragmentBase):
 
     def __reduce__(self):
         return self.__class__, (
-            self.type, self.position, self.modification_dict, self.bare_mass,
+            self.kind, self.position, self.modification_dict, self.bare_mass,
             self.golden_pairs, self.flanking_amino_acids, self.glycosylation,
             self.neutral_loss, self.composition)
 
@@ -304,7 +304,7 @@ class SimpleFragment(FragmentBase):
         return SimpleFragment, (self.name, corrected_mass, self.kind, self.composition, self.neutral_loss)
 
     def __repr__(self):
-        return "SimpleFragment(name={self.name}, mass={self.mass:.04f}, kind={self.kind})".format(self=self)
+        return "SimpleFragment(name={self.name}, mass={self.mass:.04f}, series={self.kind})".format(self=self)
 
     def get_series(self):
         return self.kind
