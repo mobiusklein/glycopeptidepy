@@ -401,6 +401,8 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
         ]
         fragment_combinations = product(*fragments)
         for fragment_set in fragment_combinations:
+            if fragment_set == ():
+                continue
             delta_composition = Composition()
             new_modifications = ModificationIndex(stripped_modifications)
             for glycan_fragment in fragment_set:
@@ -417,6 +419,5 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
                 composition=bare_fragment.composition + delta_composition)
             yield extended_fragment
-
         # yield the intact fragment
         yield fragment

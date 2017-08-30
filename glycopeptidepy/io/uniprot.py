@@ -200,9 +200,10 @@ class Site(Domain):
 class GlycosylationSite(UniProtFeatureBase):
     feature_type = 'glycosylation site'
 
-    def __init__(self, position, glycosylation_type):
+    def __init__(self, position, glycosylation_type, description=None):
         self.position = position
         self.glycosylation_type = glycosylation_type
+        self.description = description
 
     @property
     def name(self):
@@ -221,7 +222,7 @@ class GlycosylationSite(UniProtFeatureBase):
         position = int(feature.find(
             ".//up:position", nsmap).attrib['position']) - 1
         glycosylation_type = feature.attrib["description"].split(" ")[0]
-        return cls(position, glycosylation_type)
+        return cls(position, glycosylation_type, feature.attrib["description"])
 
 
 UniProtProtein = make_struct("UniProtProtein", (

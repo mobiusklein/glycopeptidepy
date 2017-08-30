@@ -135,7 +135,8 @@ expasy_rules = {'arg-c': 'R',
                 'staphylococcal peptidase i': '(?<=[^E])E',
                 'thermolysin': '[^DE](?=[AFILMV])',
                 'thrombin': '((?<=G)R(?=G))|((?<=[AFGILTVM][AFGILTVWA]P)R(?=[^DE][^DE]))',
-                'trypsin': '([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))'}
+                'trypsin': '([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))',
+                'none': ''}
 
 
 def merge_enzyme_rules(enzyme_patterns):
