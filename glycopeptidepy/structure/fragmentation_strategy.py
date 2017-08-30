@@ -19,6 +19,7 @@ from glycopeptidepy.structure.glycan import (
     GlycosylationType)
 from glycopeptidepy.structure.fragment import (
     IonSeries,
+    SimpleFragment,
     PeptideFragment,
     format_negative_composition,
     NeutralLoss)
@@ -43,11 +44,74 @@ glycosylation_type_to_core = {
 
 
 class FragmentationStrategyBase(object):
+    def __init__(self, peptide):
+        self.peptide = peptide
+
+    def __repr__(self):
+        return "%s(%s)" % (
+            self.__class__.__name__,
+            self.peptide)
+
+
+class CADFragmentationStrategy(FragmentationStrategyBase):
+    def __init__(self, peptide, max_cleavages=2):
+        super(CADFragmentationStrategy, self).__init__(peptide)
+        self.max_cleavages = max_cleavages
+        self.iterator = self._generator(self.max_cleavages)
+
+    def _generator(self, max_cleavages=2):
+        glycans = self.peptide.glycosylation_manager.items()
+        n = len(glycans)
+        base_composition = self.peptide.peptide_composition()
+        for i in range(1, n + 1):
+            for dissociated in combinations(glycans, i):
+                remaining = dict(glycans)
+                for position, glycan in dissociated:
+                    remaining.pop(position)
+                reference_composition = base_composition.copy()
+                for position, glycan in remaining.items():
+                    reference_composition += glycan.total_composition()
+
+                glycan_B_ions = defaultdict(list)
+                glycan_Y_ions = defaultdict(list)
+                for position, glycan in dissociated:
+                    for f in glycan.rule.get_fragments("BY", max_cleavages=max_cleavages):
+                        if 'B' in f.series:
+                            glycan_B_ions[position].append(f)
+                        else:
+                            glycan_Y_ions[position].append(f)
+                for b_ion_set in glycan_B_ions.values():
+                    for f in b_ion_set:
+                        yield f
+                key_order = list(glycan_Y_ions.keys())
+                for y_ion_set in product(*glycan_Y_ions.values()):
+                    name = ",".join("%d:%s" % (k, f.name) for k, f in zip(key_order, y_ion_set))
+                    fragment_composition = reference_composition.copy()
+                    for f in y_ion_set:
+                        fragment_composition += f.composition
+                    f = SimpleFragment(
+                        name="peptide+" + name,
+                        mass=fragment_composition.mass,
+                        composition=fragment_composition,
+                        kind=IonSeries.stub_glycopeptide)
+                    yield f
+
+    def __next__(self):
+        return next(self.iterator)
+
+    def next(self):
+        return self.__next__()
+
+    def __iter__(self):
+        return self
+
+
+class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
     def __init__(self, peptide, series, neutral_losses=None, max_losses=1):
         if neutral_losses is None:
             neutral_losses = dict()
-        self.peptide = peptide
+        super(PeptideFragmentationStrategyBase, self).__init__(peptide)
         self.series = IonSeries(series)
         self.neutral_loss_rules = defaultdict(list, neutral_losses)
         self.max_losses = max_losses
@@ -182,7 +246,7 @@ class FragmentationStrategyBase(object):
             self.running_mass, self.index)
 
 
-class HCDFragmentationStrategy(FragmentationStrategyBase):
+class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
     modifications_of_interest = [
         _n_glycosylation,
         _modification_hexnac,
@@ -292,7 +356,7 @@ for key, value in _residue_to_neutral_loss.items():
     exd_sidechain_losses[R(key)].extend(value)
 
 
-class EXDFragmentationStrategy(FragmentationStrategyBase):
+class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
     glycan_fragment_ladder = "Y"
 
     def __init__(self, peptide, series, neutral_losses=None, max_losses=1, max_glycan_cleavages=2):

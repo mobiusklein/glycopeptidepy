@@ -1,5 +1,5 @@
 import itertools
-from collections import Counter
+from collections import Counter, defaultdict
 
 from six import string_types as basestring
 
@@ -16,7 +16,7 @@ from .modification import (
     ModificationIndex)
 from .residue import Residue
 
-from .fragmentation_strategy import HCDFragmentationStrategy
+from .fragmentation_strategy import HCDFragmentationStrategy, CADFragmentationStrategy
 
 from glypy import GlycanComposition, Glycan, ReducedEnd
 from glypy.composition.glycan_composition import (
@@ -172,6 +172,7 @@ def total_composition(sequence):
         sequence = parse(sequence)
     return _total_composition(sequence)
 
+
 def _total_composition(sequence):
     total = Composition()
     for position in sequence:
@@ -186,6 +187,7 @@ def _total_composition(sequence):
     if gc:
         total += gc.total_composition()
     return total
+
 
 def _calculate_mass(sequence):
     total = 0
@@ -367,11 +369,10 @@ class PeptideSequence(PeptideSequenceBase):
         elif isinstance(value, GlycosylationManager):
             self._glycosylation_manager = value
         self._invalidate()
-        # if isinstance(value, GlycanComposition):
-        #     self._patch_glycan_composition()
-        # elif isinstance(value, Glycan):
-        #     value.reducing_end = ReducedEnd(-Composition("H2O"), valence=0)
-        # self._glycan_composition = None
+
+    @property
+    def glycosylation_manager(self):
+        return self._glycosylation_manager
 
     @property
     def glycan_composition(self):
@@ -733,7 +734,10 @@ class PeptideSequence(PeptideSequenceBase):
         elif gag_linker:
             return self.gag_linker_stub_fragments(extended=extended)
         else:
-            raise ValueError("No Glycan Class Detected")
+            if len(self._glycosylation_manager) > 0:
+                raise NotImplementedError()
+            else:
+                raise ValueError("No Glycan Class Detected")
 
     def n_glycan_stub_fragments(self, extended=False):
         glycan = self.glycan_composition
@@ -1077,6 +1081,9 @@ class PeptideSequence(PeptideSequenceBase):
             seen.add(key_base)
             yield SimpleFragment(name=key_base, mass=mass, composition=composition, kind=stub_glycopeptide_series)
 
+    def _glycan_structural_dissociation(self, max_cleavages=2):
+        return CADFragmentationStrategy(self, max_cleavages)
+
     def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,
                          include_large_glycan_fragments=True, maximum_fragment_size=5):
         r'''
@@ -1153,23 +1160,10 @@ class PeptideSequence(PeptideSequenceBase):
                         kind=oxonium_ion_series,
                         composition=composition - water2_plus_sidechain_plus_carbon)
 
-        if isinstance(self.glycan, Glycan) and all_series:
-            glycan = self.glycan
-            base_composition = self.total_composition() - self.glycan.total_composition()
-            base_mass = base_composition.mass
+        if self.glycosylation_manager.is_fully_specified_topologies() and all_series:
+            for f in self._glycan_structural_dissociation():
+                yield f
 
-            for fragment in glycan.fragments("BY"):
-                if fragment.is_reducing():
-                    # TODO:
-                    # When self.glycan is adjusted for the attachment cost with the anchoring
-                    # amino acid, this water.mass penalty can be removed
-                    yield SimpleFragment(
-                        name="peptide+" + fragment.name, mass=base_mass + fragment.mass - water.mass,
-                        kind=stub_glycopeptide_series, composition=base_composition + fragment.composition)
-                else:
-                    yield SimpleFragment(
-                        name=fragment.name, mass=fragment.mass, kind=oxonium_ion_series,
-                        composition=fragment.composition)
         elif allow_ambiguous and all_series:
             if self.modification_index[_n_glycosylation] > 0:
                 _offset = Composition()
