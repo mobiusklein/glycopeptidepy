@@ -244,6 +244,17 @@ class GlycosylationManager(dict):
                 base += gc
         return GlycanCompositionProxy(base)
 
+    def is_fully_specified_topologies(self):
+        is_fully_specified = len(self) > 0
+        for key, value in self.items():
+            if value.rule.is_core:
+                is_fully_specified = False
+                break
+            elif value.rule.is_composition:
+                is_fully_specified = False
+                break
+        return is_fully_specified
+
     @property
     def glycan_composition(self):
         if self._proxy is None:
