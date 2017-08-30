@@ -1,5 +1,6 @@
 import re
 import threading
+from collections import defaultdict
 
 from lxml import etree
 from glycopeptidepy.structure.modification import ModificationRule
@@ -225,7 +226,7 @@ class GlycosylationSite(UniProtFeatureBase):
 
 UniProtProtein = make_struct("UniProtProtein", (
     "sequence", "features", "recommended_name", "gene_name", "names", "accessions",
-    "keywords"))
+    "keywords", "dbreferences"))
 
 
 def get_etree_for(accession):
@@ -259,6 +260,14 @@ def get_features_for(accession, error=False):
         gene_name = ""
     accessions = [el.text for el in tree.findall(
         ".//up:accession", nsmap)]
+    dbreferences = defaultdict(list)
+    for tag in tree.findall(".//up:dbReference", nsmap):
+        db = tag.attrib['type']
+        entry = dict(id=tag.attrib['id'])
+        for prop in tag.findall(".//up:property", nsmap):
+            entry[prop.attrib['type']] = prop.attrib['value']
+        dbreferences[db].append(entry)
+
     features = []
     exc_type = Exception if not error else KeyboardInterrupt
     for tag in tree.findall(".//up:feature", nsmap):
@@ -273,7 +282,8 @@ def get_features_for(accession, error=False):
     for kw in tree.findall(".//up:keyword", nsmap):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
     return UniProtProtein(
-        seq, features, recommended_name, gene_name, names, accessions, keywords)
+        seq, features, recommended_name, gene_name, names, accessions,
+        keywords, dbreferences)
 
 
 get = get_features_for
