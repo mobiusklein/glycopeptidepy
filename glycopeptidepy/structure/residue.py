@@ -272,7 +272,7 @@ class AminoAcidResidue(ResidueBase):
 Residue = AminoAcidResidue
 
 
-def register_residue(name, symbol, formula, chemical_class):
+def register_residue(name, symbol, formula, chemical_class=None):
     assert symbol not in symbol_to_residue
     assert name not in residue_table
     residue_to_symbol[name] = symbol
