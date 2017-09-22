@@ -198,6 +198,10 @@ def extract_targets_from_string(target_string):
         return ModificationTarget(amino_acids, position)
 
 
+def extract_targets_from_rule_string(name):
+    return extract_targets_from_string(title_cleaner.search(name).groupdict()["target"])
+
+
 def get_position_modifier_rules_dict(sequence):
     '''Labels the start and end indices of the sequence
 
@@ -487,6 +491,7 @@ class ModificationRule(object):
             self.categories.update(
                 target.classification)
         self.categories = list(self.categories)
+        self._hash = hash(self.preferred_name)
 
     @property
     def is_standard(self):
@@ -607,7 +612,7 @@ class ModificationRule(object):
         return self._c_term_target
 
     def __hash__(self):
-        return hash(self.preferred_name)
+        return self._hash
 
     def __eq__(self, other):
         if self is other:
@@ -635,7 +640,6 @@ class ModificationRule(object):
 
     def is_tracked_for(self, category):
         return False
-
 
 
 class AnonymousModificationRule(ModificationRule):
@@ -734,6 +738,7 @@ class AminoAcidSubstitution(AnonymousModificationRule):
         self.options = kwargs
         self.categories = [ModificationCategory['substitution']]
         self.aliases = set()
+        self._hash = hash(self.preferred_name)
 
     def serialize(self):
         return "@" + self.name
@@ -912,6 +917,7 @@ class Glycosylation(ModificationRule):
         self.aliases = set()
         self.options = {}
         self.fragile = True
+        self._hash = hash(self.preferred_name)
 
     def _make_string(self):
         template = "#:{}:{}"
@@ -978,6 +984,7 @@ class CoreGlycosylation(Glycosylation):
         self.options = {}
         self.aliases = set()
         self.categories = [ModificationCategory.glycosylation]
+        self._hash = hash(self.preferred_name)
 
     def clone(self):
         return self.__class__()
@@ -1058,10 +1065,7 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
         self.preferred_name = self.unimod_name
         self.targets = [ModificationTarget("S")]
         self.composition = _hexnac.total_composition().clone()
-        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
-        self.options = {}
-        self.aliases = set()
-        self.categories = [ModificationCategory.glycosylation]
+        self._common_init()
 
     @property
     def glycosylation_type(self):
@@ -1122,6 +1126,7 @@ class GlycanFragment(Glycosylation):
         self.options = {}
         self.aliases = set()
         self.categories = [ModificationCategory.glycosylation]
+        self._hash = hash(self.preferred_name)
 
 
 def load_from_csv(stream):
@@ -1351,14 +1356,14 @@ class Modification(ModificationBase):
 
     _table = ModificationTable()
 
-    __slots__ = ["name", "mass", "position", "number", "rule", "composition"]
+    __slots__ = ["name", "mass", "rule", "composition", "_hash"]
 
     @classmethod
     def register_new_rule(cls, rule):
         ModificationTable.register_new_rule(rule)
 
     @classmethod
-    def mass_by_name(cls, name, mod_num=1):
+    def mass_by_name(cls, name):
         if len(name) == 0:
             mass = 0.0
         elif "@" == name[0]:
@@ -1368,7 +1373,7 @@ class Modification(ModificationBase):
             mass = cls._table[name].mass
         return mass
 
-    def __init__(self, rule, mod_pos=-1, mod_num=1):
+    def __init__(self, rule):
         name = None
         if(isinstance(rule, basestring)):
             try:
@@ -1398,9 +1403,8 @@ class Modification(ModificationBase):
 
         self.name = name
         self.mass = rule.mass
-        self.position = mod_pos
-        self.number = mod_num
         self.rule = rule
+        self._hash = self.rule._hash
 
         try:
             self.composition = rule.composition
@@ -1412,10 +1416,6 @@ class Modification(ModificationBase):
             rep = str(self.name)
         else:
             rep = self.rule.serialize()
-        if self.number > 1:
-            # Numbers large than 1 will cause errors in lookup. Need
-            # to incorporate a method for inferring number from string
-            rep = "{0}{{{1}}}".format(rep, self.number)
         return rep
 
     def valid_site(self, amino_acid=None, position_modifiers=None):
@@ -1432,11 +1432,11 @@ class Modification(ModificationBase):
     __str__ = serialize
 
     def __hash__(self):
-        return hash(str(self))
+        return self._hash
 
     def __eq__(self, other):
         try:
-            return (self.name == other.name) and (self.number == other.number)
+            return other.name in self.rule.names
         except AttributeError:
             return other in self.rule.names
 
@@ -1444,10 +1444,11 @@ class Modification(ModificationBase):
         return not self == other
 
     def __getstate__(self):
-        return [self.name, self.mass, self.position, self.number, self.rule, self.composition]
+        return [self.name, self.mass, self.rule, self.composition]
 
     def __setstate__(self, state):
-        self.name, self.mass, self.position, self.number, self.rule, self.composition = state
+        self.name, self.mass, self.rule, self.composition = state
+        self._hash = self.rule._hash
 
     def clone(self):
         return self.__class__(self.rule)

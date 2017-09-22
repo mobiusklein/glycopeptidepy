@@ -547,7 +547,7 @@ class PeptideSequence(PeptideSequenceBase):
         if isinstance(modification_type, Modification):
             mod = modification_type
         else:
-            mod = Modification(rule=modification_type, mod_pos=position)
+            mod = Modification(rule=modification_type)
 
         if position is SequenceLocation.n_term:
             self.n_term = mod

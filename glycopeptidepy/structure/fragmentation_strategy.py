@@ -247,13 +247,13 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
 
 class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
-    modifications_of_interest = [
+    modifications_of_interest = set([
         _n_glycosylation,
         _modification_hexnac,
         _o_glycosylation,
         _gag_linker_glycosylation,
         _modification_xylose
-    ]
+    ])
 
     modification_compositions = {
         k: k.composition for k in modifications_of_interest
