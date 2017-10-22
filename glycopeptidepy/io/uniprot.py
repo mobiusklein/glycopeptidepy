@@ -290,6 +290,18 @@ def get_features_for(accession, error=False):
 get = get_features_for
 
 
+def get(accessions):
+    if accessions is None:
+        raise TypeError("accessions cannot be `None`")
+    if isinstance(accessions, basestring):
+        return get_features_for(accessions)
+    elif len(accessions) < 5:
+        return map(get_features_for, accessions)
+    else:
+        chunk_size = min(len(accessions) // 5, 15)
+        return ProteinDownloader.download(accessions, chunk_size)
+
+
 class ProteinDownloader(object):
     @staticmethod
     def chunk(seq, n=5):
