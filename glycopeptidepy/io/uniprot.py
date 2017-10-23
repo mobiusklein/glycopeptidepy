@@ -9,7 +9,7 @@ from glypy import Composition
 from glypy.utils import make_struct
 from glypy.io.glyspace import UniprotRDFClient
 
-from six import add_metaclass
+from six import add_metaclass, string_types as basestring
 
 uri_template = "http://www.uniprot.org/uniprot/{accession}.xml"
 nsmap = {"up": "http://uniprot.org/uniprot"}
@@ -296,7 +296,7 @@ def get(accessions):
     if isinstance(accessions, basestring):
         return get_features_for(accessions)
     elif len(accessions) < 5:
-        return map(get_features_for, accessions)
+        return list(map(get_features_for, accessions))
     else:
         chunk_size = min(len(accessions) // 5, 15)
         return ProteinDownloader.download(accessions, chunk_size)
@@ -333,11 +333,21 @@ class ProteinDownloader(object):
         return results
 
     @classmethod
-    def download(cls, accession_iterable, chunk_size=15):
+    def download(cls, accession_iterable, chunk_size=15, ordered=True):
+        accession_iterable = list(accession_iterable)
         chunks = cls.chunk(accession_iterable, chunk_size)
         proteome = []
         for chunk in chunks:
             proteome.extend(cls.fetch(chunk))
+        if not ordered:
+            return proteome
+        acc_map = {}
+        for prot in proteome:
+            for acc in prot.accessions:
+                acc_map[acc] = prot
+        proteome = []
+        for acc in accession_iterable:
+            proteome.append(acc_map.get(acc))
         return proteome
 
     def __call__(self, *args, **kwargs):
