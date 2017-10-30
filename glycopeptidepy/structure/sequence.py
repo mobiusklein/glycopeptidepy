@@ -1084,6 +1084,14 @@ class PeptideSequence(PeptideSequenceBase):
     def _glycan_structural_dissociation(self, max_cleavages=2):
         return CADFragmentationStrategy(self, max_cleavages)
 
+    def _oxonium_fragments_get_monosaccharide_list(self, glycan):
+        monosaccharides = dict(glycan)
+        for mono, count in list(monosaccharides.items()):
+            dissociated = remove_labile_modifications(mono)
+            if dissociated != mono:
+                monosaccharides[dissociated] = count
+        return monosaccharides
+
     def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,
                          include_large_glycan_fragments=True, maximum_fragment_size=5):
         r'''
@@ -1104,15 +1112,18 @@ class PeptideSequence(PeptideSequenceBase):
         water = Composition("H2O")
         water2 = water * 2
         side_chain_plus_carbon = Composition("CH2O")
+        two_side_chains_plus_carbon = side_chain_plus_carbon * 2
         water2_plus_sidechain_plus_carbon = water2 + side_chain_plus_carbon
+        water_plus_two_side_chains_plus_carbon = water + two_side_chains_plus_carbon
         _hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
         _hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
         _neuac = FrozenMonosaccharideResidue.from_iupac_lite("NeuAc")
 
         if oxonium:
             glycan = (self.glycan_composition).clone()
-            for k in glycan:
-                k = remove_labile_modifications(k)
+
+            monosaccharides = self._oxonium_fragments_get_monosaccharide_list(glycan)
+            for k in monosaccharides:
                 key = str(k)
                 mass = k.mass()
                 composition = k.total_composition()
@@ -1129,20 +1140,28 @@ class PeptideSequence(PeptideSequenceBase):
                     composition=composition - (
                         water2), kind=oxonium_ion_series)
                 yield SimpleFragment(
+                    name=key + "-C2H4O2", mass=mass - two_side_chains_plus_carbon.mass,
+                    composition=composition - (
+                        two_side_chains_plus_carbon), kind=oxonium_ion_series)
+                yield SimpleFragment(
                     name=key + "-CH6O3",
                     mass=mass - water2_plus_sidechain_plus_carbon.mass,
                     composition=composition - water2_plus_sidechain_plus_carbon,
                     kind=oxonium_ion_series)
+                yield SimpleFragment(
+                    name=key + "-C2H6O3",
+                    mass=mass - water_plus_two_side_chains_plus_carbon.mass,
+                    composition=composition - water_plus_two_side_chains_plus_carbon,
+                    kind=oxonium_ion_series)
             for i in range(2, 4):
-                for kk in itertools.combinations_with_replacement(sorted(glycan, key=str), i):
+                for kk in itertools.combinations_with_replacement(sorted(monosaccharides, key=str), i):
                     invalid = False
                     for k, v in Counter(kk).items():
-                        if glycan[k] < v:
+                        if monosaccharides[k] < v:
                             invalid = True
                             break
                     if invalid:
                         continue
-                    kk = list(map(remove_labile_modifications, kk))
                     key = ''.join(map(str, kk))
                     mass = sum(k.mass() for k in kk)
                     composition = sum((k.total_composition()
@@ -1155,10 +1174,6 @@ class PeptideSequence(PeptideSequenceBase):
                     yield SimpleFragment(
                         name=key + "-H4O2", mass=mass - water2.mass, kind=oxonium_ion_series,
                         composition=composition - (water2))
-                    yield SimpleFragment(
-                        name=key + "-CH6O3", mass=mass - water2_plus_sidechain_plus_carbon.mass,
-                        kind=oxonium_ion_series,
-                        composition=composition - water2_plus_sidechain_plus_carbon)
 
         if self.glycosylation_manager.is_fully_specified_topologies() and all_series:
             for f in self._glycan_structural_dissociation():
