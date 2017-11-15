@@ -5,8 +5,8 @@ from glycopeptidepy.utils.collectiontools import decoratordict
 from glypy.utils import Enum
 
 from glypy.structure.glycan import NamedGlycan
+from glypy.structure.glycan_composition import HashableGlycanComposition
 from glypy import Composition
-from glypy.composition.glycan_composition import HashableGlycanComposition
 
 
 class allset(object):

@@ -11,7 +11,7 @@ from io import StringIO
 from collections import defaultdict
 from collections import Iterable
 
-from glypy.composition.glycan_composition import (
+from glypy.structure.glycan_composition import (
     FrozenMonosaccharideResidue, FrozenGlycanComposition)
 
 from glypy.utils import Enum

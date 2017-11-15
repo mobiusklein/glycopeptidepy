@@ -19,7 +19,7 @@ from .residue import Residue
 from .fragmentation_strategy import HCDFragmentationStrategy, CADFragmentationStrategy
 
 from glypy import GlycanComposition, Glycan, ReducedEnd
-from glypy.composition.glycan_composition import (
+from glypy.structure.glycan_composition import (
     FrozenGlycanComposition, FrozenMonosaccharideResidue,
     MonosaccharideResidue)
 

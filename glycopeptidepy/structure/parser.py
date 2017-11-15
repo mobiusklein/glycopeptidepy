@@ -4,7 +4,7 @@ from . import PeptideSequenceBase
 from .modification import NGlycanCoreGlycosylation
 
 
-from glypy.composition.glycan_composition import FrozenGlycanComposition
+from glypy.structure.glycan_composition import FrozenGlycanComposition
 
 _n_glycan_core = NGlycanCoreGlycosylation()
 glycan_parser = FrozenGlycanComposition.parse
