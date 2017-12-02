@@ -1,4 +1,4 @@
-from collections import Mapping
+from collections import Mapping, defaultdict
 
 from glycopeptidepy.utils.collectiontools import decoratordict
 
@@ -47,6 +47,12 @@ class TypedGlycanComposition(HashableGlycanComposition):
     def __init__(self, glycosylation_type=None, *args, **kwargs):
         self.glycosylation_type = GlycosylationType[glycosylation_type]
         super(TypedGlycanComposition, self).__init__(*args, **kwargs)
+
+    def clone(self, propogate_composition_offset=True):
+        dup = self.__class__(self.glycosylation_type, self)
+        if not propogate_composition_offset:
+            dup.composition_offset = Composition('H2O')
+        return dup
 
     def is_type(self, glycosylation_type):
         return self.glycosylation_type is GlycosylationType[glycosylation_type]
@@ -143,9 +149,27 @@ class GlycosylationManager(dict):
         self._aggregate = None
         self.aggregate = aggregate
         self._proxy = None
+        self._type_track = None
 
     def invalidate(self):
         self._proxy = None
+        self._type_track = None
+
+    @property
+    def glycosylation_types(self):
+        if self._type_track is None:
+            self._type_track = self._update_track()
+        return self._type_track
+
+    def count_glycosylation_type(self, glycosylation_type):
+        return len(self.glycosylation_types[glycosylation_type])
+
+    def _update_track(self):
+        track = defaultdict(list)
+        for position, value in self.items():
+            glycosylation = value.rule
+            track[glycosylation.glycosylation_type].append((position, value))
+        return track
 
     def clear(self):
         self.invalidate()

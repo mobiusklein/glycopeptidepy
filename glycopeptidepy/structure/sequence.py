@@ -721,9 +721,12 @@ class PeptideSequence(PeptideSequenceBase):
         return self.n_glycan_sequon_sites
 
     def stub_fragments(self, extended=False):
-        n_glycan = self.modification_index[_n_glycosylation] > 0
-        o_glycan = self.modification_index[_o_glycosylation] > 0
-        gag_linker = self.modification_index[_gag_linker_glycosylation] > 0
+        n_glycan = self.glycosylation_manager.count_glycosylation_type(
+            GlycosylationType.n_linked) > 0
+        o_glycan = self.glycosylation_manager.count_glycosylation_type(
+            GlycosylationType.o_linked) > 0
+        gag_linker = self.glycosylation_manager.count_glycosylation_type(
+            GlycosylationType.glycosaminoglycan) > 0
         if sum((n_glycan, o_glycan, gag_linker)) > 2:
             raise ValueError(
                 "Does not support mixed-type glycan fragmentation (yet)")
@@ -734,7 +737,7 @@ class PeptideSequence(PeptideSequenceBase):
         elif gag_linker:
             return self.gag_linker_stub_fragments(extended=extended)
         else:
-            if len(self._glycosylation_manager) > 0:
+            if len(self.glycosylation_manager) > 0:
                 raise NotImplementedError()
             else:
                 raise ValueError("No Glycan Class Detected")
@@ -744,8 +747,8 @@ class PeptideSequence(PeptideSequenceBase):
         fucose_count = glycan['Fuc'] or glycan['dHex']
         hexnac_in_aggregate = glycan['HexNAc']
         hexose_in_aggregate = glycan["Hex"]
-        core_count = self.modification_index[_n_glycosylation]
-
+        core_count = self.glycosylation_manager.count_glycosylation_type(
+            GlycosylationType.n_linked)
         per_site_shifts = []
         hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
         hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
@@ -869,7 +872,9 @@ class PeptideSequence(PeptideSequenceBase):
     def o_glycan_stub_fragments(self, extended=False):
         glycan = self.glycan_composition
         fucose_count = glycan['Fuc'] or glycan['dHex']
-        core_count = self.modification_index[_o_glycosylation]
+
+        core_count = self.glycosylation_manager.count_glycosylation_type(
+            GlycosylationType.o_linked)
 
         per_site_shifts = []
         hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
@@ -995,13 +1000,12 @@ class PeptideSequence(PeptideSequenceBase):
 
     def gag_linker_stub_fragments(self, extended=False):
         glycan = self.glycan_composition
-        # fucose_count = glycan['Fuc'] or glycan['dHex']
-        core_count = self.modification_index[_gag_linker_glycosylation]
+
+        core_count = self.glycosylation_manager.count_glycosylation_type(
+            GlycosylationType.glycosaminoglycan)
 
         per_site_shifts = []
         hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
-        # hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
-        # fucose = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
         xyl = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
         hexa = FrozenMonosaccharideResidue.from_iupac_lite("HexA")
 

@@ -926,8 +926,11 @@ class Glycosylation(ModificationRule):
             metadata = "{},{}".format(self.encoding_format, metadata)
         else:
             metadata = self.encoding_format
-        return template.format(
-            metadata, self.glycan.serialize(self.encoding_format))
+        if self.is_composition:
+            return template.format(metadata, self.glycan.serialize())
+        else:
+            return template.format(
+                metadata, self.glycan.serialize(self.encoding_format))
 
     @property
     def glycosylation_type(self):
