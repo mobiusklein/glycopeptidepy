@@ -278,9 +278,10 @@ class PeptideFragment(FragmentBase):
 
 
 class SimpleFragment(FragmentBase):
-    __slots__ = ["name", "mass", "kind", "composition", "_neutral_loss"]
+    __slots__ = ["name", "mass", "kind", "composition",
+                 "_neutral_loss", "is_glycosylated"]
 
-    def __init__(self, name, mass, kind, composition, neutral_loss=None):
+    def __init__(self, name, mass, kind, composition, neutral_loss=None, is_glycosylated=False):
         self._name = None
         self._hash = None
         self._neutral_loss = None
@@ -289,19 +290,22 @@ class SimpleFragment(FragmentBase):
         self.kind = kind
         self.neutral_loss = neutral_loss
         self.composition = composition
+        self.is_glycosylated = is_glycosylated
 
     def clone(self):
         corrected_mass = self.mass
         if self._neutral_loss is not None:
             corrected_mass - self.neutral_loss.mass
         return self.__class__(self.name, corrected_mass, self.kind,
-                              self._neutral_loss.clone() if self._neutral_loss is not None else None)
+                              self._neutral_loss.clone() if self._neutral_loss is not None else None,
+                              self.is_glycosylated)
 
     def __reduce__(self):
         corrected_mass = self.mass
         if self._neutral_loss is not None:
             corrected_mass - self.neutral_loss.mass
-        return SimpleFragment, (self.name, corrected_mass, self.kind, self.composition, self.neutral_loss)
+        return SimpleFragment, (self.name, corrected_mass, self.kind, self.composition,
+                                self.neutral_loss, self.is_glycosylated)
 
     def __repr__(self):
         return "SimpleFragment(name={self.name}, mass={self.mass:.04f}, series={self.kind})".format(self=self)
