@@ -1012,7 +1012,7 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
 
-    def get_fragments(self):
+    def losses(self, *args, **kwargs):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1044,7 +1044,7 @@ class OGlycanCoreGlycosylation(CoreGlycosylation):
     def glycosylation_type(self):
         return GlycosylationType.o_linked
 
-    def get_fragments(self):
+    def losses(self, *args, **kwargs):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1074,7 +1074,7 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
     def glycosylation_type(self):
         return GlycosylationType.glycosaminoglycan
 
-    def get_fragments(self):
+    def losses(self, *args, **kwargs):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
@@ -1097,7 +1097,7 @@ class OGlcNAcylation(CoreGlycosylation):
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
 
-    def get_fragments(self):
+    def get_fragments(self, *args, **kwargs):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
