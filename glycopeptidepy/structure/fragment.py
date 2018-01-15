@@ -304,14 +304,33 @@ class SimpleFragment(FragmentBase):
         corrected_mass = self.mass
         if self._neutral_loss is not None:
             corrected_mass - self.neutral_loss.mass
-        return SimpleFragment, (self.name, corrected_mass, self.kind, self.composition,
+        return self.__class__, (self.name, corrected_mass, self.kind, self.composition,
                                 self.neutral_loss, self.is_glycosylated)
 
     def __repr__(self):
-        return "SimpleFragment(name={self.name}, mass={self.mass:.04f}, series={self.kind})".format(self=self)
+        return ("{self.__class__.__name__}(name={self.name}, "
+                "mass={self.mass:.04f}, series={self.kind})").format(self=self)
 
     def get_series(self):
         return self.kind
+
+
+class StubFragment(SimpleFragment):
+    __slots__ = ['glycosylation_size']
+
+    def __init__(self, name, mass, kind, composition, neutral_loss=None, is_glycosylated=False, glycosylation_size=0):
+        super(StubFragment, self).__init__(name, mass, kind, composition, neutral_loss, is_glycosylated)
+        self.glycosylation_size = glycosylation_size
+
+    def clone(self):
+        dup = super(StubFragment, self).clone()
+        dup.glycosylation_size = self.glycosylation_size
+        return dup
+
+    def __reduce__(self):
+        proto = super(StubFragment, self).__reduce__()
+        proto[1] = proto[1] + (self.glycosylation_size,)
+        return proto
 
 
 monosaccharide_to_losses = {
@@ -381,7 +400,6 @@ class MemoizedIonSeriesMetaclass(type):
 
 @add_metaclass(MemoizedIonSeriesMetaclass)
 class IonSeries(object):
-    # __metaclass__ = MemoizedIonSeriesMetaclass
 
     @classmethod
     def get(cls, name):
