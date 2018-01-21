@@ -23,9 +23,19 @@ LSLLFKKLVGTKVLMASVQGSKRRKLRVYLHCTNTDNPRYKEGDL
 TLYAINLHNVTKYLRLPYPFSNKQVDKYLLRPLGPHGLLSKSVQL
 NGLTLKMVDDQTLPPLMEKPLRPGSSLGLPAFSYSFFVIRNAKVA
 ACI
+
+>sp|P02763|A1AG1_HUMAN Alpha-1-acid glycoprotein 1 OS=Homo sapiens GN=ORM1 PE=1 SV=1
+MALSWVLTVLSLLPLLEAQIPLCANLVPVPITNATLDQITGKWFYIASAFRNEEYNKSVQ
+EIQATFFYFTPNKTEDTIFLREYQTRQDQCIYNTTYLNVQRENGTISRYVGGQEHFAHLL
+ILRDTKTYMLAFDVNDEKNWGLSVYADKPETTKEQLGEFYEALDCLRIPKSDVVYTDWKK
+DKCEPLEKQHEKERKQEEGES
+
 '''
 
-heparanase = next(iter(ProteinFastaFileParser(StringIO(_protein_fasta))))
+parser = ProteinFastaFileParser(StringIO(_protein_fasta))
+
+heparanase = next(parser)
+agp1 = next(parser)
 
 
 class TestProtease(unittest.TestCase):
@@ -34,6 +44,15 @@ class TestProtease(unittest.TestCase):
         for peptide, start, stop, missed in trypsin.cleave(heparanase, 2):
             assert missed < 3
             if peptide == "KFKNSTYSR":
+                break
+        else:
+            raise AssertionError("Did not produce overlapped digest")
+
+    def test_semispecific(self):
+        trypsin = enzyme.Protease("trypsin")
+        for peptide, start, end, missed in trypsin.cleave(agp1, semispecific=True):
+            assert missed < 3
+            if peptide == "LVPVPITNATLDQITGK":
                 break
         else:
             raise AssertionError("Did not produce overlapped digest")
