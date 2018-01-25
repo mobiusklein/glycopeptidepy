@@ -38,7 +38,7 @@ class Protease(object):
         self.cleavage_start = cleavage_start
         self.cleavage_end = cleavage_end
         try:
-            self.regex = re.compile(expasy_rules[name.lower()])
+            self.regex = re.compile(enzyme_rules[name.lower()])
         except KeyError:
             self.regex = re.compile(name)
 
@@ -203,41 +203,56 @@ class Protease(object):
         return out
 
 
-expasy_rules = {'arg-c': 'R',
-                'asp-n': '\\w(?=D)',
-                'bnps-skatole': 'W',
-                'caspase 1': '(?<=[FWYL]\\w[HAT])D(?=[^PEDQKR])',
-                'caspase 10': '(?<=IEA)D',
-                'caspase 2': '(?<=DVA)D(?=[^PEDQKR])',
-                'caspase 3': '(?<=DMQ)D(?=[^PEDQKR])',
-                'caspase 4': '(?<=LEV)D(?=[^PEDQKR])',
-                'caspase 5': '(?<=[LW]EH)D',
-                'caspase 6': '(?<=VE[HI])D(?=[^PEDQKR])',
-                'caspase 7': '(?<=DEV)D(?=[^PEDQKR])',
-                'caspase 8': '(?<=[IL]ET)D(?=[^PEDQKR])',
-                'caspase 9': '(?<=LEH)D',
-                'chymotrypsin high specificity': '([FY](?=[^P]))|(W(?=[^MP]))',
-                'chymotrypsin low specificity': '([FLY](?=[^P]))|(W(?=[^MP]))|(M(?=[^PY]))|(H(?=[^DMPW]))',
-                'clostripain': 'R',
-                'cnbr': 'M',
-                'enterokinase': '(?<=[DE]{3})K',
-                'factor xa': '(?<=[AFGILTVM][DE]G)R',
-                'formic acid': 'D',
-                'glutamyl endopeptidase': 'E',
-                'granzyme b': '(?<=IEP)D',
-                'hydroxylamine': 'N(?=G)',
-                'iodosobenzoic acid': 'W',
-                'lysc': 'K',
-                'ntcb': '\\w(?=C)',
-                'pepsin ph1.3': '((?<=[^HKR][^P])[^R](?=[FLWY][^P]))|((?<=[^HKR][^P])[FLWY](?=\\w[^P]))',
-                'pepsin ph2.0': '((?<=[^HKR][^P])[^R](?=[FL][^P]))|((?<=[^HKR][^P])[FL](?=\\w[^P]))',
-                'proline endopeptidase': '(?<=[HKR])P(?=[^P])',
-                'proteinase k': '[AEFILTVWY]',
-                'staphylococcal peptidase i': '(?<=[^E])E',
-                'thermolysin': '[^DE](?=[AFILMV])',
-                'thrombin': '((?<=G)R(?=G))|((?<=[AFGILTVM][AFGILTVWA]P)R(?=[^DE][^DE]))',
-                'trypsin': '([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))',
-                'none': ''}
+enzyme_rules = {
+    'bnps-skatole': 'W',
+    'caspase 1': '(?<=[FWYL]\\w[HAT])D(?=[^PEDQKR])',
+    'caspase 10': '(?<=IEA)D',
+    'caspase 2': '(?<=DVA)D(?=[^PEDQKR])',
+    'caspase 3': '(?<=DMQ)D(?=[^PEDQKR])',
+    'caspase 4': '(?<=LEV)D(?=[^PEDQKR])',
+    'caspase 5': '(?<=[LW]EH)D',
+    'caspase 6': '(?<=VE[HI])D(?=[^PEDQKR])',
+    'caspase 7': '(?<=DEV)D(?=[^PEDQKR])',
+    'caspase 8': '(?<=[IL]ET)D(?=[^PEDQKR])',
+    'caspase 9': '(?<=LEH)D',
+    'chymotrypsin': '(?<=[FYWL])(?!P)',
+    'chymotrypsin high specificity': '([FY](?=[^P]))|(W(?=[^MP]))',
+    'chymotrypsin low specificity': '([FLY](?=[^P]))|(W(?=[^MP]))|(M(?=[^PY]))|(H(?=[^DMPW]))',
+    'clostripain': 'R',
+    'cnbr': 'M',
+    'enterokinase': '(?<=[DE]{3})K',
+    'factor xa': '(?<=[AFGILTVM][DE]G)R',
+    'formic acid': 'D',
+    'glutamyl endopeptidase': 'E',
+    'granzyme b': '(?<=IEP)D',
+    'hydroxylamine': 'N(?=G)',
+    'iodosobenzoic acid': 'W',
+    'lyc-c': "(?<=K)(?!P)",
+    'ntcb': '\\w(?=C)',
+    'pepsin ph1.3': '((?<=[^HKR][^P])[^R](?=[FLWY][^P]))|((?<=[^HKR][^P])[FLWY](?=\\w[^P]))',
+    'pepsin ph2.0': '((?<=[^HKR][^P])[^R](?=[FL][^P]))|((?<=[^HKR][^P])[FL](?=\\w[^P]))',
+    'proline endopeptidase': '(?<=[HKR])P(?=[^P])',
+    'proteinase k': '[AEFILTVWY]',
+    'staphylococcal peptidase i': '(?<=[^E])E',
+    'thermolysin': '[^DE](?=[AFILMV])',
+    'thrombin': '((?<=G)R(?=G))|((?<=[AFGILTVM][AFGILTVWA]P)R(?=[^DE][^DE]))',
+    'trypsin': '([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))',
+    'none': '',
+    'trypchymo': '(?<=[FYWLKR])(?!P)',
+    'trypsin/p': '(?<=[KR])',
+    'lys-c/p': '(?<=K)',
+    'pepsina': '(?<=[FL])',
+    'v8-de': '(?<=[BDEZ])(?!P)',
+    'v8-e': '(?<=[EZ])(?!P)',
+    '2-iodobenzoate': '(?<=W)',
+    'arg-c': '(?<=R)(?!P)',
+    'asp-n_ambic': '(?=[DE])',
+    'asp-n': '(?=[BD])',
+    'leukocyte elastase': '(?<=[ALIV])(?!P)',
+}
+
+
+expasy_rules = enzyme_rules
 
 
 def merge_enzyme_rules(enzyme_patterns):
