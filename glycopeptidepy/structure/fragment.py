@@ -45,7 +45,7 @@ fragment_direction = {
     "z": -1,
 }
 
-generic_neutral_losses_composition = {
+generic_chemical_shifts_composition = {
     "-NH3": -Composition("NH3"),
     "-H2O": -Composition("H2O"),
     # "-NH3-NH3": -Composition("(NH3)2"),
@@ -58,11 +58,10 @@ def format_negative_composition(composition):
     return "-%s" % formula({k: -v for k, v in composition.items()})
 
 
-class NeutralLoss(object):
-
+class ChemicalShift(object):
     def __init__(self, name, composition=None):
         if composition is None:
-            composition = generic_neutral_losses_composition[name]
+            composition = generic_chemical_shifts_composition[name]
         self.name = name
         self.composition = composition
         self.mass = composition.mass
@@ -74,9 +73,15 @@ class NeutralLoss(object):
         return self.name
 
     def __repr__(self):
-        return "NeutralLoss(name=%r)" % self.name
+        return "%s(name=%r)" % (self.__class__.__name__, self.name)
+
+    def is_loss(self):
+        return self.mass < 0
 
     AllLosses = object()
+
+
+NeutralLoss = ChemicalShift
 
 
 class FragmentBase(object):
@@ -85,9 +90,9 @@ class FragmentBase(object):
 
     Attributes
     ----------
-    neutral_loss : NeutralLoss
-        The NeutralLoss associated with this fragment, or None.
-        If a NeutralLoss, its composition and mass are subtracted
+    chemical_shift : ChemicalShift
+        The ChemicalShift associated with this fragment, or None.
+        If a ChemicalShift, its composition and mass are subtracted
         from this object's composition and mass attributes.
     name: str
         The human readable description of this fragment
@@ -96,7 +101,7 @@ class FragmentBase(object):
 
     """
 
-    __slots__ = ("_neutral_loss", "_name", "_hash")
+    __slots__ = ("_chemical_shift", "_name", "_hash")
 
     def get_series(self):
         raise NotImplementedError()
@@ -122,21 +127,21 @@ class FragmentBase(object):
     def clone(self):
         raise NotImplementedError()
 
-    def get_neutral_loss(self):
-        return self._neutral_loss
+    def get_chemical_shift(self):
+        return self._chemical_shift
 
-    def set_neutral_loss(self, neutral_loss):
-        if self._neutral_loss is not None:
-            self.mass -= self._neutral_loss.mass
-        self._neutral_loss = neutral_loss
-        if neutral_loss is not None:
-            self.mass += neutral_loss.mass
+    def set_chemical_shift(self, chemical_shift):
+        if self._chemical_shift is not None:
+            self.mass += self._chemical_shift.mass
+        self._chemical_shift = chemical_shift
+        if chemical_shift is not None:
+            self.mass -= chemical_shift.mass
 
     def get_fragment_name(self):
         parts = [self._name]
-        neutral_loss = self.neutral_loss
-        if neutral_loss is not None:
-            parts.append(str(neutral_loss))
+        chemical_shift = self.chemical_shift
+        if chemical_shift is not None:
+            parts.append(str(chemical_shift))
         return ''.join(parts)
 
     @property
@@ -149,16 +154,16 @@ class FragmentBase(object):
     def set_name(self, name):
         self._name = name
 
-    neutral_loss = property(get_neutral_loss, set_neutral_loss)
+    chemical_shift = property(get_chemical_shift, set_chemical_shift)
 
-    def generate_neutral_losses(self, losses=NeutralLoss.AllLosses):
-        if losses is NeutralLoss.AllLosses:
-            losses = generic_neutral_losses_composition.keys()
+    def generate_chemical_shiftes(self, losses=ChemicalShift.AllLosses):
+        if losses is ChemicalShift.AllLosses:
+            losses = generic_chemical_shifts_composition.keys()
 
         for loss in losses:
             frag = self.clone()
             if loss is not None:
-                frag.neutral_loss = NeutralLoss(loss)
+                frag.chemical_shift = ChemicalShift(loss)
             yield frag
 
 
@@ -172,10 +177,10 @@ class PeptideFragment(FragmentBase):
 
     __slots__ = ("kind", "position", "modification_dict", "bare_mass",
                  "golden_pairs", "flanking_amino_acids", "glycosylation",
-                 "_neutral_loss", "composition", 'mass')
+                 "_chemical_shift", "composition", 'mass')
 
     def __init__(self, kind, position, modification_dict, mass, golden_pairs=None,
-                 flanking_amino_acids=None, glycosylation=None, neutral_loss=None,
+                 flanking_amino_acids=None, glycosylation=None, chemical_shift=None,
                  composition=None):
         if golden_pairs is None:
             golden_pairs = []
@@ -186,7 +191,7 @@ class PeptideFragment(FragmentBase):
         self.modification_dict = modification_dict
         self.mass = mass
         self.composition = composition
-        self._neutral_loss = None
+        self._chemical_shift = None
         self._name = None
         self._hash = None
 
@@ -195,15 +200,15 @@ class PeptideFragment(FragmentBase):
 
         self.golden_pairs = golden_pairs
         self.glycosylation = glycosylation
-        self.neutral_loss = neutral_loss
+        self.chemical_shift = chemical_shift
 
         self._update_mass_with_modifications()
 
     def _update_mass_with_modifications(self):
         for key, value in self.modification_dict.items():
             self.mass += (key).mass * value
-        if self.neutral_loss is not None:
-            self.mass += self.neutral_loss.mass
+        if self.chemical_shift is not None:
+            self.mass += self.chemical_shift.mass
 
     def get_series(self):
         return self.kind
@@ -214,21 +219,21 @@ class PeptideFragment(FragmentBase):
             self.bare_mass, self.golden_pairs, tuple(
                 self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
-            self._neutral_loss.clone() if self._neutral_loss is not None else None,
+            self._chemical_shift.clone() if self._chemical_shift is not None else None,
             self.composition.clone())
 
     def total_composition(self):
         composition = self.composition.clone()
-        neutral_loss = self.neutral_loss
-        if neutral_loss is not None:
-            composition += neutral_loss.composition
+        chemical_shift = self.chemical_shift
+        if chemical_shift is not None:
+            composition += chemical_shift.composition
         return composition
 
     def __reduce__(self):
         return self.__class__, (
             self.kind, self.position, self.modification_dict, self.bare_mass,
             self.golden_pairs, self.flanking_amino_acids, self.glycosylation,
-            self.neutral_loss, self.composition)
+            self.chemical_shift, self.composition)
 
     def base_name(self):
         """Simply return string like b2, y3 with no modificaiton information."""
@@ -253,8 +258,8 @@ class PeptideFragment(FragmentBase):
                 else:
                     pass
 
-        if self.neutral_loss is not None:
-            fragment_name.append(str(self.neutral_loss))
+        if self.chemical_shift is not None:
+            fragment_name.append(str(self.chemical_shift))
         name = ''.join(fragment_name)
         return name
 
@@ -270,42 +275,43 @@ class PeptideFragment(FragmentBase):
 
     def __repr__(self):
         return ("PeptideFragment(%(type)s %(position)s %(mass)s "
-                "%(modification_dict)s %(flanking_amino_acids)s %(neutral_loss)r)") % {
+                "%(modification_dict)s %(flanking_amino_acids)s %(chemical_shift)r)") % {
             "type": self.series, "position": self.position, "mass": self.mass,
             "modification_dict": self.modification_dict, "flanking_amino_acids": self.flanking_amino_acids,
-            "neutral_loss": self.neutral_loss
+            "chemical_shift": self.chemical_shift
         }
 
 
 class SimpleFragment(FragmentBase):
     __slots__ = ["name", "mass", "kind", "composition",
-                 "_neutral_loss", "is_glycosylated"]
+                 "_chemical_shift", "is_glycosylated"]
 
-    def __init__(self, name, mass, kind, composition, neutral_loss=None, is_glycosylated=False):
+    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False):
         self._name = None
         self._hash = None
-        self._neutral_loss = None
+        self._chemical_shift = None
         self.name = name
         self.mass = mass
         self.kind = kind
-        self.neutral_loss = neutral_loss
+        self.chemical_shift = chemical_shift
         self.composition = composition
         self.is_glycosylated = is_glycosylated
 
     def clone(self):
         corrected_mass = self.mass
-        if self._neutral_loss is not None:
-            corrected_mass - self.neutral_loss.mass
+        if self._chemical_shift is not None:
+            corrected_mass - self.chemical_shift.mass
         return self.__class__(self.name, corrected_mass, self.kind,
-                              self._neutral_loss.clone() if self._neutral_loss is not None else None,
+                              self.composition,
+                              self._chemical_shift.clone() if self._chemical_shift is not None else None,
                               self.is_glycosylated)
 
     def __reduce__(self):
         corrected_mass = self.mass
-        if self._neutral_loss is not None:
-            corrected_mass - self.neutral_loss.mass
+        if self._chemical_shift is not None:
+            corrected_mass - self.chemical_shift.mass
         return self.__class__, (self.name, corrected_mass, self.kind, self.composition,
-                                self.neutral_loss, self.is_glycosylated)
+                                self.chemical_shift, self.is_glycosylated)
 
     def __repr__(self):
         return ("{self.__class__.__name__}(name={self.name}, "
@@ -318,8 +324,8 @@ class SimpleFragment(FragmentBase):
 class StubFragment(SimpleFragment):
     __slots__ = ['glycosylation_size']
 
-    def __init__(self, name, mass, kind, composition, neutral_loss=None, is_glycosylated=False, glycosylation_size=0):
-        super(StubFragment, self).__init__(name, mass, kind, composition, neutral_loss, is_glycosylated)
+    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False, glycosylation_size=0):
+        super(StubFragment, self).__init__(name, mass, kind, composition, chemical_shift, is_glycosylated)
         self.glycosylation_size = glycosylation_size
 
     def clone(self):

@@ -27,7 +27,7 @@ from glycopeptidepy.structure.fragment import (
     StubFragment,
     PeptideFragment,
     format_negative_composition,
-    NeutralLoss)
+    ChemicalShift)
 from glycopeptidepy.structure.residue import (
     AminoAcidResidue as R,
     residue_to_neutral_loss as _residue_to_neutral_loss)
@@ -577,13 +577,13 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
 
 class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
-    def __init__(self, peptide, series, neutral_losses=None, max_losses=1):
-        if neutral_losses is None:
-            neutral_losses = dict()
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1):
+        if chemical_shifts is None:
+            chemical_shifts = dict()
         super(PeptideFragmentationStrategyBase, self).__init__(peptide)
         self.series = IonSeries(series)
-        self.neutral_loss_rules = defaultdict(list, neutral_losses)
-        self.max_losses = max_losses
+        self.chemical_shift_rules = defaultdict(list, chemical_shifts)
+        self.max_chemical_shifts = max_chemical_shifts
 
         # Null Values
         self.running_mass = 0
@@ -602,21 +602,21 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     def direction(self):
         return self.series.direction
 
-    def _get_viable_loss_combinations(self):
-        losses = []
-        if not self.neutral_loss_rules:
-            return losses
+    def _get_viable_chemical_shift_combinations(self):
+        shifts = []
+        if not self.chemical_shift_rules:
+            return shifts
         for residue, count in self.amino_acids_counter.items():
-            loss_composition = self.neutral_loss_rules[residue]
+            loss_composition = self.chemical_shift_rules[residue]
             if loss_composition:
                 for i in range(count):
-                    losses.append(loss_composition + [Composition()])
+                    shifts.append(loss_composition + [Composition()])
         loss_composition_combinations = {}
-        for comb in combinations(losses, self.max_losses):
+        for comb in combinations(shifts, self.max_chemical_shifts):
             for prod in product(*comb):
                 loss_composition = sum(prod, Composition())
                 loss_composition_combinations[format_negative_composition(loss_composition)] = loss_composition
-        return [NeutralLoss(k, v) for k, v in loss_composition_combinations.items() if v]
+        return [ChemicalShift(k, v) for k, v in loss_composition_combinations.items() if v]
 
     def _initialize_start_terminal(self):
         if self.direction > 0:
@@ -694,12 +694,12 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             glycosylation=self.glycosylation_manager.copy(),
             flanking_amino_acids=self.flanking_residues(),
             composition=self.running_composition)
-        losses = self._get_viable_loss_combinations()
+        shifts = self._get_viable_chemical_shift_combinations()
         for fragment in self.partial_loss(frag):
             fragments_from_site.append(fragment)
-            for loss in losses:
+            for shift in shifts:
                 f = fragment.clone()
-                f.neutral_loss = loss
+                f.chemical_shift = shift
                 fragments_from_site.append(f)
         return fragments_from_site
 
@@ -828,8 +828,8 @@ for key, value in _residue_to_neutral_loss.items():
 class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
     glycan_fragment_ladder = "Y"
 
-    def __init__(self, peptide, series, neutral_losses=None, max_losses=1, max_glycan_cleavages=2):
-        super(EXDFragmentationStrategy, self).__init__(peptide, series, neutral_losses, max_losses)
+    def __init__(self, peptide, series, neutral_losses=None, max_chemical_shifts=1, max_glycan_cleavages=2):
+        super(EXDFragmentationStrategy, self).__init__(peptide, series, neutral_losses, max_chemical_shifts)
         self.max_glycan_cleavages = max_glycan_cleavages
 
     def _strip_glycosylation_from_modification_dict(self, modification_dict):
