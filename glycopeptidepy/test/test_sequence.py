@@ -200,6 +200,16 @@ class PeptideSequenceSuiteBase(object):
         self.assertTrue(t1.base_sequence_equality(t2))
         self.assertFalse(t1.modified_sequence_equality(t2))
 
+    def test_terminal_modification(self):
+        base = self.parse_sequence("QDQC(Carbamidomethyl)IYNTTYLNVQR")
+        self.assertAlmostEqual(base.mass, 1914.8894, 3)
+        modified = base.clone()
+        mt = modification.ModificationTable()
+        pyro_glu_from_q = mt['Pyro-glu from Q']
+        sites = pyro_glu_from_q.find_valid_sites(modified)
+        modified.add_modification(sites[0], pyro_glu_from_q())
+        self.assertAlmostEqual(modified.mass, 1897.86282353323, 3)
+
 
 class TestPeptideSequence(PeptideSequenceSuiteBase, unittest.TestCase):
     def parse_sequence(self, seqstr):

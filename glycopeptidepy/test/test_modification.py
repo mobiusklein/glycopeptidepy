@@ -11,7 +11,7 @@ n_glycan_rule = '#:glycoct:RES 1b:b-dglc-HEX-1:5 2s:n-acetyl 3b:b-dglc-HEX-1:5 \
 class TestModifcationTarget(unittest.TestCase):
     def test_n_term_special_flag(self):
         mt = modification.ModificationTable()
-        rule = mt["Pyro-glu from Q"]
+        rule = mt["Acetylation"]
         peptide = sequence.parse("QVPQLQSQ")
         sites = rule.find_valid_sites(peptide)
         self.assertTrue(sites[0] is modification.SequenceLocation.n_term)

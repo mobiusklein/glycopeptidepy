@@ -272,7 +272,23 @@ class ModificationTarget(object):
 
     def valid_site(self, amino_acid=None, position_modifier=SequenceLocation.anywhere):
         '''Return if a given residue at a sequence position (N-term, C-term, None)
-        is valid'''
+        is valid
+
+        Arguments
+        ---------
+        amino_acid: AminoAcidResidue
+            The amino acid to test
+        position_modifier: SequenceLocation
+            The position in the sequence to test
+
+        Returns
+        -------
+        valid: bool
+            Whether the match is valid
+        location_specification: SequenceLocation
+            If the site is valid, this will be the type of location matched,
+            otherwise it will default to SequenceLocation.anywhere
+        '''
         valid = False
 
         # Validate amino acid target target
@@ -281,11 +297,18 @@ class ModificationTarget(object):
         valid = valid and ((self.position_modifier is SequenceLocation.anywhere) or
                            (position_modifier == self.position_modifier))
 
+        # If the rule includes a position modifier other than anywhere
         if valid and (position_modifier is not SequenceLocation.anywhere) and (
                 self.position_modifier is not SequenceLocation.anywhere):
-            return position_modifier
-
-        return valid
+            if position_modifier == self.position_modifier:
+                if self.amino_acid_targets is None:
+                    return valid, position_modifier
+                else:
+                    return valid, SequenceLocation.anywhere
+            else:
+                valid = False
+                return valid, SequenceLocation.anywhere
+        return valid, SequenceLocation.anywhere
 
     def valid_site_seq(self, sequence, position, position_modifier=SequenceLocation.anywhere):
         aa_mod_pair = sequence[position]
@@ -402,8 +425,8 @@ class ModificationRule(object):
                 targets = set(
                     [extract_targets_from_string(amino_acid_specificity)])
             except TypeError:
-                print(modification_name, amino_acid_specificity)
-                raise TypeError("Could not extract targets")
+                raise TypeError("Could not extract targets for %s with specificity %r" % (
+                    modification_name, amino_acid_specificity))
 
         # If the specificity is already a rule, store it as a list of one rules
         elif isinstance(amino_acid_specificity, ModificationTarget):
@@ -513,8 +536,26 @@ class ModificationRule(object):
         return dup
 
     def valid_site(self, amino_acid=None, position_modifiers=None):
-        return max([target.valid_site(amino_acid, position_modifiers) for
-                    target in self.targets])
+        valid_sites = []
+        for target in self.targets:
+            result, site = target.valid_site(amino_acid, position_modifiers)
+            if not result:
+                continue
+            # if SequenceLocation.anywhere is encountered, store 0 since None
+            # can't be ordered with numbers
+            if site.value is None:
+                valid_sites.append(0)
+            else:
+                # otherwise store the location's numeric value
+                valid_sites.append(site.value)
+        if not valid_sites:
+            return False
+        # Find the minimum site type. Terminal sites are negative numbers
+        # and prefer those from 0 which denotes SequenceLocation.anywhere
+        site_type = min(valid_sites)
+        if site_type == 0:
+            return SequenceLocation.anywhere
+        return SequenceLocation[site_type]
 
     def why_valid(self, amino_acid=None, position_modifiers=None):
         possible_targets = [target for target in self.targets if target.valid_site(
@@ -539,7 +580,7 @@ class ModificationRule(object):
             amino_acid = position[0].name
             position_modifiers = position_modifier_rules.get(index)
             is_valid = self.valid_site(amino_acid, position_modifiers)
-            if(is_valid):
+            if is_valid:
                 if (is_valid is SequenceLocation.n_term) or (is_valid is SequenceLocation.c_term):
                     valid_indices.append(is_valid)
                 else:
@@ -1205,8 +1246,6 @@ class ModificationSource(object):
 class ModificationTable(ModificationSource):
 
     other_modifications = {
-        # "HexNAc": HexNAcylation(),
-        # "Xyl": Xylation(),
         "HexNAc": hexnac_modification,
         "Xyl": xylose_modification,
         "N-Glycosylation": NGlycanCoreGlycosylation(),
