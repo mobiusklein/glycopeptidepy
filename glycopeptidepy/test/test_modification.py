@@ -15,6 +15,11 @@ class TestModifcationTarget(unittest.TestCase):
         peptide = sequence.parse("QVPQLQSQ")
         sites = rule.find_valid_sites(peptide)
         self.assertTrue(sites[0] is modification.SequenceLocation.n_term)
+
+        rule = mt['Gln->pyro-Glu']
+        sites = rule.find_valid_sites(peptide)
+        self.assertEqual(sites[0], 0)
+
         deamidated = mt["Deamidated"]
         sites = deamidated.find_valid_sites(peptide)
         self.assertEqual(sites, [0, 3, 5, 7])

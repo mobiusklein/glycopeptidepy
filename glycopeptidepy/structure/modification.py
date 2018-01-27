@@ -1,6 +1,7 @@
 import csv
 import json
 import string
+import warnings
 from copy import deepcopy
 import re
 from pkg_resources import resource_stream
@@ -255,12 +256,13 @@ class ModificationTarget(object):
         classification = ModificationCategory[specificity.get("classification")]
         if position_modifier == "Anywhere":
             position_modifier = SequenceLocation.anywhere
-        if position_modifier in nterm or site in nterm:
+        elif position_modifier in nterm or site in nterm:
             position_modifier = SequenceLocation.n_term
         elif position_modifier in cterm or site in cterm:
             position_modifier = SequenceLocation.c_term
-        # elif position_modifier :
-        #     raise Exception("Undefined Position, " + str(position_modifier))
+        else:
+            warnings.warn("Could not find a location for %r" % (position_modifier,))
+
         return cls(amino_acid, position_modifier, [classification])
 
     def __init__(self, site_targets=None, position_modifier=None, classification=None):
