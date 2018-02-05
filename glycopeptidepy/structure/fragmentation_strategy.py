@@ -20,7 +20,8 @@ from glycopeptidepy.structure.modification import (
     ModificationIndex)
 from glycopeptidepy.structure.glycan import (
     GlycosylationManager,
-    GlycosylationType)
+    GlycosylationType,
+    HashableGlycanComposition)
 from glycopeptidepy.structure.fragment import (
     IonSeries,
     SimpleFragment,
@@ -295,9 +296,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 composition += site['composition']
             is_glycosylated = (composition != base_composition)
             invalid = False
-            glycosylation_size = 0
             for key, value in names.items():
-                glycosylation_size += value
                 if glycan[key] < value:
                     invalid = True
                     break
@@ -306,13 +305,14 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
             if len(extended_key) > 0:
                 key_base = "%s+%s" % (key_base, extended_key)
+            glycosylation = HashableGlycanComposition(names)
             yield StubFragment(
                 name=key_base,
                 mass=mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
-                glycosylation_size=glycosylation_size)
+                glycosylation=glycosylation)
 
     def o_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
@@ -435,7 +435,6 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                     break
             if invalid:
                 continue
-
             extended_key = ''.join(
                 "%s%d" % kv for kv in sorted(names.items()) if kv[1] > 0)
             if len(extended_key) > 0:
@@ -443,13 +442,14 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
             if key_base in seen:
                 continue
             seen.add(key_base)
+            glycosylation = HashableGlycanComposition(names)
             yield StubFragment(
                 name=key_base,
                 mass=mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
-                glycosylation_size=glycosylation_size)
+                glycosylation=glycosylation)
 
     def gag_linker_stub_fragments(self):
         glycan = self.glycan_composition()
@@ -538,13 +538,14 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
             if key_base in seen:
                 continue
             seen.add(key_base)
+            glycosylation = HashableGlycanComposition(names)
             yield StubFragment(
                 name=key_base,
                 mass=mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
-                glycosylation_size=glycosylation_size)
+                glycosylation=glycosylation)
 
     def stub_fragments(self):
         n_glycan = self.count_glycosylation_type(GlycosylationType.n_linked) > 0

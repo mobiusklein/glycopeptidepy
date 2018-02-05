@@ -4,6 +4,7 @@ from six import add_metaclass
 from .modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
+from .glycan import HashableGlycanComposition
 from .composition import Composition, formula
 from ..utils import simple_repr
 
@@ -322,20 +323,26 @@ class SimpleFragment(FragmentBase):
 
 
 class StubFragment(SimpleFragment):
-    __slots__ = ['glycosylation_size']
+    __slots__ = ['glycosylation']
 
-    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False, glycosylation_size=0):
+    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False, glycosylation=None):
+        if glycosylation is None:
+            glycosylation = HashableGlycanComposition()
         super(StubFragment, self).__init__(name, mass, kind, composition, chemical_shift, is_glycosylated)
-        self.glycosylation_size = glycosylation_size
+        self.glycosylation = glycosylation
 
     def clone(self):
         dup = super(StubFragment, self).clone()
-        dup.glycosylation_size = self.glycosylation_size
+        dup.glycosylation = self.glycosylation
         return dup
+
+    @property
+    def glycosylation_size(self):
+        return sum(self.glycosylation.values())
 
     def __reduce__(self):
         proto = super(StubFragment, self).__reduce__()
-        proto[1] = proto[1] + (self.glycosylation_size,)
+        proto[1] = proto[1] + (self.glycosylation,)
         return proto
 
 

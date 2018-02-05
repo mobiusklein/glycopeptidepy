@@ -1,4 +1,4 @@
-from collections import defaultdict
+from collections import defaultdict, Mapping
 import itertools
 
 try:
@@ -34,7 +34,7 @@ class decoratordict(dict):
         return wrapper
 
 
-class _AccumulatorBag(object):
+class _AccumulatorBag(Mapping):
     def __init__(self, source=None):
         self.store = defaultdict(int)
         if source is not None:
@@ -56,6 +56,21 @@ class _AccumulatorBag(object):
         for key, value in other.items():
             self[key] += value
         return self
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def __contains__(self, key):
+        return key in self.store
+
+    def keys(self):
+        return self.store.keys()
+
+    def values(self):
+        return self.store.values()
 
     def items(self):
         return self.store.items()

@@ -173,8 +173,12 @@ class PeptideSequenceSuiteBase(object):
     def test_multiply_glycosylated_stubs(self):
         seq = self.parse_sequence("N(N-Glycosylation)ITEIVYLTN(N-Glycosylation)TTIEK{Hex:14; HexNAc:4}")
         stubs = list(seq.stub_fragments(extended=True))
-        name_set = {f.name for f in stubs}
+        name_set = {f.name: f for f in stubs}
         self.assertTrue("peptide+Hex4HexNAc2" in name_set)
+        f = name_set['peptide+Hex4HexNAc2']
+        assert f.is_glycosylated
+        assert f.glycosylation_size == 6
+        self.assertAlmostEqual(f.glycosylation.mass(), 1072.3806, 2)
 
     def test_gag_linker_peptide(self):
         seq = self.parse_sequence(p7)
