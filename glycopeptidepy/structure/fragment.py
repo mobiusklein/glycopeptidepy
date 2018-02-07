@@ -274,6 +274,15 @@ class PeptideFragment(FragmentBase):
                     return True
         return False
 
+    @property
+    def glycosylation_size(self):
+        if self.glycosylation is not None:
+            raise NotImplementedError()
+        size = 0
+        size += self.modification_dict.get(_modification_hexnac, 0)
+        size += self.modification_dict.get(_modification_xylose, 0)
+        return size
+
     def __repr__(self):
         return ("PeptideFragment(%(type)s %(position)s %(mass)s "
                 "%(modification_dict)s %(flanking_amino_acids)s %(chemical_shift)r)") % {

@@ -14,6 +14,8 @@ class TestPeptideFragment(unittest.TestCase):
         for position in seq.get_fragments('b'):
             for frag in position:
                 self.assertEqual(frag_map[frag], 1)
+                if "HexNAc" in frag.name:
+                    assert frag.glycosylation_size > 0
 
 
 if __name__ == '__main__':
