@@ -124,6 +124,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         self.extended = extended
         self._hexose = None
         self._hexnac = None
+        self._neuac = None
+        self._neugc = None
         self._fucose = None
         self._dhex = None
         self._xylose = None
@@ -158,6 +160,18 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         return self._dhex
 
     @property
+    def neuac(self):
+        if self._neuac is None:
+            self._neuac = self._prepare_monosaccharide("Neu5Ac")
+        return self._neuac
+
+    @property
+    def neugc(self):
+        if self._neugc is None:
+            self._neugc = self._prepare_monosaccharide("Neu5Gc")
+        return self._neugc
+
+    @property
     def xylose(self):
         if self._xylose is None:
             self._xylose = self._prepare_monosaccharide("Xyl")
@@ -180,110 +194,13 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
 
     def n_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
-
-        hexose = self.hexose
-        hexnac = self.hexnac
-        fucose = self.fucose
-
-        fucose_count = glycan['Fuc'] or glycan['dHex']
-        hexnac_in_aggregate = glycan['HexNAc']
-        hexose_in_aggregate = glycan["Hex"]
         core_count = self.count_glycosylation_type(GlycosylationType.n_linked)
         per_site_shifts = []
         base_composition = self.peptide_composition()
         base_mass = base_composition.mass
 
-        def fucosylate_increment(shift):
-            fucosylated = shift.copy()
-            fucosylated['key'] = fucosylated['key'].copy()
-            fucosylated['mass'] += fucose.mass()
-            fucosylated['composition'] = fucosylated[
-                'composition'] + fucose.total_composition()
-            fucosylated['key']["Fuc"] = 1
-            return fucosylated
-
         for i in range(core_count):
-            core_shifts = []
-            for hexnac_count in range(min(hexnac_in_aggregate + 1, 3)):
-                if hexnac_count == 0:
-                    shift = {
-                        "mass": 0,
-                        "composition": Composition(),
-                        "key": {}
-                    }
-                    core_shifts.append(shift)
-                elif hexnac_count == 1:
-                    shift = {
-                        "mass": (hexnac_count * hexnac.mass()),
-                        "composition": hexnac_count * hexnac.total_composition(),
-                        "key": {"HexNAc": hexnac_count}
-                    }
-                    core_shifts.append(shift)
-                    if i < fucose_count:
-                        fucosylated = fucosylate_increment(shift)
-                        core_shifts.append(fucosylated)
-                elif hexnac_count == 2:
-                    shift = {
-                        "mass": (hexnac_count * hexnac.mass()),
-                        "composition": hexnac_count * hexnac.total_composition(),
-                        "key": {"HexNAc": hexnac_count}
-                    }
-                    core_shifts.append(shift)
-
-                    if i < fucose_count:
-                        fucosylated = fucosylate_increment(shift)
-                        core_shifts.append(fucosylated)
-
-                    for hexose_count in range(1, min(hexose_in_aggregate + 1, 4)):
-                        shift = {
-                            "mass": (hexnac_count * hexnac.mass()) + (hexose_count * hexose.mass()),
-                            "composition": (hexnac_count * hexnac.total_composition()) + (
-                                hexose_count * hexose.total_composition()),
-                            "key": {"HexNAc": hexnac_count, "Hex": hexose_count}
-                        }
-                        core_shifts.append(shift)
-                        if i < fucose_count:
-                            fucosylated = fucosylate_increment(shift)
-                            core_shifts.append(fucosylated)
-
-                        # After the core motif has been exhausted, speculatively add
-                        # on the remaining core monosaccharides sequentially until
-                        # exhausted.
-                        if hexose_count == 3 and hexnac_in_aggregate >= 2 * core_count and self.extended:
-                            for extra_hexnac_count in range(0, 3):
-                                if extra_hexnac_count + hexnac_count > hexnac_in_aggregate:
-                                    continue
-                                shift = {
-                                    "mass": (
-                                        (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
-                                        hexose_count * hexose.mass()),
-                                    "composition": (
-                                        (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
-                                        hexose_count * hexose.total_composition()),
-                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count}
-                                }
-                                core_shifts.append(shift)
-                                if i < fucose_count:
-                                    fucosylated = fucosylate_increment(shift)
-                                    core_shifts.append(fucosylated)
-                                for extra_hexose_count in range(1, 3):
-                                    if extra_hexose_count + hexose_count > hexose_in_aggregate:
-                                        continue
-                                    shift = {
-                                        "mass": (
-                                            (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
-                                            (hexose_count + extra_hexose_count) * hexose.mass()),
-                                        "composition": (
-                                            (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
-                                            (hexose_count + extra_hexose_count) * hexose.total_composition()),
-                                        "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
-                                            hexose_count + extra_hexose_count)}
-                                    }
-                                    core_shifts.append(shift)
-                                    if i < fucose_count:
-                                        fucosylated = fucosylate_increment(
-                                            shift)
-                                        core_shifts.append(fucosylated)
+            core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
         for positions in product(*per_site_shifts):
             key_base = 'peptide'
@@ -314,106 +231,118 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 kind=IonSeries.stub_glycopeptide,
                 glycosylation=glycosylation)
 
-    def o_glycan_stub_fragments(self):
-        glycan = self.glycan_composition()
-        fucose_count = glycan['Fuc'] or glycan['dHex']
+    def fucosylate_increment(self, shift):
+        fucosylated = shift.copy()
+        fucosylated['key'] = fucosylated['key'].copy()
+        fucosylated['mass'] += self.fucose.mass()
+        fucosylated['composition'] = fucosylated[
+            'composition'] + self.fucose.total_composition()
+        fucosylated['key']["Fuc"] = 1
+        return fucosylated
 
-        core_count = self.count_glycosylation_type(GlycosylationType.o_linked)
-
-        per_site_shifts = []
+    def n_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=1):
         hexose = self.hexose
         hexnac = self.hexnac
-        fucose = self.fucose
-        base_composition = self.peptide_composition()
-        base_mass = base_composition.mass
 
-        hexnac_in_aggregate = glycan[hexnac]
-        hexose_in_aggregate = glycan[hexose]
+        fucose_count = glycan['Fuc'] or glycan['dHex']
+        hexnac_in_aggregate = glycan['HexNAc']
+        hexose_in_aggregate = glycan["Hex"]
 
-        def fucosylate_increment(shift):
-            fucosylated = shift.copy()
-            fucosylated['key'] = fucosylated['key'].copy()
-            fucosylated['mass'] += fucose.mass()
-            fucosylated['composition'] = fucosylated[
-                'composition'] + fucose.total_composition()
-            fucosylated['key']["Fuc"] = 1
-            return fucosylated
+        core_shifts = []
+        base_hexnac = min(hexnac_in_aggregate + 1, 3)
+        for hexnac_count in range(base_hexnac):
+            if hexnac_count == 0:
+                shift = {
+                    "mass": 0,
+                    "composition": Composition(),
+                    "key": {}
+                }
+                core_shifts.append(shift)
+            elif hexnac_count == 1:
+                shift = {
+                    "mass": (hexnac_count * hexnac.mass()),
+                    "composition": hexnac_count * hexnac.total_composition(),
+                    "key": {"HexNAc": hexnac_count}
+                }
+                core_shifts.append(shift)
+                if iteration_count < fucose_count:
+                    fucosylated = self.fucosylate_increment(shift)
+                    core_shifts.append(fucosylated)
+            elif hexnac_count == 2:
+                shift = {
+                    "mass": (hexnac_count * hexnac.mass()),
+                    "composition": hexnac_count * hexnac.total_composition(),
+                    "key": {"HexNAc": hexnac_count}
+                }
+                core_shifts.append(shift)
 
-        for i in range(core_count):
-            core_shifts = []
-            for hexnac_count in range(3):
-                if hexnac_in_aggregate < hexnac_count:
-                    continue
-                if hexnac_count == 0:
+                if iteration_count < fucose_count:
+                    fucosylated = self.fucosylate_increment(shift)
+                    core_shifts.append(fucosylated)
+
+                for hexose_count in range(1, min(hexose_in_aggregate + 1, 4)):
                     shift = {
-                        "mass": 0,
-                        "composition": Composition(),
-                        "key": {}
+                        "mass": (hexnac_count * hexnac.mass()) + (hexose_count * hexose.mass()),
+                        "composition": (hexnac_count * hexnac.total_composition()) + (
+                            hexose_count * hexose.total_composition()),
+                        "key": {"HexNAc": hexnac_count, "Hex": hexose_count}
                     }
                     core_shifts.append(shift)
-                elif hexnac_count >= 1:
-                    shift = {
-                        "mass": (hexnac_count * hexnac.mass()),
-                        "composition": hexnac_count * hexnac.total_composition(),
-                        "key": {"HexNAc": hexnac_count}
-                    }
-                    core_shifts.append(shift)
-                    if i < fucose_count:
-                        fucosylated = fucosylate_increment(shift)
+                    if iteration_count < fucose_count:
+                        fucosylated = self.fucosylate_increment(shift)
                         core_shifts.append(fucosylated)
-                    for hexose_count in range(0, 2):
-                        if hexose_in_aggregate < hexose_count:
-                            continue
-                        shift = {
-                            "mass": (
-                                (hexnac_count) * hexnac.mass()) + (
-                                (hexose_count) * hexose.mass()),
-                            "composition": (
-                                (hexnac_count) * hexnac.total_composition()) + (
-                                (hexose_count) * hexose.total_composition()),
-                            "key": {"HexNAc": hexnac_count, "Hex": (
-                                hexose_count)}
-                        }
-                        if hexose_count > 0:
+
+                    # After the core motif has been exhausted, speculatively add
+                    # on the remaining core monosaccharides sequentially until
+                    # exhausted.
+                    if hexose_count == 3 and hexnac_in_aggregate >= 2 * core_count and self.extended:
+                        for extra_hexnac_count in range(0, 3):
+                            if extra_hexnac_count + hexnac_count > hexnac_in_aggregate:
+                                continue
+                            shift = {
+                                "mass": (
+                                    (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                    hexose_count * hexose.mass()),
+                                "composition": (
+                                    (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                    hexose_count * hexose.total_composition()),
+                                "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count}
+                            }
                             core_shifts.append(shift)
-                            if i < fucose_count:
-                                fucosylated = fucosylate_increment(shift)
+                            if iteration_count < fucose_count:
+                                fucosylated = self.fucosylate_increment(shift)
                                 core_shifts.append(fucosylated)
-                        # After the core motif has been exhausted, speculatively add
-                        # on the remaining core monosaccharides sequentially until
-                        # exhausted.
-                        if self.extended and hexnac_in_aggregate - hexnac_count >= 0:
-                            for extra_hexnac_count in range(hexnac_in_aggregate - hexnac_count):
+                            for extra_hexose_count in range(1, 3):
+                                if extra_hexose_count + hexose_count > hexose_in_aggregate:
+                                    continue
                                 shift = {
                                     "mass": (
                                         (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
-                                        (hexose_count) * hexose.mass()),
+                                        (hexose_count + extra_hexose_count) * hexose.mass()),
                                     "composition": (
                                         (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
-                                        (hexose_count) * hexose.total_composition()),
+                                        (hexose_count + extra_hexose_count) * hexose.total_composition()),
                                     "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
-                                        hexose_count)}
+                                        hexose_count + extra_hexose_count)}
                                 }
-                                if i < fucose_count:
-                                    fucosylated = fucosylate_increment(shift)
+                                core_shifts.append(shift)
+                                if iteration_count < fucose_count:
+                                    fucosylated = self.fucosylate_increment(
+                                        shift)
                                     core_shifts.append(fucosylated)
-                                if hexose_in_aggregate > hexose_count:
-                                    for extra_hexose_count in range(hexose_in_aggregate - hexose_count):
-                                        shift = {
-                                            "mass": (
-                                                (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
-                                                (hexose_count + extra_hexose_count) * hexose.mass()),
-                                            "composition": (
-                                                (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
-                                                (hexose_count + extra_hexose_count) * hexose.total_composition()),
-                                            "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
-                                                hexose_count + extra_hexose_count)}
-                                        }
-                                        if i < fucose_count:
-                                            fucosylated = fucosylate_increment(
-                                                shift)
-                                            core_shifts.append(fucosylated)
+        return core_shifts
 
+    def o_glycan_stub_fragments(self):
+        glycan = self.glycan_composition()
+
+        core_count = self.count_glycosylation_type(GlycosylationType.o_linked)
+        per_site_shifts = []
+
+        base_composition = self.peptide_composition()
+        base_mass = base_composition.mass
+
+        for i in range(core_count):
+            core_shifts = self.o_glycan_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
         seen = set()
         for positions in product(*per_site_shifts):
@@ -451,66 +380,100 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 kind=IonSeries.stub_glycopeptide,
                 glycosylation=glycosylation)
 
+    def o_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=1):
+        hexose = self.hexose
+        hexnac = self.hexnac
+
+        fucose_count = glycan['Fuc'] or glycan['dHex']
+        hexnac_in_aggregate = glycan[hexnac]
+        hexose_in_aggregate = glycan[hexose]
+        core_shifts = []
+        for hexnac_count in range(3):
+            if hexnac_in_aggregate < hexnac_count:
+                continue
+            if hexnac_count == 0:
+                shift = {
+                    "mass": 0,
+                    "composition": Composition(),
+                    "key": {}
+                }
+                core_shifts.append(shift)
+            elif hexnac_count >= 1:
+                shift = {
+                    "mass": (hexnac_count * hexnac.mass()),
+                    "composition": hexnac_count * hexnac.total_composition(),
+                    "key": {"HexNAc": hexnac_count}
+                }
+                core_shifts.append(shift)
+                if iteration_count < fucose_count:
+                    fucosylated = self.fucosylate_increment(shift)
+                    core_shifts.append(fucosylated)
+                for hexose_count in range(0, 2):
+                    if hexose_in_aggregate < hexose_count:
+                        continue
+                    shift = {
+                        "mass": (
+                            (hexnac_count) * hexnac.mass()) + (
+                            (hexose_count) * hexose.mass()),
+                        "composition": (
+                            (hexnac_count) * hexnac.total_composition()) + (
+                            (hexose_count) * hexose.total_composition()),
+                        "key": {"HexNAc": hexnac_count, "Hex": (
+                            hexose_count)}
+                    }
+                    if hexose_count > 0:
+                        core_shifts.append(shift)
+                        if iteration_count < fucose_count:
+                            fucosylated = self.fucosylate_increment(shift)
+                            core_shifts.append(fucosylated)
+                    # After the core motif has been exhausted, speculatively add
+                    # on the remaining core monosaccharides sequentially until
+                    # exhausted.
+                    if self.extended and hexnac_in_aggregate - hexnac_count >= 0:
+                        for extra_hexnac_count in range(hexnac_in_aggregate - hexnac_count):
+                            shift = {
+                                "mass": (
+                                    (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                    (hexose_count) * hexose.mass()),
+                                "composition": (
+                                    (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                    (hexose_count) * hexose.total_composition()),
+                                "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                    hexose_count)}
+                            }
+                            if iteration_count < fucose_count:
+                                fucosylated = self.fucosylate_increment(shift)
+                                core_shifts.append(fucosylated)
+                            if hexose_in_aggregate > hexose_count:
+                                for extra_hexose_count in range(hexose_in_aggregate - hexose_count):
+                                    shift = {
+                                        "mass": (
+                                            (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                            (hexose_count + extra_hexose_count) * hexose.mass()),
+                                        "composition": (
+                                            (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                            (hexose_count + extra_hexose_count) * hexose.total_composition()),
+                                        "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                            hexose_count + extra_hexose_count)}
+                                    }
+                                    if iteration_count < fucose_count:
+                                        fucosylated = self.fucosylate_increment(
+                                            shift)
+                                        core_shifts.append(fucosylated)
+
+        return core_shifts
+
     def gag_linker_stub_fragments(self):
         glycan = self.glycan_composition()
 
         core_count = self.count_glycosylation_type(GlycosylationType.glycosaminoglycan)
 
         per_site_shifts = []
-        hexose = self.hexose
-        xyl = self.xylose
-        hexa = self.hexa
 
         base_composition = self.peptide_composition()
         base_mass = base_composition.mass
         for i in range(core_count):
-            core_shifts = []
-            for xyl_count in range(2):
-                if xyl_count == 0:
-                    shift = {
-                        "mass": 0,
-                        "composition": Composition(),
-                        "key": {}
-                    }
-                    core_shifts.append(shift)
-                else:
-                    shift = {
-                        "mass": xyl.mass() * xyl_count,
-                        "composition": xyl.total_composition() * xyl_count,
-                        "key": {
-                            xyl: xyl_count
-                        }
-                    }
-                    core_shifts.append(shift)
-                if xyl_count > 0:
-                    # TODO: Handle modified Hexose residues here too.
-                    for hexose_count in range(1, 3):
-                        shift = {
-                            "mass": ((xyl.mass() * xyl_count) + (
-                                hexose.mass() * hexose_count)),
-                            "composition": (
-                                (xyl.total_composition() * xyl_count) + (
-                                    hexose.total_composition() * hexose_count)),
-                            "key": {
-                                xyl: xyl_count,
-                                hexose: hexose_count
-                            }
-                        }
-                        core_shifts.append(shift)
-                        if hexose_count == 2:
-                            shift = {
-                                "mass": ((xyl.mass() * xyl_count) + (
-                                    hexose.mass() * hexose_count) + hexa.mass()),
-                                "composition": (
-                                    (xyl.total_composition() * xyl_count) + (
-                                        hexose.total_composition() * hexose_count) + hexa.total_composition()),
-                                "key": {
-                                    xyl: xyl_count,
-                                    hexose: hexose_count,
-                                    hexa: 1
-                                }
-                            }
-                            core_shifts.append(shift)
+            core_shifts = self.gag_linker_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
         seen = set()
         for positions in product(*per_site_shifts):
@@ -546,6 +509,61 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
                 glycosylation=glycosylation)
+
+    def gag_linker_composition_fragments(self, glycan, core_count=1, iteration_count=1):
+        hexose = self.hexose
+        xyl = self.xylose
+        hexa = self.hexa
+
+        core_shifts = []
+        for xyl_count in range(2):
+            if xyl_count == 0:
+                shift = {
+                    "mass": 0,
+                    "composition": Composition(),
+                    "key": {}
+                }
+                core_shifts.append(shift)
+            else:
+                shift = {
+                    "mass": xyl.mass() * xyl_count,
+                    "composition": xyl.total_composition() * xyl_count,
+                    "key": {
+                        xyl: xyl_count
+                    }
+                }
+                core_shifts.append(shift)
+            if xyl_count > 0:
+                # TODO: Handle modified Hexose residues here too.
+                for hexose_count in range(1, 3):
+                    shift = {
+                        "mass": ((xyl.mass() * xyl_count) + (
+                            hexose.mass() * hexose_count)),
+                        "composition": (
+                            (xyl.total_composition() * xyl_count) + (
+                                hexose.total_composition() * hexose_count)),
+                        "key": {
+                            xyl: xyl_count,
+                            hexose: hexose_count
+                        }
+                    }
+                    core_shifts.append(shift)
+                    if hexose_count == 2:
+                        shift = {
+                            "mass": ((xyl.mass() * xyl_count) + (
+                                hexose.mass() * hexose_count) + hexa.mass()),
+                            "composition": (
+                                (xyl.total_composition() * xyl_count) + (
+                                    hexose.total_composition() * hexose_count) + hexa.total_composition()),
+                            "key": {
+                                xyl: xyl_count,
+                                hexose: hexose_count,
+                                hexa: 1
+                            }
+                        }
+                        core_shifts.append(shift)
+
+        return core_shifts
 
     def stub_fragments(self):
         n_glycan = self.count_glycosylation_type(GlycosylationType.n_linked) > 0
