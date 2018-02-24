@@ -445,9 +445,10 @@ class IonSeries(object):
         self.regex = re.compile(regex) if regex is not None else regex
         self.composition_shift = fragment_shift_composition.get(
             self.name, Composition())
+        self._hash = hash(self.name)
 
     def __hash__(self):
-        return hash(self.name)
+        return self._hash
 
     def __eq__(self, other):
         try:

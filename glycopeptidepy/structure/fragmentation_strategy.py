@@ -130,7 +130,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         self._dhex = None
         self._xylose = None
         self._hexa = None
-        self._generator = self.stub_fragments()
+        self._generator = None
 
     def _prepare_monosaccharide(self, name):
         return FrozenMonosaccharideResidue.from_iupac_lite(name)
@@ -192,6 +192,15 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
     def peptide_composition(self):
         return self.peptide.peptide_composition()
 
+    def fucosylate_increment(self, shift):
+        fucosylated = shift.copy()
+        fucosylated['key'] = fucosylated['key'].copy()
+        fucosylated['mass'] += self.fucose.mass()
+        fucosylated['composition'] = fucosylated[
+            'composition'] + self.fucose.total_composition()
+        fucosylated['key']["Fuc"] = 1
+        return fucosylated
+
     def n_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
         core_count = self.count_glycosylation_type(GlycosylationType.n_linked)
@@ -230,15 +239,6 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
                 glycosylation=glycosylation)
-
-    def fucosylate_increment(self, shift):
-        fucosylated = shift.copy()
-        fucosylated['key'] = fucosylated['key'].copy()
-        fucosylated['mass'] += self.fucose.mass()
-        fucosylated['composition'] = fucosylated[
-            'composition'] + self.fucose.total_composition()
-        fucosylated['key']["Fuc"] = 1
-        return fucosylated
 
     def n_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=1):
         hexose = self.hexose
@@ -585,6 +585,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 raise ValueError("No Glycan Class Detected")
 
     def __next__(self):
+        if self._generator is None:
+            self._generator = self.stub_fragments()
         return next(self._generator)
 
     def next(self):
