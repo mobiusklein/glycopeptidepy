@@ -39,7 +39,7 @@ class AminoAcidSequenceBuildingBlock(object):
         self._string = None
 
     def __hash__(self):
-        return hash(self.residue.symbol)
+        return hash(str(self))
 
     def __eq__(self, other):
         try:
