@@ -5,7 +5,7 @@ from glycopeptidepy.utils.collectiontools import decoratordict
 from glypy.utils import Enum
 
 from glypy.structure.glycan import NamedGlycan
-from glypy.structure.glycan_composition import HashableGlycanComposition
+from glypy.structure.glycan_composition import GlycanComposition, HashableGlycanComposition
 from glypy import Composition
 
 
@@ -45,6 +45,10 @@ glycosylation_site_detectors = decoratordict({
 class TypedGlycanComposition(HashableGlycanComposition):
 
     def __init__(self, glycosylation_type=None, *args, **kwargs):
+        if isinstance(glycosylation_type, GlycanComposition):
+            temp = args[0]
+            args = (glycosylation_type,) + args[1:]
+            glycosylation_type = temp
         self.glycosylation_type = GlycosylationType[glycosylation_type]
         super(TypedGlycanComposition, self).__init__(*args, **kwargs)
 
