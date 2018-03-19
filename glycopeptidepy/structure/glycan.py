@@ -5,7 +5,9 @@ from glycopeptidepy.utils.collectiontools import decoratordict
 from glypy.utils import Enum
 
 from glypy.structure.glycan import NamedGlycan
-from glypy.structure.glycan_composition import GlycanComposition, HashableGlycanComposition
+from glypy.structure.glycan_composition import (
+    FrozenMonosaccharideResidue,
+    FrozenGlycanComposition, GlycanComposition, HashableGlycanComposition)
 from glypy import Composition
 
 
@@ -60,6 +62,102 @@ class TypedGlycanComposition(HashableGlycanComposition):
 
     def is_type(self, glycosylation_type):
         return self.glycosylation_type is GlycosylationType[glycosylation_type]
+
+
+class GlycanCombination(Mapping):
+    def __init__(self, components):
+        self.components = tuple(components)
+        self._glycan_composition = self._sum_components(self.components)
+
+    def _sum_components(self, components):
+        acc = HashableGlycanComposition()
+        for x in components:
+            acc += x
+        acc.composition_offset -= Composition({"H": 2, "O": 1})
+        return acc
+
+    def mass(self, *args, **kwargs):
+        return self._glycan_composition.mass(*args, **kwargs)
+
+    def total_composition(self, *args, **kwargs):
+        return self._glycan_composition.total_composition(*args, **kwargs)
+
+    def __iter__(self):
+        return iter(self._glycan_composition)
+
+    def __getitem__(self, key):
+        return self._glycan_composition[key]
+
+    def keys(self):
+        return self._glycan_composition.keys()
+
+    def values(self):
+        return self._glycan_composition.values()
+
+    def items(self):
+        return self._glycan_composition.items()
+
+    def clone(self, *args, **kwargs):
+        return self._glycan_composition.clone(*args, **kwargs)
+
+    def serialize(self):
+        parts = [str(x)[1:-1] for x in self.components]
+        return '{%s}' % '|'.join(parts)
+
+    def __repr__(self):
+        return self.serialize()
+
+    def __str__(self):
+        return self.serialize()
+
+    @classmethod
+    def parse(cls, string):
+        string = str(string)[1:-1]
+        parts = string.split("|")
+        components = []
+        for part in parts:
+            component = HashableGlycanComposition()
+            tokens = part.split("; ")
+            for token in tokens:
+                try:
+                    residue, count = token.split(":")
+                except ValueError:
+                    if string == "{}":
+                        return cls([])
+                    else:
+                        raise ValueError("Malformed Token, %s" % (token,))
+                component[FrozenMonosaccharideResidue.from_iupac_lite(residue)] = int(count)
+            components.append(component)
+        return cls(components)
+
+    def __hash__(self):
+        return hash(self._glycan_composition)
+
+    def __eq__(self, other):
+        try:
+            other = other._glycan_composition
+        except AttributeError:
+            pass
+        return self._glycan_composition == other
+
+    def __ne__(self, other):
+        try:
+            other = other._glycan_composition
+        except AttributeError:
+            pass
+        return (self._glycan_composition != other)
+
+    def __add__(self, other):
+        return self._glycan_composition + other
+
+    def __sub__(self, other):
+        return self._glycan_composition - other
+
+    def __mul__(self, other):
+        return self._glycan_composition * other
+
+    def __len__(self):
+        return len(self._glycan_composition)
 
 
 class TypedGlycan(NamedGlycan):

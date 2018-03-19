@@ -1,6 +1,10 @@
 import re
+import csv
 import threading
+
 from collections import defaultdict
+
+import requests
 
 from lxml import etree
 from glycopeptidepy.structure.modification import ModificationRule
@@ -443,3 +447,17 @@ class _UniProtPTMListParser(object):
 
 
 rdf = UniprotRDFClient()
+
+
+def search(query):
+    url = (
+        "https://www.uniprot.org/uniprot/?sort=score&"
+        "desc=&compress=no&query={query}&fil=&&format=tab"
+        "&columns=id,entry%20name,reviewed,protein%20names,genes,organism,length")
+    response = requests.get(url.format(query=query), stream=True)
+    response.raise_for_status()
+    data = response.raw.read()
+    reader = csv.reader(data.splitlines(), delimiter='\t')
+    header = next(reader)
+    return [dict(zip(header, line)) for line in reader]
+    # return response

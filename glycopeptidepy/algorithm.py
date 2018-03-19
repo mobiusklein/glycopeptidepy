@@ -59,7 +59,7 @@ def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=N
     sequence_tokens = sequence_tokenizer_respect_sequons(sequence)
     pref = sequence_tokens[:prefix_len]
     if suffix_len == 0:
-        suf = ""
+        suf = []
         body = sequence_tokens[prefix_len:]
     else:
         suf = sequence_tokens[-suffix_len:]

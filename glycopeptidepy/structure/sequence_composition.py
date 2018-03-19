@@ -57,7 +57,7 @@ class AminoAcidSequenceBuildingBlock(object):
         if self._string is None:
             self._string = "{}{}".format(
                 self.residue.symbol,
-                "({.name})".format(self.modifications[0]) if len(self.modifications) > 0 else "")
+                "({})".format(self.modifications[0]) if len(self.modifications) > 0 else "")
         return self._string
 
     def __contains__(self, item):
