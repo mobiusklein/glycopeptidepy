@@ -49,5 +49,35 @@ class TestGlycosylationRule(unittest.TestCase):
         self.assertAlmostEqual(rule.mass, dehydrated_mass, 3)
 
 
+class TestModificationTable(unittest.TestCase):
+    def test_restricted_table(self):
+        table = modification.RestrictedModificationTable(
+            constant_modifications=['Carbamidomethyl (C)'],
+            variable_modifications=['Deamidated (N)'])
+
+        total = len(table.rules())
+        given = len(table.other_modifications)
+        assert total - given == 2
+
+
+class TestAminoAcidSubstitution(unittest.TestCase):
+    def test_parse(self):
+        rule_name = "@Asn->Pro"
+        rule = modification.AminoAcidSubstitution.try_parse(rule_name)
+        assert rule is not None
+        assert rule.serialize() == rule_name
+
+
+class AnonymousModificationRule(unittest.TestCase):
+    def test_parse(self):
+        rule_name = "@Name-1.0"
+        rule = modification.AnonymousModificationRule.try_parse(rule_name)
+        assert rule.name == "Name"
+        assert rule.mass == 1.0
+        assert rule.serialize() == rule_name
+        assert not rule.is_standard
+        assert rule == rule.clone()
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,6 +1,6 @@
 import unittest
 
-from glycopeptidepy.structure import sequence, modification, fragment, composition
+from glycopeptidepy.structure import sequence, fragment
 
 
 class TestPeptideFragment(unittest.TestCase):

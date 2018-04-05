@@ -1407,7 +1407,7 @@ class Modification(ModificationBase):
         ModificationTable.register_new_rule(rule)
 
     @classmethod
-    def mass_by_name(cls, name):
+    def mass_by_name(cls, name):  # pragma: no cover
         if len(name) == 0:
             mass = 0.0
         elif "@" == name[0]:

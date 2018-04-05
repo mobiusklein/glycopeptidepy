@@ -306,7 +306,7 @@ def get(accessions):
         return ProteinDownloader.download(accessions, chunk_size)
 
 
-class ProteinDownloader(object):
+class ProteinDownloader(object):  # pragma: no cover
     @staticmethod
     def chunk(seq, n=5):
         i = 0
@@ -370,7 +370,7 @@ class ProteinDownloader(object):
         return file_handle
 
 
-class _UniProtPTMListParser(object):
+class _UniProtPTMListParser(object):  # pragma: no cover
     def __init__(self, path):
         self.path = path
         self.handle = open(path)

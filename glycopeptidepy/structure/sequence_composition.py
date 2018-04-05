@@ -1,3 +1,5 @@
+# pragma: no cover
+
 import itertools
 from glypy import MonosaccharideResidue
 

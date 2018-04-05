@@ -350,9 +350,9 @@ class StubFragment(SimpleFragment):
         return sum(self.glycosylation.values())
 
     def __reduce__(self):
-        proto = super(StubFragment, self).__reduce__()
+        proto = list(super(StubFragment, self).__reduce__())
         proto[1] = proto[1] + (self.glycosylation,)
-        return proto
+        return tuple(proto)
 
 
 monosaccharide_to_losses = {

@@ -201,6 +201,15 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         fucosylated['key']["Fuc"] = 1
         return fucosylated
 
+    def xylosylate_increment(self, shift):
+        xylosylated = shift.copy()
+        xylosylated['key'] = xylosylated['key'].copy()
+        xylosylated['mass'] += self.xylose.mass()
+        xylosylated['composition'] = xylosylated[
+            'composition'] + self.xylose.total_composition()
+        xylosylated['key']["Fuc"] = 1
+        return xylosylated
+
     def n_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
         core_count = self.count_glycosylation_type(GlycosylationType.n_linked)
@@ -245,6 +254,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         hexnac = self.hexnac
 
         fucose_count = glycan['Fuc'] or glycan['dHex']
+        xylose_count = glycan['Xyl']
         hexnac_in_aggregate = glycan['HexNAc']
         hexose_in_aggregate = glycan["Hex"]
 
@@ -279,6 +289,12 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 if iteration_count < fucose_count:
                     fucosylated = self.fucosylate_increment(shift)
                     core_shifts.append(fucosylated)
+                    if iteration_count < xylose_count:
+                        xylosylated = self.xylosylate_increment(fucosylated)
+                        core_shifts.append(xylosylated)
+                if iteration_count < xylose_count:
+                    xylosylated = self.xylosylate_increment(shift)
+                    core_shifts.append(xylosylated)
 
                 for hexose_count in range(1, min(hexose_in_aggregate + 1, 4)):
                     shift = {
@@ -291,6 +307,12 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                     if iteration_count < fucose_count:
                         fucosylated = self.fucosylate_increment(shift)
                         core_shifts.append(fucosylated)
+                        if iteration_count < xylose_count:
+                            xylosylated = self.xylosylate_increment(fucosylated)
+                            core_shifts.append(xylosylated)
+                    if iteration_count < xylose_count:
+                        xylosylated = self.xylosylate_increment(shift)
+                        core_shifts.append(xylosylated)
 
                     # After the core motif has been exhausted, speculatively add
                     # on the remaining core monosaccharides sequentially until
@@ -312,6 +334,12 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                             if iteration_count < fucose_count:
                                 fucosylated = self.fucosylate_increment(shift)
                                 core_shifts.append(fucosylated)
+                                if iteration_count < xylose_count:
+                                    xylosylated = self.xylosylate_increment(fucosylated)
+                                    core_shifts.append(xylosylated)
+                            if iteration_count < xylose_count:
+                                xylosylated = self.xylosylate_increment(shift)
+                                core_shifts.append(xylosylated)
                             for extra_hexose_count in range(1, 3):
                                 if extra_hexose_count + hexose_count > hexose_in_aggregate:
                                     continue
@@ -327,9 +355,14 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                                 }
                                 core_shifts.append(shift)
                                 if iteration_count < fucose_count:
-                                    fucosylated = self.fucosylate_increment(
-                                        shift)
+                                    fucosylated = self.fucosylate_increment(shift)
                                     core_shifts.append(fucosylated)
+                                    if iteration_count < xylose_count:
+                                        xylosylated = self.xylosylate_increment(fucosylated)
+                                        core_shifts.append(xylosylated)
+                                if iteration_count < xylose_count:
+                                    xylosylated = self.xylosylate_increment(shift)
+                                    core_shifts.append(xylosylated)
         return core_shifts
 
     def o_glycan_stub_fragments(self):
