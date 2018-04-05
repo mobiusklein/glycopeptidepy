@@ -85,14 +85,6 @@ class AminoAcidSequenceBuildingBlock(object):
     def clone(self):
         return self.__class__(self.residue, tuple(self.modifications))
 
-    def _add_modification(self, modification):
-        # This method invalidates hashes. Only use during initialization
-        mods = list(self.modifications)
-        mods.append(modification)
-        self.modifications = tuple(mods)
-        self.mass += modification.mass
-        return self
-
 
 class ModificationBuildingBlock(object):
     # Not all SequenceComposition methods are compatible with these?
