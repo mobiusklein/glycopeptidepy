@@ -25,6 +25,8 @@ p10 = ('N(#:iupac,glycosylation_type=n_linked:b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-2)-
        '-(1-4)-?-D-Glcp2NAc)ITEIVYLTN(#:iupac,glycosylation_type=n_linked:b-D-Galp-(1-4)'
        '-b-D-Glcp2NAc-(1-2)-a-D-Manp-(1-6)-[b-D-Galp-(1-4)-b-D-Glcp2NAc-(1-4)-a-D-Manp-(1-3)]'
        'b-D-Manp-(1-4)-b-D-Glcp2NAc-(1-4)-?-D-Glcp2NAc)TTIEK')
+p11 = ("N(#:glycosylation_type=n_linked:{Hex:5; HexNAc:4})ITEI"
+       "VYLTN(#:glycosylation_type=n_linked:{Hex:5; HexNAc:4})TTIEK")
 hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
@@ -189,8 +191,11 @@ class PeptideSequenceSuiteBase(object):
     def test_glycan_representations(self):
         t1 = self.parse_sequence(p9)
         t2 = self.parse_sequence(p10)
+        t3 = self.parse_sequence(p11)
         self.assertAlmostEqual(t1.total_mass, t2.total_mass, 4)
+        self.assertAlmostEqual(t1.total_mass, t3.total_mass, 4)
         self.assertEqual(t1.clone().deglycosylate(), t2.clone().deglycosylate())
+        self.assertEqual(t1.clone().deglycosylate(), t3.clone().deglycosylate())
 
     def test_glycan_tracking(self):
         t1 = self.parse_sequence("PEPT(HexNAc)IDE")
