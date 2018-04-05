@@ -64,7 +64,7 @@ class TypedGlycanComposition(HashableGlycanComposition):
         return self.glycosylation_type is GlycosylationType[glycosylation_type]
 
 
-class GlycanCombination(Mapping):
+class GlycanCombination(Mapping):  # pragma: no cover
     def __init__(self, components):
         self.components = tuple(components)
         self._glycan_composition = self._sum_components(self.components)

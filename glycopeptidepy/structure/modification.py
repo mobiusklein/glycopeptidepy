@@ -898,8 +898,10 @@ class Glycosylation(ModificationRule):
             match = re.search(r":([^:]+?):(.+)", rule_string, re.DOTALL)
             if match:
                 metadata = match.group(1).split(",")
-                format_type = metadata[0]
-                metadata = dict([token.split("=") for token in metadata[1:]])
+                if '=' not in metadata[0]:
+                    format_type = metadata[0]
+                    metadata = metadata[1:]
+                metadata = dict([token.split("=") for token in metadata])
                 glycan_definition = match.group(2)
             else:
                 raise ValueError("Cannot recognize glycan format %r" % (rule_string,))
