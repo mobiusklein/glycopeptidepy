@@ -41,20 +41,26 @@ agp1 = next(parser)
 class TestProtease(unittest.TestCase):
     def test_digest(self):
         trypsin = enzyme.Protease("trypsin")
+        example_found = False
         for peptide, start, stop, missed in trypsin.cleave(heparanase, 2):
             assert missed < 3
             if peptide == "KFKNSTYSR":
-                break
-        else:
+                example_found = True
+        if not example_found:
             raise AssertionError("Did not produce overlapped digest")
 
     def test_semispecific(self):
         trypsin = enzyme.Protease("trypsin")
+        c_term_example = False
+        n_term_example = False
         for peptide, start, end, missed in trypsin.cleave(agp1, semispecific=True):
             assert missed < 3
             if peptide == "LVPVPITNATLDQITGK":
-                break
-        else:
+                c_term_example = True
+            if peptide == 'ENGT':
+                n_term_example = True
+
+        if not (n_term_example and c_term_example):
             raise AssertionError("Did not produce overlapped digest")
 
     def test_combine(self):

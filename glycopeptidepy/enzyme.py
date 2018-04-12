@@ -159,7 +159,7 @@ class Protease(object):
 
         # N-terminus is enzyme-specific
         for ix, j in enumerate(all_sites):
-            terminal_ix = min(ix + missed_cleavages, n_sites - 1)
+            terminal_ix = min(ix + missed_cleavages + 1, n_sites - 1)
             terminal_site = all_sites[terminal_ix]
             sites_between = all_sites[ix:terminal_ix]
             for k in range(j + 1, terminal_site):
