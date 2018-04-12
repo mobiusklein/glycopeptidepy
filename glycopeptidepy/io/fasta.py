@@ -1,7 +1,7 @@
 import re
 import textwrap
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 try:
     from collections.abc import Mapping, Sequence as SequenceABC
 except ImportError:
@@ -109,6 +109,90 @@ class DefLineParserBase(object):
 
     def parse(self, defline):
         raise NotImplementedError()
+
+
+class PEFFDeflineParser(DefLineParserBase):
+    kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
+    detect_pattern = re.compile(r"^>?\S+:\S+")
+
+    def __init__(self, validate=True):
+        self.validate = validate
+
+    def extract_parenthesis_list(self, text):
+        chunks = []
+        chunk = []
+        paren_level = 0
+        i = 0
+        n = len(text)
+        while i < n:
+            c = text[i]
+            i += 1
+            if c == "(":
+                if paren_level > 0:
+                    chunk.append(c)
+                paren_level += 1
+            elif c == ")":
+                if paren_level > 1:
+                    chunk.append(c)
+                paren_level -= 1
+                if paren_level == 0:
+                    if chunk:
+                        chunks.append(chunk)
+                    chunk = []
+            else:
+                chunk.append(c)
+        chunks = list(map(''.join, chunks))
+        return chunks
+
+    def split_pipe_separated_tuple(self, text):
+        parts = text.split("|")
+        return parts
+
+    def coerce_types(self, key, value):
+        if "|" in value:
+            value = self.split_pipe_separated_tuple(value)
+            result = []
+            for i, v in enumerate(value):
+                result.append(self._coerce_value(key, v, i))
+            return tuple(result)
+        else:
+            return self._coerce_value(key, value, 0)
+
+    def _coerce_value(self, key, value, index):
+        try:
+            return int(value)
+        except ValueError:
+            pass
+        try:
+            return float(value)
+        except ValueError:
+            pass
+        return str(value)
+
+    def parse(self, line):
+        if self.validate:
+            match = self.detect_pattern.match(line)
+            if not match:
+                raise UnparsableDeflineError(
+                    "Failed to parse {!r} using {!r}".format(
+                        line, self))
+        storage = OrderedDict()
+        prefix = None
+        db_uid = None
+        if line.startswith(">"):
+            line = line[1:]
+        prefix, line = line.split(":", 1)
+        db_uid, line = line.split(" ", 1)
+        storage['Prefix'] = prefix
+        storage['DbUniqueId'] = db_uid
+        kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
+        for key, value in kv_pattern.findall(line):
+            if not value.startswith("(") or " (" in value:
+                storage[key] = self.coerce_types(key, value)
+            else:
+                # multi-value
+                storage[key] = [self.coerce_types(key, v) for v in self.extract_parenthesis_list(value)]
+        return storage
 
 
 class CallableDefLineParser(DefLineParserBase):
@@ -219,16 +303,19 @@ uniprot_parser = RegexDefLineParser(uniprot_regex)
 partial_uniprot_regex = r"(?P<accession>[A-Z0-9\-]+)\|(?P<name>\S+)"
 partial_uniprot_parser = RegexDefLineParser(partial_uniprot_regex)
 
-default_parser = DispatchingDefLineParser([uniprot_parser, partial_uniprot_parser, space_delim_parser])
+peff_parser = PEFFDeflineParser()
+
+default_parser = DispatchingDefLineParser([uniprot_parser, partial_uniprot_parser, peff_parser, space_delim_parser])
 
 
-class FastaFileParser(object):
-    def __init__(self, path, defline_parser=default_parser):
+class FastaFileReader(object):
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8'):
         self.state = "defline"
-        self.handle = opener(path)
+        self.handle = opener(path, 'rb')
         self.defline = None
         self.sequence_chunks = []
         self.defline_parser = defline_parser
+        self.encoding = encoding
         self._generator = None
 
     def process_result(self, d):
@@ -248,6 +335,10 @@ class FastaFileParser(object):
     def _parse_lines(self):
         for line in self.handle:
             line = line.strip()
+            try:
+                line = line.decode(self.encoding)
+            except AttributeError:
+                pass
             if self.state == 'defline':
                 if line.startswith(">"):
                     self.defline = line[1:]
@@ -285,14 +376,20 @@ class FastaFileParser(object):
                 pass
 
 
-class ProteinFastaFileParser(FastaFileParser):
+FastaFileParser = FastaFileReader
 
-    def __init__(self, path, defline_parser=default_parser):
-        super(ProteinFastaFileParser, self).__init__(path, defline_parser)
+
+class ProteinFastaFileReader(FastaFileReader):
+
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8'):
+        super(ProteinFastaFileReader, self).__init__(path, defline_parser, encoding)
 
     def process_result(self, d):
         p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
         return p
+
+
+ProteinFastaFileParser = ProteinFastaFileReader
 
 
 class FastaFileWriter(object):
@@ -328,3 +425,97 @@ class ProteinFastaFileWriter(FastaFileWriter):
 
 def read(f, defline_parser=default_parser, reader_type=ProteinFastaFileParser):
     return reader_type(f, defline_parser=defline_parser)
+
+
+class PEFFHeaderBlock(Mapping):
+    def __init__(self, storage=None, block_type=None):
+        if storage is None:
+            storage = OrderedDict()
+        self.block_type = block_type
+        self.storage = storage
+
+    def keys(self):
+        return self.storage.keys()
+
+    def values(self):
+        return self.storage.values()
+
+    def items(self):
+        return self.storage.items()
+
+    def __iter__(self):
+        return iter(self.storage)
+
+    def __getitem__(self, key):
+        return self.storage[key]
+
+    def __len__(self):
+        return len(self.storage)
+
+    def __contains__(self, key):
+        return key in self.storage
+
+    def __getattr__(self, key):
+        if key == "storage":
+            raise AttributeError(key)
+        try:
+            return self.storage[key]
+        except KeyError:
+            raise AttributeError(key)
+
+    def __dir__(self):
+        base = set(dir(super(PEFFHeaderBlock, self)))
+        keys = set(self._mapping.keys())
+        return list(base | keys)
+
+    def __repr__(self):
+        return "# //\n%s\n# //" % '\n'.join('# %s=%s' % kv for kv in self.items())
+
+
+class PEFFReader(ProteinFastaFileReader):
+    def __init__(self, path, defline_parser=PEFFDeflineParser(False)):
+        super(PEFFReader, self).__init__(opener(path, 'rb'), defline_parser, encoding='ascii')
+        if 'b' not in self.handle.mode:
+            raise ValueError("PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
+        self.version = (0, 0)
+        self.blocks = []
+        self.comments = []
+        self.number_of_entries = 0
+        self._parse_header()
+
+    def _parse_header(self):
+        offset = 0
+        line = self.handle.readline()
+        line = line.decode('ascii')
+        offset += len(line)
+        if not line.startswith("# PEFF"):
+            raise ValueError("Not a PEFF File")
+        self.version = tuple(map(int, line.strip()[7:].split(".")))
+        in_header = True
+        current_block = defaultdict(list)
+        while in_header:
+            line = self.handle.readline()
+            line = line.decode('ascii')
+            if not line.startswith("#"):
+                in_header = False
+                self.handle.seek(offset)
+            offset += len(line)
+            line = line.strip()[2:]
+            if '=' in line:
+                key, value = line.split("=", 1)
+                if key == "GeneralComment":
+                    self.comments.append(value)
+                else:
+                    current_block[key].append(value)
+            if line.startswith("//"):
+                if current_block:
+                    self.blocks.append(PEFFHeaderBlock({k: v if len(v) > 1 else v[0]
+                                                        for k, v in current_block.items()}))
+                current_block = defaultdict(list)
+        number_of_entries = 0
+        for block in self.blocks:
+            try:
+                number_of_entries += int(block['NumberOfEntries'])
+            except KeyError:
+                pass
+        self.number_of_entries = number_of_entries

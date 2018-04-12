@@ -14,7 +14,7 @@ class TestFastaIO(unittest.TestCase):
 
     def test_fasta_parser(self):
         with self.open_stream() as f:
-            parser = fasta.ProteinFastaFileParser(f)
+            parser = fasta.ProteinFastaFileReader(f)
             i = 0
             for protein in parser:
                 i += 1
@@ -43,3 +43,21 @@ class TestHeaderParsing(unittest.TestCase):
         result = fasta.default_parser(header)
         self.assertRaises(AttributeError, lambda: result.accession)
         self.assertEqual(result[0], "P16066")
+
+
+class TestPEFF(unittest.TestCase):
+    def open_stream(self, mode='rb'):
+        return open(datafile("SmallTestDB-PEFF1.0.peff"), mode)
+
+    def test_peff_parser(self):
+        with self.open_stream() as f:
+            parser = fasta.PEFFReader(f)
+            assert parser.number_of_entries == 29
+            proteins = list(parser)
+            n = len(proteins)
+            # this file was manually corrupted by its creator
+            # to include a space in the first sequence
+            assert n + 1 == parser.number_of_entries
+            annotations = proteins[0].annotations
+            assert len(annotations) == 7
+            assert annotations['Length'] == 265
