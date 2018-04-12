@@ -225,10 +225,12 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
             names = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
+            is_extended = False
             for site in positions:
                 mass += site['mass']
                 names += (site['key'])
                 composition += site['composition']
+                is_extended |= site['is_extended']
             is_glycosylated = (composition != base_composition)
             invalid = False
             for key, value in names.items():
@@ -247,7 +249,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
-                glycosylation=glycosylation)
+                glycosylation=glycosylation,
+                is_extended=is_extended)
 
     def n_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=1):
         hexose = self.hexose
@@ -265,14 +268,16 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 shift = {
                     "mass": 0,
                     "composition": Composition(),
-                    "key": {}
+                    "key": {},
+                    'is_extended': False,
                 }
                 core_shifts.append(shift)
             elif hexnac_count == 1:
                 shift = {
                     "mass": (hexnac_count * hexnac.mass()),
                     "composition": hexnac_count * hexnac.total_composition(),
-                    "key": {"HexNAc": hexnac_count}
+                    "key": {"HexNAc": hexnac_count},
+                    'is_extended': False,
                 }
                 core_shifts.append(shift)
                 if iteration_count < fucose_count:
@@ -282,7 +287,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 shift = {
                     "mass": (hexnac_count * hexnac.mass()),
                     "composition": hexnac_count * hexnac.total_composition(),
-                    "key": {"HexNAc": hexnac_count}
+                    "key": {"HexNAc": hexnac_count},
+                    'is_extended': False,
                 }
                 core_shifts.append(shift)
 
@@ -301,7 +307,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                         "mass": (hexnac_count * hexnac.mass()) + (hexose_count * hexose.mass()),
                         "composition": (hexnac_count * hexnac.total_composition()) + (
                             hexose_count * hexose.total_composition()),
-                        "key": {"HexNAc": hexnac_count, "Hex": hexose_count}
+                        "key": {"HexNAc": hexnac_count, "Hex": hexose_count},
+                        'is_extended': False,
                     }
                     core_shifts.append(shift)
                     if iteration_count < fucose_count:
@@ -328,7 +335,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                                 "composition": (
                                     (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
                                     hexose_count * hexose.total_composition()),
-                                "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count}
+                                "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count},
+                                'is_extended': True
                             }
                             core_shifts.append(shift)
                             if iteration_count < fucose_count:
@@ -351,7 +359,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                                         (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
                                         (hexose_count + extra_hexose_count) * hexose.total_composition()),
                                     "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
-                                        hexose_count + extra_hexose_count)}
+                                        hexose_count + extra_hexose_count)},
+                                    'is_extended': True
                                 }
                                 core_shifts.append(shift)
                                 if iteration_count < fucose_count:

@@ -76,6 +76,16 @@ class PeptideSequenceSuiteBase(object):
         self.assertAlmostEqual(stubs[5], 1687.6571, 3)
         self.assertEqual(composition, peptide.total_composition())
 
+    def test_stub_ions_extended(self):
+        peptide = self.parse_sequence(p3)
+        stubs = sorted({f for f in peptide.stub_fragments(extended=True)
+                       if f.glycosylation}, key=lambda x: x.glycosylation.mass())
+        for stub in stubs:
+            if sum(stub.glycosylation.values()) > 5:
+                assert stub.is_extended
+            else:
+                assert not stub.is_extended
+
     def test_glycan_fragments_stubs(self):
         peptide = self.parse_sequence(p3)
         stubs = {f.name: f.mass for f in peptide.glycan_fragments(all_series=True, allow_ambiguous=True)}

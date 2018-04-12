@@ -332,17 +332,20 @@ class SimpleFragment(FragmentBase):
 
 
 class StubFragment(SimpleFragment):
-    __slots__ = ['glycosylation']
+    __slots__ = ['glycosylation', 'is_extended']
 
-    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False, glycosylation=None):
+    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False,
+                 glycosylation=None, is_extended=False):
         if glycosylation is None:
             glycosylation = HashableGlycanComposition()
         super(StubFragment, self).__init__(name, mass, kind, composition, chemical_shift, is_glycosylated)
         self.glycosylation = glycosylation
+        self.is_extended = is_extended
 
     def clone(self):
         dup = super(StubFragment, self).clone()
         dup.glycosylation = self.glycosylation
+        dup.is_extended = self.is_extended
         return dup
 
     @property
@@ -351,7 +354,7 @@ class StubFragment(SimpleFragment):
 
     def __reduce__(self):
         proto = list(super(StubFragment, self).__reduce__())
-        proto[1] = proto[1] + (self.glycosylation,)
+        proto[1] = proto[1] + (self.glycosylation, self.is_extended)
         return tuple(proto)
 
 
@@ -452,12 +455,15 @@ class IonSeries(object):
 
     def __eq__(self, other):
         try:
-            return self is other or self.name == other.name
+            return self.name == other.name
         except AttributeError:
             return self.name == other
 
     def __ne__(self, other):
-        return not self == other
+        try:
+            return self.name != other.name
+        except AttributeError:
+            return self.name != other
 
     __repr__ = simple_repr
 
