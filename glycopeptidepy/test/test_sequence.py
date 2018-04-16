@@ -192,11 +192,24 @@ class PeptideSequenceSuiteBase(object):
         assert f.glycosylation_size == 6
         self.assertAlmostEqual(f.glycosylation.mass(), 1072.3806, 2)
 
-    def test_gag_linker_peptide(self):
+    def test_gag_linker_oxonium_ions(self):
         seq = self.parse_sequence(p7)
         self.assertAlmostEqual(seq.total_mass, 2285.766, 2)
         ox_map = {f.name: f for f in seq.glycan_fragments()}
         self.assertAlmostEqual(ox_map["HexNAca,enHex"].mass, 361.10089, 3)
+
+    def test_gag_linker_stubs(self):
+        seq = self.parse_sequence(p7)
+        self.assertAlmostEqual(seq.total_mass, 2285.766, 2)
+        peptide_mass = seq.peptide_composition().mass
+        stub_map = {f.name: f for f in seq.stub_fragments()}
+        bare_peptide = stub_map['peptide']
+        self.assertAlmostEqual(bare_peptide.mass, peptide_mass, 2)
+
+    def test_cad_fragmentation(self):
+        t1 = self.parse_sequence(p10)
+        low_energy_frags = list(t1.glycan_fragments(oxonium=False, all_series=True))
+        assert len(low_energy_frags) == 431
 
     def test_glycan_representations(self):
         t1 = self.parse_sequence(p9)

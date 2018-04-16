@@ -76,7 +76,7 @@ class CADFragmentationStrategy(FragmentationStrategyBase):
                     remaining.pop(position)
                 reference_composition = base_composition.copy()
                 for position, glycan in remaining.items():
-                    reference_composition += glycan.total_composition()
+                    reference_composition += glycan.rule.total_composition()
 
                 glycan_B_ions = defaultdict(list)
                 glycan_Y_ions = defaultdict(list)

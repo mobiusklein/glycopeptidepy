@@ -34,6 +34,16 @@ class TestModifcationTarget(unittest.TestCase):
         self.assertEqual(spaced_parsed, modification.extract_targets_from_string(part_spaced2))
         self.assertEqual(spaced_parsed, modification.extract_targets_from_string(no_space))
 
+    def test_serialize(self):
+        spaced = 'Q @ N-term'
+        spaced_parsed = modification.extract_targets_from_string(spaced)
+        assert spaced == spaced_parsed.serialize()
+
+    def test__len__(self):
+        spaced = 'Q @ N-term'
+        spaced_parsed = modification.extract_targets_from_string(spaced)
+        assert len(spaced_parsed) == 1
+
 
 class TestGlycosylationRule(unittest.TestCase):
     def test_parse(self):
@@ -58,6 +68,22 @@ class TestModificationTable(unittest.TestCase):
         total = len(table.rules())
         given = len(table.other_modifications)
         assert total - given == 2
+
+
+class TestModificationRule(unittest.TestCase):
+    def test_targets(self):
+        mod = modification.Modification("Deamidation")
+        assert len(mod.rule.targets) == 5
+        assert len(mod.rule.n_term_targets) == 1
+        assert len(mod.rule.c_term_targets) == 0
+
+    def test_subtraction(self):
+        mod = modification.Modification("Deamidation")
+        assert len((mod.rule - mod.rule).targets) == 0
+
+    def test_serialize(self):
+        mod = modification.Modification("Deamidation")
+        assert mod.rule.serialize() == mod.rule.preferred_name
 
 
 class TestAminoAcidSubstitution(unittest.TestCase):

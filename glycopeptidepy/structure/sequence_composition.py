@@ -1,6 +1,12 @@
 # pragma: no cover
 
 import itertools
+
+try:
+    basestring
+except Exception:
+    from six import string_types as basestring
+
 from glypy import MonosaccharideResidue
 
 from .residue import Residue as AminoAcidResidue, memoize, get_all_residues
@@ -165,6 +171,8 @@ class SequenceComposition(dict):
     def __setitem__(self, key, value):
         if key is None:
             return
+        if isinstance(key, basestring):
+            key = AminoAcidSequenceBuildingBlock.from_str(key)
         dict.__setitem__(self, key, value)
         self._mass = None
 

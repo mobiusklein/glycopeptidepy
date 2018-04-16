@@ -239,7 +239,7 @@ class PeptideFragment(FragmentBase):
     def base_name(self):
         """Simply return string like b2, y3 with no modificaiton information."""
         fragment_name = []
-        fragment_name.append(self.series)
+        fragment_name.append(str(self.series))
         fragment_name.append(str(self.position))
         return ''.join(fragment_name)
 
@@ -356,52 +356,6 @@ class StubFragment(SimpleFragment):
         proto = list(super(StubFragment, self).__reduce__())
         proto[1] = proto[1] + (self.glycosylation, self.is_extended)
         return tuple(proto)
-
-
-monosaccharide_to_losses = {
-    "HexNAc": [
-        ("C2H6O3", Composition("C2H6O3")),
-        ("CH603", Composition("CH603")),
-        ("C2H4O2", Composition("C2H4O2")),
-    ]
-}
-
-
-def make_monosaccharide_loss_set(monosaccharide):
-    k = monosaccharide
-    key = str(k)
-    mass = k.mass()
-    composition = k.total_composition()
-    water = Composition("H2O")
-    water2 = water * 2
-    oxonium_ion_series = IonSeries.oxonium_ion
-    yield SimpleFragment(
-        name=key, mass=mass,
-        composition=composition,
-        kind=oxonium_ion_series)
-    yield SimpleFragment(
-        name=key + "-H2O", mass=mass - water.mass,
-        composition=composition - water,
-        kind=oxonium_ion_series)
-    yield SimpleFragment(
-        name=key + "-H4O2", mass=mass - water2.mass,
-        composition=composition - (
-            water2), kind=oxonium_ion_series)
-    if key in monosaccharide_to_losses:
-        for name, loss in monosaccharide_to_losses[key]:
-            yield SimpleFragment(
-                name="%s-%s" % (key, name),
-                composition=composition - loss,
-                mass=mass - loss.mass,
-                kind=oxonium_ion_series)
-
-
-monosaccharide_oxonium_ion_limits = defaultdict(lambda: float('inf'), {
-    "Neu5Ac": 1,
-    "Fuc": 1,
-    "dHex": 1,
-    "Neu5Gc": 1
-})
 
 
 class MemoizedIonSeriesMetaclass(type):

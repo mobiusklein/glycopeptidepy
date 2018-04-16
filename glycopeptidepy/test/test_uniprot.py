@@ -7,7 +7,7 @@ try:
     is_online = True
     response = requests.get("http://www.uniprot.org/")
     response.raise_for_status()
-except:
+except Exception:
     is_online = False
 
 
@@ -17,8 +17,18 @@ def skip_not_online(fn):
     else:
         return fn
 
+
 @skip_not_online
 class UniProtClientTest(unittest.TestCase):
     def test_get(self):
         prot = uniprot.get("P13611")
         self.assertIn("P13611", prot.accessions)
+
+    def test_search(self):
+        result = uniprot.search('Aggrecan')
+        top = result[:5]
+        for res in top:
+            if res['Entry'] == 'P16112':
+                break
+        else:
+            raise AssertionError("Did not find Human Aggrecan in the top five search results")

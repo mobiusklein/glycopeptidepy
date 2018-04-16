@@ -312,14 +312,6 @@ class ModificationTarget(object):
                 return valid, SequenceLocation.anywhere
         return valid, SequenceLocation.anywhere
 
-    def valid_site_seq(self, sequence, position, position_modifier=SequenceLocation.anywhere):
-        aa_mod_pair = sequence[position]
-        if len(aa_mod_pair[1]) > 0:
-            return False
-        amino_acid = aa_mod_pair[0]
-
-        return self.valid_site(amino_acid, position_modifier)
-
     def __repr__(self):
         amino_acid_components = "{%s}" % ', '.join(map(str, self.amino_acid_targets or ()))
         rep = "{amino_acid_targets}@{position_modifier}".format(
@@ -334,13 +326,11 @@ class ModificationTarget(object):
         return hash(repr(self))
 
     def __len__(self):
-        position_modifiers_count = 0
+        position_modifier_count = 0
         amino_acid_targets_count = 0
-        if self.position_modifiers is not None:
-            position_modifiers_count = len(self.position_modifiers)
         if self.amino_acid_targets is not None:
             amino_acid_targets_count = len(self.amino_acid_targets)
-        return amino_acid_targets_count + position_modifiers_count
+        return amino_acid_targets_count + position_modifier_count
 
     def serialize(self):
         parts = []
@@ -567,10 +557,6 @@ class ModificationRule(object):
                              (str(amino_acid) + str(position_modifiers), self))
         minimized_target = min(possible_targets, key=len)
         return minimized_target
-
-    def valid_site_seq(self, sequence, position, position_modifiers):
-        return any([target.valid_site_seq(sequence, position, position_modifiers) for
-                    target in self.targets])
 
     def find_valid_sites(self, sequence):
         valid_indices = []
@@ -1013,6 +999,9 @@ class Glycosylation(ModificationRule):
             raise TypeError("Cannot generate fragments from composition")
         for frag in self.glycan.fragments(*args, **kwargs):
             yield frag
+
+    def total_composition(self):
+        return self.glycan.total_composition()
 
 
 class CoreGlycosylation(Glycosylation):

@@ -1,6 +1,8 @@
 import re
 import csv
 import threading
+import gzip
+import io
 
 from collections import defaultdict
 
@@ -456,7 +458,11 @@ def search(query):
         "&columns=id,entry%20name,reviewed,protein%20names,genes,organism,length")
     response = requests.get(url.format(query=query), stream=True)
     response.raise_for_status()
-    data = response.raw.read()
+    response_buffer = response.raw
+    data = response_buffer.read()
+    if response.headers.get("content-encoding") == 'gzip':
+        response_buffer = gzip.GzipFile(mode='rb', fileobj=io.BytesIO(data))
+        data = response_buffer.read()
     reader = csv.reader(data.splitlines(), delimiter='\t')
     header = next(reader)
     return [dict(zip(header, line)) for line in reader]

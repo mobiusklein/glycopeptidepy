@@ -1,11 +1,14 @@
 import unittest
 
+from io import BytesIO
+try:
+    from StringIO import StringIO
+except ImportError:
+    from io import StringIO
+
 from glycopeptidepy.io import fasta
 
-from .common import datafile
-
-
-n_proteins_in_fasta = 244
+from glycopeptidepy.test.common import datafile
 
 
 class TestFastaIO(unittest.TestCase):
@@ -13,6 +16,7 @@ class TestFastaIO(unittest.TestCase):
         return open(datafile("proteins.fa"))
 
     def test_fasta_parser(self):
+        n_proteins_in_fasta = 244
         with self.open_stream() as f:
             parser = fasta.ProteinFastaFileReader(f)
             i = 0
@@ -20,6 +24,29 @@ class TestFastaIO(unittest.TestCase):
                 i += 1
                 self.assertEqual(protein.name.db, 'sp')
             self.assertEqual(i, n_proteins_in_fasta)
+
+    def test_fasta_writer(self):
+        outbuffer = BytesIO()
+        writer = fasta.FastaFileWriter(outbuffer)
+        writer.write(b"description", b"PEPTIDE")
+        writer.write(b"description2", b"PROTEIN")
+        content = outbuffer.getvalue()
+        reference = b'''>description
+PEPTIDE
+
+>description2
+PROTEIN
+
+'''
+        assert content == reference
+        with self.open_stream() as f:
+            parser = fasta.ProteinFastaFileReader(f)
+            proteins = list(parser)
+        outbuffer = StringIO()
+        writer = fasta.ProteinFastaFileWriter(outbuffer)
+        writer.writelines(proteins)
+        assert outbuffer.getvalue() == self.open_stream().read()
+
 
 
 class TestHeaderParsing(unittest.TestCase):
@@ -61,3 +88,7 @@ class TestPEFF(unittest.TestCase):
             annotations = proteins[0].annotations
             assert len(annotations) == 7
             assert annotations['Length'] == 265
+
+
+if __name__ == '__main__':
+    unittest.main()
