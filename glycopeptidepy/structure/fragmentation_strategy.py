@@ -571,7 +571,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                     "mass": xyl.mass() * xyl_count,
                     "composition": xyl.total_composition() * xyl_count,
                     "key": {
-                        xyl: xyl_count
+                        "Xyl": xyl_count
                     }
                 }
                 core_shifts.append(shift)
@@ -585,8 +585,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                             (xyl.total_composition() * xyl_count) + (
                                 hexose.total_composition() * hexose_count)),
                         "key": {
-                            xyl: xyl_count,
-                            hexose: hexose_count
+                            "Xyl": xyl_count,
+                            "Hex": hexose_count
                         }
                     }
                     core_shifts.append(shift)
@@ -598,9 +598,9 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                                 (xyl.total_composition() * xyl_count) + (
                                     hexose.total_composition() * hexose_count) + hexa.total_composition()),
                             "key": {
-                                xyl: xyl_count,
-                                hexose: hexose_count,
-                                hexa: 1
+                                "Xyl": xyl_count,
+                                "Hex": hexose_count,
+                                "aHex": 1
                             }
                         }
                         core_shifts.append(shift)

@@ -26,12 +26,12 @@ class TestFastaIO(unittest.TestCase):
             self.assertEqual(i, n_proteins_in_fasta)
 
     def test_fasta_writer(self):
-        outbuffer = BytesIO()
+        outbuffer = StringIO()
         writer = fasta.FastaFileWriter(outbuffer)
-        writer.write(b"description", b"PEPTIDE")
-        writer.write(b"description2", b"PROTEIN")
+        writer.write("description", "PEPTIDE")
+        writer.write("description2", "PROTEIN")
         content = outbuffer.getvalue()
-        reference = b'''>description
+        reference = '''>description
 PEPTIDE
 
 >description2

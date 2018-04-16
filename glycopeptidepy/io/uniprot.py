@@ -462,7 +462,7 @@ def search(query):
     data = response_buffer.read()
     if response.headers.get("content-encoding") == 'gzip':
         response_buffer = gzip.GzipFile(mode='rb', fileobj=io.BytesIO(data))
-        data = response_buffer.read()
+        data = response_buffer.read().decode('utf-8')
     reader = csv.reader(data.splitlines(), delimiter='\t')
     header = next(reader)
     return [dict(zip(header, line)) for line in reader]
