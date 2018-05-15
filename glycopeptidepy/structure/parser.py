@@ -200,20 +200,22 @@ def strip_modifications(sequence):
     return ''.join([residue for residue, mod in chunks])
 
 
-def sequence_tokenizer_respect_sequons(sequence):
+def sequence_tokenizer_respect_sequons(sequence, known_sites=None):
     '''A wrapper around `sequence_tokenizer` that will treat an n-glycan sequon as a single unit
 
     Return
     ------
     list
     '''
+    if known_sites is None:
+        known_sites = tuple()
     chunks, modifications, glycan, n_term, c_term = sequence_tokenizer(sequence)
     positions = []
     i = 0
     sequence_length = len(chunks)
     while(i < sequence_length):
         cur_pos = chunks[i]
-        if cur_pos[0] == "N" and _n_glycan_core in cur_pos[1]:
+        if (cur_pos[0] == "N" and _n_glycan_core in cur_pos[1]) or (i in known_sites):
             positions.append(chunks[i:(i + 3)])
             i += 2
         else:
