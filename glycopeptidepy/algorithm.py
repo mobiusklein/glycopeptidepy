@@ -50,13 +50,13 @@ def edit_distance(s1, s2):
     return distances[-1]
 
 
-def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=None):
+def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=None, known_sites=None):
     if peptide_type is None:
         peptide_type = PeptideSequence
     if isinstance(sequence, PeptideSequence):
         sequence = str(sequence)
     original = peptide_type(sequence)
-    sequence_tokens = sequence_tokenizer_respect_sequons(sequence)
+    sequence_tokens = sequence_tokenizer_respect_sequons(sequence, known_sites=known_sites)
     pref = sequence_tokens[:prefix_len]
     if suffix_len == 0:
         suf = []
