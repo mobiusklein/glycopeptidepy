@@ -468,4 +468,24 @@ def search(query):
     reader = csv.reader(data.splitlines(), delimiter='\t')
     header = next(reader)
     return [dict(zip(header, line)) for line in reader]
-    # return response
+
+
+def proteome(format='fasta', raw=False, **kwargs):
+    query = "&".join(["query=%s:%s" % (k, v) for k, v in kwargs])
+    uri = "https://www.uniprot.org/uniprot/{query}&force=no&format={format}"
+    url = uri.format(query=query, format=format)
+    response = requests.get(url, stream=True)
+    response_buffer = response.raw
+    data = response_buffer.read()
+    if response.headers.get("content-encoding") == 'gzip':
+        response_buffer = gzip.GzipFile(mode='rb', fileobj=io.BytesIO(data))
+        data = response_buffer.read()
+    if raw:
+        return data
+    if format == 'fasta':
+        from .fasta import ProteinFastaFileReader
+        return ProteinFastaFileReader(io.BytesIO(data))
+    elif format == 'xml':
+        return etree.fromstring(data)
+    else:
+        return io.BytesIO(data)
