@@ -432,40 +432,40 @@ class PEFFHeaderBlock(Mapping):
         if storage is None:
             storage = OrderedDict()
         self.block_type = block_type
-        self.storage = storage
+        self._storage = storage
 
     def keys(self):
-        return self.storage.keys()
+        return self._storage.keys()
 
     def values(self):
-        return self.storage.values()
+        return self._storage.values()
 
     def items(self):
-        return self.storage.items()
+        return self._storage.items()
 
     def __iter__(self):
-        return iter(self.storage)
+        return iter(self._storage)
 
     def __getitem__(self, key):
-        return self.storage[key]
+        return self._storage[key]
 
     def __len__(self):
-        return len(self.storage)
+        return len(self._storage)
 
     def __contains__(self, key):
-        return key in self.storage
+        return key in self._storage
 
     def __getattr__(self, key):
-        if key == "storage":
+        if key == "_storage":
             raise AttributeError(key)
         try:
-            return self.storage[key]
+            return self._storage[key]
         except KeyError:
             raise AttributeError(key)
 
     def __dir__(self):
         base = set(dir(super(PEFFHeaderBlock, self)))
-        keys = set(self._mapping.keys())
+        keys = set(self._storage.keys())
         return list(base | keys)
 
     def __repr__(self):
@@ -475,8 +475,11 @@ class PEFFHeaderBlock(Mapping):
 class PEFFReader(ProteinFastaFileReader):
     def __init__(self, path, defline_parser=PEFFDeflineParser(False)):
         super(PEFFReader, self).__init__(opener(path, 'rb'), defline_parser, encoding='ascii')
-        if 'b' not in self.handle.mode:
-            raise ValueError("PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
+        try:
+            if 'b' not in self.handle.mode:
+                raise ValueError("PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
+        except AttributeError:
+            pass
         self.version = (0, 0)
         self.blocks = []
         self.comments = []
