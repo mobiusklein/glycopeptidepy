@@ -65,7 +65,7 @@ def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=N
         suf = sequence_tokens[-suffix_len:]
         body = sequence_tokens[prefix_len:-suffix_len]
     body = body[::-1]
-    rev_sequence = (list_to_sequence(pref + list(body) + suf))
+    rev_sequence = (list_to_sequence(list(pref) + list(body) + list(suf)))
     if str(list_to_sequence(sequence_tokens)) == str(rev_sequence):
         rot_body = pair_rotate(body)
         rev_sequence = (list_to_sequence(pref + list(rot_body) + suf))
@@ -82,7 +82,7 @@ def reverse_sequence(sequence, prefix_len=0, suffix_len=1, peptide_type=None, kn
     if isinstance(sequence, PeptideSequence):
         sequence = str(sequence)
     original = peptide_type(sequence)
-    sequence_tokens = sequence_tokenizer(sequence)
+    sequence_tokens = sequence_tokenizer(sequence)[0]
     pref = sequence_tokens[:prefix_len]
     if suffix_len == 0:
         suf = []
@@ -91,7 +91,7 @@ def reverse_sequence(sequence, prefix_len=0, suffix_len=1, peptide_type=None, kn
         suf = sequence_tokens[-suffix_len:]
         body = sequence_tokens[prefix_len:-suffix_len]
     body = body[::-1]
-    rev_sequence = (list_to_sequence(pref + list(body) + suf))
+    rev_sequence = (list_to_sequence(list(pref) + list(body) + list(suf)))
     if str(list_to_sequence(sequence_tokens)) == str(rev_sequence):
         rot_body = pair_rotate(body)
         rev_sequence = (list_to_sequence(pref + list(rot_body) + suf))
