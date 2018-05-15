@@ -122,7 +122,7 @@ class DictWrapperSuiteBase(object):
     def test_values(self):
         inst = self._make_instance()
         ref = self._make_reference()
-        assert sorted(inst.values()) == sorted(ref.values())
+        assert sorted(inst.values(), key=str) == sorted(ref.values(), key=str)
 
     def test_items(self):
         inst = self._make_instance()
