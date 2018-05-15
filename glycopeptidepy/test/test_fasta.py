@@ -48,7 +48,6 @@ PROTEIN
         assert outbuffer.getvalue() == self.open_stream().read()
 
 
-
 class TestHeaderParsing(unittest.TestCase):
     def test_proper_uniprot(self):
         header = ">sp|P16066|ANPRA_HUMAN Atrial natriuretic peptide receptor 1"
@@ -88,6 +87,110 @@ class TestPEFF(unittest.TestCase):
             annotations = proteins[0].annotations
             assert len(annotations) == 7
             assert annotations['Length'] == 265
+
+
+class DictWrapperSuiteBase(object):
+    def _make_instance(self):
+        raise NotImplementedError()
+
+    def _make_reference(self):
+        raise NotImplementedError()
+
+    def test_getitem(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        for key in ref:
+            assert inst[key] == ref[key]
+
+    def test_getattr(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        for key in ref:
+            assert getattr(inst, key) == ref[key]
+
+    def test_contains(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        for key in ref:
+            assert key in inst
+
+    def test_keys(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        assert set(inst.keys()) == set(ref.keys())
+
+    def test_values(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        assert sorted(inst.values()) == sorted(ref.values())
+
+    def test_items(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        assert sorted(inst.items()) == sorted(ref.items())
+
+    def test_len(self):
+        inst = self._make_instance()
+        ref = self._make_reference()
+        assert len(inst) == len(ref)
+
+
+class TestFastaHeader(DictWrapperSuiteBase, unittest.TestCase):
+    defline = ">sp|Q9NYU2|UGGG1_HUMAN UDP-glucose:glycoprotein glucosyltransferase 1"
+
+    def _make_instance(self):
+        return fasta.default_parser(self.defline)
+
+    def _make_reference(self):
+        ref = {'accession': 'Q9NYU2',
+               'db': 'sp',
+               'description': 'UDP-glucose:glycoprotein glucosyltransferase 1',
+               'name': 'UGGG1_HUMAN'}
+        return ref
+
+
+class TestPEFFHeaderBlock(DictWrapperSuiteBase, unittest.TestCase):
+    block = b'''# PEFF 1.0
+# GeneralComment=this is a hand crafted peff file
+# GeneralComment=This is a second comment line.
+# //
+# DbName=UniProtKB/Swiss-Prot-extract
+# Prefix=sp
+# DbDescription=selected entries from UniProtKB
+# Decoy=false
+# DbSource=ftp://ftp.uniprot.org//ftp/pub/databases/uniprot/current_release/knowledgebase/complete/uniprot_sprot.dat.gz
+# DbVersion=55.5
+# DbDate=20080610
+# NumberOfEntries=28
+# Conversion=manual extraction of entries, conversion with prepareDb.pl and then manually edited
+# SequenceType=AA
+# SpecificKey=3D-Status:status of a 3-D structure
+# SpecificValue=3D-Status:(available|unsure|not available)
+# SpecificKey=isoform:description of a specific isoform
+# SpecificValue=isoform:(xsd:type=string)
+# //'''
+
+    def _make_instance(self):
+        buff = BytesIO(self.block)
+        reader = fasta.PEFFReader(buff)
+        return reader.blocks[0]
+
+    def _make_reference(self):
+        return {u'Conversion': u'manual extraction of entries, conversion with prepareDb.pl and then manually edited',
+                u'DbDate': u'20080610',
+                u'DbDescription': u'selected entries from UniProtKB',
+                u'DbName': u'UniProtKB/Swiss-Prot-extract',
+                u'DbSource': (u'ftp://ftp.uniprot.org//ftp/pub/databases/uniprot/'
+                              u'current_release/knowledgebase/complete/uniprot_sprot.dat.gz'),
+                u'DbVersion': u'55.5',
+                u'Decoy': u'false',
+                u'NumberOfEntries': u'28',
+                u'Prefix': u'sp',
+                u'SequenceType': u'AA',
+                u'SpecificKey': [u'3D-Status:status of a 3-D structure',
+                                 u'isoform:description of a specific isoform'],
+                u'SpecificValue': [u'3D-Status:(available|unsure|not available)',
+                                   u'isoform:(xsd:type=string)']}
 
 
 if __name__ == '__main__':
