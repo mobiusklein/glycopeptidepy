@@ -237,7 +237,7 @@ class PeptideFragment(FragmentBase):
             self.chemical_shift, self.composition)
 
     def base_name(self):
-        """Simply return string like b2, y3 with no modificaiton information."""
+        """Simply return string like b2, y3 with no modification information."""
         fragment_name = []
         fragment_name.append(str(self.series))
         fragment_name.append(str(self.position))
@@ -253,9 +253,9 @@ class PeptideFragment(FragmentBase):
             if mod_rule in self.concerned_modifications or mod_rule.is_a(ModificationCategory.glycosylation):
                 if count > 1:
                     fragment_name.extend(
-                        ['+', str(count), (mod_rule.name)])
+                        ['+', str(count), str(mod_rule.name)])
                 elif count == 1:
-                    fragment_name.extend(['+', (mod_rule.name)])
+                    fragment_name.extend(['+', str(mod_rule.name)])
                 else:
                     pass
 
