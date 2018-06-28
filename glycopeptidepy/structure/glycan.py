@@ -386,3 +386,6 @@ class GlycosylationManager(dict):
         if self._proxy is None:
             self._proxy = self._make_glycan_composition_proxy()
         return self._proxy
+
+    def total_glycosylation_size(self):
+        return sum(self.aggregate.values())
