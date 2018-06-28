@@ -4,6 +4,11 @@ import threading
 import gzip
 import io
 
+try:
+    from urllib import urlopen
+except ImportError:
+    from urllib.request import urlopen
+
 from collections import defaultdict
 
 import requests
@@ -17,7 +22,7 @@ from glypy.io.glyspace import UniprotRDFClient
 
 from six import add_metaclass, string_types as basestring
 
-uri_template = "http://www.uniprot.org/uniprot/{accession}.xml"
+uri_template = "https://www.uniprot.org/uniprot/{accession}.xml"
 nsmap = {"up": "http://uniprot.org/uniprot"}
 
 
@@ -237,12 +242,12 @@ UniProtProtein = make_struct("UniProtProtein", (
 
 
 def get_etree_for(accession):
-    tree = etree.parse(uri_template.format(accession=accession))
+    tree = etree.parse(urlopen(uri_template.format(accession=accession)))
     return tree
 
 
 def get_features_for(accession, error=False):
-    tree = etree.parse(uri_template.format(accession=accession))
+    tree = get_etree_for(accession)
     seq = tree.find(
         ".//up:entry/up:sequence", nsmap).text.replace(
         "\n", '')
