@@ -1,5 +1,6 @@
 import re
 import csv
+import warnings
 import threading
 import gzip
 import io
@@ -246,8 +247,7 @@ def get_etree_for(accession):
     return tree
 
 
-def get_features_for(accession, error=False):
-    tree = get_etree_for(accession)
+def parse(tree, error=False):
     seq = tree.find(
         ".//up:entry/up:sequence", nsmap).text.replace(
         "\n", '')
@@ -281,7 +281,7 @@ def get_features_for(accession, error=False):
         dbreferences[db].append(entry)
 
     features = []
-    exc_type = Exception if not error else KeyboardInterrupt
+    exc_type = Exception
     for tag in tree.findall(".//up:feature", nsmap):
         feature_type = tag.attrib['type']
         try:
@@ -289,7 +289,10 @@ def get_features_for(accession, error=False):
             if feature_obj is not None:
                 features.append(feature_obj)
         except exc_type as e:
-            print(e, feature_type, accession, etree.tostring(tag))
+            if error:
+                raise
+            else:
+                warnings.warn("An exception %s occurred while parsing feature type %s" % (e, feature_type))
     keywords = set()
     for kw in tree.findall(".//up:keyword", nsmap):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
@@ -298,7 +301,9 @@ def get_features_for(accession, error=False):
         keywords, dbreferences)
 
 
-get = get_features_for
+def get_features_for(accession, error=False):
+    tree = get_etree_for(accession)
+    return parse(tree, error)
 
 
 def get(accessions):
