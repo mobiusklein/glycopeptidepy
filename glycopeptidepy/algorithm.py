@@ -69,8 +69,8 @@ def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=N
     if str(list_to_sequence(sequence_tokens)) == str(rev_sequence):
         rot_body = pair_rotate(body)
         rev_sequence = (list_to_sequence(pref + list(rot_body) + suf))
-    rev_sequence.n_term = original.n_term
-    rev_sequence.c_term = original.c_term
+    rev_sequence.n_term = original.n_term.clone()
+    rev_sequence.c_term = original.c_term.clone()
     if original.glycan:
         rev_sequence.glycan = original.glycan.clone(propogate_composition_offset=False)
     return rev_sequence
@@ -95,8 +95,8 @@ def reverse_sequence(sequence, prefix_len=0, suffix_len=1, peptide_type=None, kn
     if str(list_to_sequence(sequence_tokens)) == str(rev_sequence):
         rot_body = pair_rotate(body)
         rev_sequence = (list_to_sequence(pref + list(rot_body) + suf))
-    rev_sequence.n_term = original.n_term
-    rev_sequence.c_term = original.c_term
+    rev_sequence.n_term = original.n_term.clone()
+    rev_sequence.c_term = original.c_term.clone()
     if original.glycan:
         rev_sequence.glycan = original.glycan.clone(propogate_composition_offset=False)
     return rev_sequence
