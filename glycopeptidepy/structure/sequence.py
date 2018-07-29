@@ -6,7 +6,7 @@ from six import string_types as basestring
 from . import PeptideSequenceBase, MoleculeBase
 from . import constants as structure_constants
 
-from .composition import Composition
+from .composition import Composition, formula
 from .fragment import (
     PeptideFragment,
     SimpleFragment, IonSeries, _n_glycosylation, _o_glycosylation,
@@ -208,6 +208,88 @@ def _calculate_mass(sequence):
     return total
 
 
+class TerminalGroup(MoleculeBase):
+    __slots__ = ("base_composition", "_mass", "_modification")
+
+    def __init__(self, base_composition, modification=None):
+        self.base_composition = Composition(base_composition)
+        self._modification = None
+        self._mass = None
+        if modification is not None:
+            self.modification = modification
+
+    def _calculate_mass(self):
+        base_mass = self.base_composition.mass
+        mod = self.modification
+        if mod is not None:
+            base_mass += mod.mass
+        return base_mass
+
+    def clone(self):
+        return self.__class__(self.base_composition, self.modification)
+
+    def __reduce__(self):
+        return self.__class__, (self.base_composition, self.modification)
+
+    @property
+    def mass(self):
+        if self._mass is None:
+            self._mass = self._calculate_mass()
+        return self._mass
+
+    @property
+    def modification(self):
+        return self._modification
+
+    @modification.setter
+    def modification(self, value):
+        self._mass = None
+        self._modification = value
+
+    def modify(self, modification):
+        return self.__class__(self.base_composition, modification)
+
+    @property
+    def composition(self):
+        modification = self.modification
+        if modification is None:
+            return self.base_composition
+        mod_comp = modification.composition
+        return self.base_composition + mod_comp
+
+    def __repr__(self):
+        template = "{self.__class__.__name__}({self.base_composition}, {self.modification})"
+        return template.format(self=self)
+
+    def __str__(self):
+        if self.modification is not None:
+            return str(self.modification)
+        return formula(self.base_composition)
+
+    def __eq__(self, other):
+        if other is None:
+            return False
+        try:
+            return (self.base_composition == other.base_composition) and (self.modification == other.modification)
+        except AttributeError:
+            if isinstance(other, basestring):
+                return self.composition == Modification(other).composition
+            else:
+                try:
+                    return self.composition == other.composition
+                except AttributeError:
+                    return NotImplemented
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return hash(formula(self.composition))
+
+    def serialize(self):
+        return str(self)
+
+
 class PeptideSequence(PeptideSequenceBase):
     '''
     Represents a peptide that may have post-translational modifications
@@ -219,8 +301,8 @@ class PeptideSequence(PeptideSequenceBase):
         The underlying container for positions in the amino acid sequence
     modification_index: ModificationIndex
         A count of different modifications attached to the amino acid sequence
-    n_term: Modification or Composition
-    c_term: Modification or Composition
+    n_term: :class:`TerminalGroup`
+    c_term: :class:`TerminalGroup`
         Terminal modifications (N-terminus and C-terminus respectively) which
         default to H and OH respectively.
     glycan: Glycan or GlycanComposition
@@ -237,8 +319,8 @@ class PeptideSequence(PeptideSequenceBase):
     @classmethod
     def from_iterable(cls, iterable):
         seq = cls(None)
-        n_term = structure_constants.N_TERM_DEFAULT
-        c_term = structure_constants.C_TERM_DEFAULT
+        n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
+        c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
         i = 0
         for pos, next_pos in peekable(iterable):
             i += 1
@@ -267,9 +349,9 @@ class PeptideSequence(PeptideSequenceBase):
                 seq.modification_index[mod.name] += 1
             seq.sequence.append(cls.position_class([resid, mod_list]))
         if not isinstance(n_term, MoleculeBase):
-            n_term = Modification(n_term)
+            n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT, n_term)
         if not isinstance(c_term, MoleculeBase):
-            c_term = Modification(c_term)
+            c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT, c_term)
 
         seq.n_term = n_term
         seq.c_term = c_term
@@ -319,10 +401,12 @@ class PeptideSequence(PeptideSequenceBase):
                 self._glycosylation_manager.aggregate = glycan.clone()
 
             self.glycan = glycan if glycan != "" else None
-            self.n_term = Modification(n_term) if isinstance(
-                n_term, basestring) else n_term
-            self.c_term = Modification(c_term) if isinstance(
-                c_term, basestring) else c_term
+            self.n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
+            self.c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
+            if n_term != structure_constants.N_TERM_DEFAULT:
+                self.n_term = self.n_term.modify(Modification(n_term))
+            if c_term != structure_constants.C_TERM_DEFAULT:
+                self.c_term = self.c_term.modify(Modification(c_term))
 
     def _invalidate(self):
         self._total_composition = None
@@ -380,6 +464,10 @@ class PeptideSequence(PeptideSequenceBase):
     @property
     def glycan_composition(self):
         return self._glycosylation_manager.glycan_composition
+
+    @property
+    def total_glycosylation_size(self):
+        return self._glycosylation_manager.total_glycosylation_size()
 
     @property
     def n_term(self):
@@ -523,10 +611,10 @@ class PeptideSequence(PeptideSequenceBase):
         dropped_index = None
         self._invalidate()
         if position is SequenceLocation.n_term:
-            self.n_term = Modification("H")
+            self.n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
             return
         elif position is SequenceLocation.c_term:
-            self.c_term = Modification("OH")
+            self.c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
             return
 
         for i, mod in enumerate(self.sequence[position][1]):
@@ -553,9 +641,9 @@ class PeptideSequence(PeptideSequenceBase):
             mod = Modification(rule=modification_type)
 
         if position is SequenceLocation.n_term:
-            self.n_term = mod
+            self.n_term = self.n_term.modify(mod)
         elif position is SequenceLocation.c_term:
-            self.c_term = mod
+            self.c_term = self.c_term.modify(mod)
         else:
             if (position == -1) or (position >= len(self.sequence)):
                 raise IndexError(
