@@ -114,6 +114,49 @@ class DefLineParserBase(object):
 class PEFFDeflineParser(DefLineParserBase):
     kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
     detect_pattern = re.compile(r"^>?\S+:\S+")
+    has_feature_index = re.compile(r"^\(?(\d+):")
+
+    class PEFFFeature(SequenceABC):
+        def __init__(self, *fields, **kwargs):
+            self.fields = tuple(fields)
+            self.id = kwargs.get('id')
+            self.feature_type = kwargs.get("feature_type")
+
+        def __getitem__(self, i):
+            return self.fields[i]
+
+        def __len__(self):
+            return len(self.fields)
+
+        def __repr__(self):
+            return repr(tuple(self))
+
+        def __str__(self):
+            return "(%s%s)" % (
+                '%r:' % self.id if self.id is not None else '',
+                '|'.join(map(str, self)), )
+
+    class PEFFHeader(FastaHeader):
+        def __init__(self, mapping, original=None):
+            FastaHeader.__init__(self, mapping, original=original)
+            self._init_feature_id_map()
+
+        def _init_feature_id_map(self):
+            self._feature_map = {}
+            for key, values in self.mapping.items():
+                if isinstance(values, list):
+                    for feature in values:
+                        if hasattr(feature, 'id'):
+                            feature_id = feature.id
+                            if feature_id is not None:
+                                self._feature_map[feature_id] = feature
+                else:
+                    feature = values
+                    if hasattr(feature, 'id'):
+                        feature_id = feature.id
+                        if feature_id is not None:
+                            self._feature_map[feature_id] = feature
+
 
     def __init__(self, validate=True):
         self.validate = validate
@@ -149,12 +192,19 @@ class PEFFDeflineParser(DefLineParserBase):
         return parts
 
     def coerce_types(self, key, value):
+        value = value.strip()
+        feature_id_match = self.has_feature_index.search(value)
+        if feature_id_match:
+            feature_id = int(feature_id_match.group(1))
+            value = self.has_feature_index.sub('', value)
+        else:
+            feature_id = None
         if "|" in value:
             value = self.split_pipe_separated_tuple(value)
             result = []
             for i, v in enumerate(value):
                 result.append(self._coerce_value(key, v, i))
-            return tuple(result)
+            return self.PEFFFeature(*result, feature_type=key, id=feature_id)
         else:
             return self._coerce_value(key, value, 0)
 
@@ -187,7 +237,7 @@ class PEFFDeflineParser(DefLineParserBase):
         storage['DbUniqueId'] = db_uid
         kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
         for key, value in kv_pattern.findall(line):
-            if not value.startswith("(") or " (" in value:
+            if not (value.startswith("(") or " (" in value):
                 storage[key] = self.coerce_types(key, value)
             else:
                 # multi-value
@@ -221,7 +271,7 @@ class CallableDefLineParser(DefLineParserBase):
 
 
 def split_on_whitespace(string):
-    return re.split("\s+", string)
+    return re.split(r"\s+", string)
 
 
 space_delim_parser = CallableDefLineParser(split_on_whitespace)
