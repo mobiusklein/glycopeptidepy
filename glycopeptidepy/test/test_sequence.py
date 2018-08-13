@@ -196,7 +196,7 @@ class PeptideSequenceSuiteBase(object):
         seq = self.parse_sequence(p7)
         self.assertAlmostEqual(seq.total_mass, 2285.766, 2)
         ox_map = {f.name: f for f in seq.glycan_fragments()}
-        self.assertAlmostEqual(ox_map["HexNAca,enHex"].mass, 361.10089, 3)
+        self.assertAlmostEqual(ox_map["HexNAca,en-Hex"].mass, 361.10089, 3)
 
     def test_gag_linker_stubs(self):
         seq = self.parse_sequence(p7)
