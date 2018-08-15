@@ -10,6 +10,8 @@ except ImportError:
 from glycopeptidepy.structure.sequence import ProteinSequence
 from glypy.utils.base import opener
 
+from six import text_type
+
 
 class FastaHeader(Mapping):
     """Hold parsed properties of a FASTA sequence's
@@ -136,14 +138,14 @@ class PEFFDeflineParser(DefLineParserBase):
                 '%r:' % self.id if self.id is not None else '',
                 '|'.join(map(str, self)), )
 
-    class PEFFHeader(FastaHeader):
+    class PEFFFastaHeader(FastaHeader):
         def __init__(self, mapping, original=None):
+            self._feature_map = {}
             FastaHeader.__init__(self, mapping, original=original)
             self._init_feature_id_map()
 
         def _init_feature_id_map(self):
-            self._feature_map = {}
-            for key, values in self.mapping.items():
+            for key, values in self.items():
                 if isinstance(values, list):
                     for feature in values:
                         if hasattr(feature, 'id'):
@@ -157,9 +159,26 @@ class PEFFDeflineParser(DefLineParserBase):
                         if feature_id is not None:
                             self._feature_map[feature_id] = feature
 
+        def _make_defline(self):
+            template = text_type(
+                ">{self.Prefix}:{self.Tag} {rest}")
+            rest_parts = []
+            for key, value in self.items():
+                if key in ("Prefix", "Tag"):
+                    continue
+                part = '\\{key}={fmt_value}'
+                if isinstance(value, ((int, float, text_type, str))):
+                    fmt_value = str(value)
+                else:
+                    fmt_value = ''.join(map(str, value))
+                rest_parts.append(part.format(key=key, fmt_value=fmt_value))
+            return template.format(self=self, rest=' '.join(rest_parts))
 
     def __init__(self, validate=True):
         self.validate = validate
+
+    def _make_header(self, mapping, defline):
+        return self.PEFFFastaHeader(mapping, defline)
 
     def extract_parenthesis_list(self, text):
         chunks = []
@@ -234,7 +253,7 @@ class PEFFDeflineParser(DefLineParserBase):
         prefix, line = line.split(":", 1)
         db_uid, line = line.split(" ", 1)
         storage['Prefix'] = prefix
-        storage['DbUniqueId'] = db_uid
+        storage['Tag'] = db_uid
         kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
         for key, value in kv_pattern.findall(line):
             if not (value.startswith("(") or " (" in value):
@@ -464,7 +483,7 @@ class FastaFileWriter(object):
 class ProteinFastaFileWriter(FastaFileWriter):
 
     def write(self, protein):
-        defline = ">%s" % protein.name
+        defline = str(protein.name)
         seq = '\n'.join(textwrap.wrap(protein.get_sequence(), 80))
         super(ProteinFastaFileWriter, self).write(defline, seq)
 
@@ -518,8 +537,11 @@ class PEFFHeaderBlock(Mapping):
         keys = set(self._storage.keys())
         return list(base | keys)
 
+    def __str__(self):
+        return "%s" % '\n'.join('# %s=%s' % kv for kv in self.items())
+
     def __repr__(self):
-        return "# //\n%s\n# //" % '\n'.join('# %s=%s' % kv for kv in self.items())
+        return "{self.__class__.__name__}({self._mapping})".format(self=self)
 
 
 class PEFFReader(ProteinFastaFileReader):
@@ -562,8 +584,8 @@ class PEFFReader(ProteinFastaFileReader):
                     current_block[key].append(value)
             if line.startswith("//"):
                 if current_block:
-                    self.blocks.append(PEFFHeaderBlock({k: v if len(v) > 1 else v[0]
-                                                        for k, v in current_block.items()}))
+                    self.blocks.append(PEFFHeaderBlock(OrderedDict((k, v if len(v) > 1 else v[0])
+                                                                   for k, v in current_block.items())))
                 current_block = defaultdict(list)
         number_of_entries = 0
         for block in self.blocks:
@@ -572,3 +594,20 @@ class PEFFReader(ProteinFastaFileReader):
             except KeyError:
                 pass
         self.number_of_entries = number_of_entries
+
+
+class PEFFWriter(ProteinFastaFileWriter):
+    version = (1, 0)
+
+    def write_header(self, blocks, comments=None):
+        if comments is None:
+            comments = []
+        if blocks is None:
+            blocks = []
+        self.handle.write("# PEFF %d.%d\n" % self.version)
+        for comment in comments:
+            self.handle.write("# GeneralComment=%s\n" % comment)
+        self.handle.write("# //\n")
+        for block in blocks:
+            self.handle.write(str(block))
+            self.handle.write("\n# //\n")
