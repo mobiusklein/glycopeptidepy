@@ -1,38 +1,90 @@
 from .constants import constants
-from .composition import Composition
+
+from . import composition
+from .composition import Composition, formula, ChemicalCompositionError
+
+from . import base
+from .base import (MoleculeBase, PeptideSequenceBase, ModificationBase, ResidueBase)
+
+from . import parser
+from .parser import (sequence_tokenizer, strip_modifications)
+
+from . import residue
+from .residue import (
+    AminoAcidResidue, register_degenerate, register_residue)
+
+from . import sequence
+from .sequence import (
+    PeptideSequence, NamedSequence, ProteinSequence,
+    AnnotatedSequence, TerminalGroup,
+    find_glycosaminoglycan_sequons, find_n_glycosylation_sequons,
+    find_o_glycosylation_sequons, )
+
+from . import modification
+from .modification import (
+    Modification, ModificationRule, ModificationTarget,
+    ModificationTable, RestrictedModificationTable,
+    AnonymousModificationRule, AminoAcidSubstitution,
+    ModificationCategory, SequenceLocation, Glycosylation,
+    CoreGlycosylation, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
+    GlycosaminoglycanLinkerGlycosylation, OGlcNAcylation, GlycanFragment,
+    ModificationStringParseError, ModificationNameResolutionError)
+
+from . import fragment
+from .fragment import (
+    ChemicalShift, FragmentBase, PeptideFragment,
+    SimpleFragment, StubFragment, IonSeries)
+
+from . import fragmentation_strategy
+from .fragmentation_strategy import (
+    FragmentationStrategyBase, CADFragmentationStrategy, HCDFragmentationStrategy,
+    EXDFragmentationStrategy)
+
+from . import glycan
+from .glycan import (
+    TypedGlycan, TypedGlycanComposition, GlycosylationType,
+    GlycanCompositionProxy, GlycosylationManager, )
 
 
 __all__ = [
-    "sequence",
-    "modification",
-    "composition",
-    "fragment",
-    "glycan",
+    "constants",
+
+    "base",
+    "MoleculeBase", "PeptideSequenceBase", "ModificationBase",
+    "ResidueBase",
+
+    "parser",
+    "sequence_tokenizer", "strip_modifications",
+
     "residue",
+    "AminoAcidResidue", "register_degenerate", "register_residue",
+
+    "sequence",
+    "PeptideSequence", "NamedSequence", "ProteinSequence",
+    "AnnotatedSequence", "TerminalGroup", "find_glycosaminoglycan_sequons",
+    "find_o_glycosylation_sequons", "find_n_glycosylation_sequons",
+
+    "modification",
+    "Modification", "ModificationRule", "ModificationTarget",
+    "ModificationTable", "RestrictedModificationTable",
+    "AnonymousModificationRule", "AminoAcidSubstitution",
+    "ModificationCategory", "SequenceLocation", "Glycosylation",
+    "CoreGlycosylation", "NGlycanCoreGlycosylation", "OGlycanCoreGlycosylation",
+    "GlycosaminoglycanLinkerGlycosylation", "OGlcNAcylation", "GlycanFragment",
+    "ModificationStringParseError", "ModificationNameResolutionError",
+
+    "composition", "Composition", "formula", "ChemicalCompositionError",
+
+    "fragment",
+    "ChemicalShift", "FragmentBase", "PeptideFragment",
+    "SimpleFragment", "StubFragment", "IonSeries",
+
+    "fragmentation_strategy",
+    "FragmentationStrategyBase", "CADFragmentationStrategy", "HCDFragmentationStrategy",
+    "EXDFragmentationStrategy",
+
+    "glycan",
+    "TypedGlycan", "TypedGlycanComposition", "GlycosylationType",
+    "GlycanCompositionProxy", "GlycosylationManager",
+
 ]
-
-
-class MoleculeBase(object):
-    mass = None
-
-    def __copy__(self):
-        return self.clone()
-
-
-# A few base types for doing type-based behavior changes
-class PeptideSequenceBase(MoleculeBase):
-    '''
-    A base type for classes describing peptide sequences, with or without modifiations
-    '''
-
-
-class ModificationBase(MoleculeBase):
-    '''
-    A base type for classes describing peptide sequence modifications
-    '''
-
-
-class ResidueBase(MoleculeBase):
-    '''
-    A base type for classes describing amino acid residues
-    '''

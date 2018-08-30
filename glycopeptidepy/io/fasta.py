@@ -12,6 +12,8 @@ from glypy.utils.base import opener
 
 from six import text_type
 
+from .cv.peff import peff_cv_term
+
 
 class FastaHeader(Mapping):
     """Hold parsed properties of a FASTA sequence's
@@ -256,6 +258,12 @@ class PEFFDeflineParser(DefLineParserBase):
         storage['Tag'] = db_uid
         kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
         for key, value in kv_pattern.findall(line):
+            if self.validate:
+                try:
+                    peff_cv_term(key, strict=True)
+                except KeyError:
+                    import warnings
+                    warnings.warn("PEFF Key {} not recognized".format(key))
             if not (value.startswith("(") or " (" in value):
                 storage[key] = self.coerce_types(key, value)
             else:

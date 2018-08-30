@@ -1374,7 +1374,7 @@ class RestrictedModificationTable(ModificationTable):
         self._include_other_rules()
 
 
-class ModificationStringParseError(Exception):
+class ModificationStringParseError(ValueError):
     pass
 
 
