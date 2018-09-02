@@ -126,6 +126,15 @@ class PEFFDeflineParser(DefLineParserBase):
             self.id = kwargs.get('id')
             self.feature_type = kwargs.get("feature_type")
 
+        def __eq__(self, other):
+            return tuple(self) == tuple(other)
+
+        def __ne__(self, other):
+            return not (self == other)
+
+        def __hash__(self):
+            return hash(str(self))
+
         def __getitem__(self, i):
             return self.fields[i]
 
@@ -569,8 +578,8 @@ class PEFFReader(ProteinFastaFileReader):
     def _parse_header(self):
         offset = 0
         line = self.handle.readline()
-        line = line.decode('ascii')
         offset += len(line)
+        line = line.decode('ascii')
         if not line.startswith("# PEFF"):
             raise ValueError("Not a PEFF File")
         self.version = tuple(map(int, line.strip()[7:].split(".")))
@@ -578,11 +587,11 @@ class PEFFReader(ProteinFastaFileReader):
         current_block = defaultdict(list)
         while in_header:
             line = self.handle.readline()
+            offset += len(line)
             line = line.decode('ascii')
             if not line.startswith("#"):
                 in_header = False
                 self.handle.seek(offset)
-            offset += len(line)
             line = line.strip()[2:]
             if '=' in line:
                 key, value = line.split("=", 1)
