@@ -622,9 +622,8 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
             return self.gag_linker_stub_fragments()
         else:
             if len(self.peptide.glycosylation_manager) > 0:
-                raise NotImplementedError()
-            else:
-                raise ValueError("No Glycan Class Detected")
+                raise ValueError("Unknown Glycan Class Detected")
+        return (a for a in [])
 
     def __next__(self):
         if self._generator is None:
