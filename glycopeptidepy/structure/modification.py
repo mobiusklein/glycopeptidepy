@@ -796,6 +796,7 @@ hexnac_modification = ModificationRule.from_unimod({
         "O": 5,
         "N": 1
     },
+    "record_id": 43,
     "mono_mass": 203.079373,
     "full_name": "N-Acetylhexosamine",
     "specificity": [{
