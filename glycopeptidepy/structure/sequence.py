@@ -588,12 +588,9 @@ class PeptideSequence(PeptideSequenceBase):
     def get_fragments(self, kind, neutral_losses=None, **kwargs):
         """Return a list of mass values for each fragment of `kind`"""
         if kind == stub_glycopeptide_series:
-            for frag in self.stub_fragments(True):
-                yield [frag]
-            raise StopIteration()
+            return ([frag] for frag in self.stub_fragments(True))
         else:
-            for frag in HCDFragmentationStrategy(self, kind):
-                yield frag
+            return HCDFragmentationStrategy(self, kind)
 
     def drop_modification(self, position, modification_type):
         '''
