@@ -69,6 +69,10 @@ class TestModificationTable(unittest.TestCase):
         given = len(table.other_modifications)
         assert total - given == 2
 
+    def test_by_unimod(self):
+        mod = modification.Modification("UNIMOD:4")
+        assert mod.name == "Carbamidomethyl"
+
 
 class TestModificationRule(unittest.TestCase):
     def test_targets(self):

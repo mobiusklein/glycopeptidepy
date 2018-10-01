@@ -437,13 +437,20 @@ class ModificationRule(object):
         specificity = unimod_entry["specificity"]
         monoisotopic_mass = unimod_entry["mono_mass"]
         full_name = unimod_entry["full_name"]
+        record_id = unimod_entry.get("record_id")
         title = unimod_entry["title"]
         alt_names = set(unimod_entry.get('alt_names', ()))
+        if record_id is not None:
+            alt_names.add("UNIMOD:%d" % (record_id))
         specificity = list(map(ModificationTarget.from_unimod_specificity, specificity))
         return cls(
             specificity, full_name, title, monoisotopic_mass,
             composition=Composition({str(k): int(v) for k, v in unimod_entry['composition'].items()}),
             alt_names=alt_names)
+
+    @staticmethod
+    def _get_preferred_name(names):
+        return min(filter(lambda x: not x.startswith("UNIMOD:"), names), key=len)
 
     def __init__(self, amino_acid_specificity, modification_name,
                  title=None, monoisotopic_mass=None, composition=None,
@@ -478,7 +485,7 @@ class ModificationRule(object):
         self._n_term_target = None
         self._c_term_target = None
         self.fragile = kwargs.get('fragile', False)
-        self.preferred_name = min(self.names, key=len)
+        self.preferred_name = self._get_preferred_name(self.names)
         self.aliases = aliases
         # The type of the parameter passed for amino_acid_specificity is variable
         # so select the method correct for the passed type
@@ -598,7 +605,7 @@ class ModificationRule(object):
             dup.composition = new_composition
             dup.names = self.names | other.names
             dup.aliases = self.aliases | other.aliases
-            dup.preferred_name = min(dup.names, key=len)
+            dup.preferred_name = self._get_preferred_name(dup.names)
             dup.options.update(other.options)
             return dup
         else:
@@ -873,7 +880,6 @@ class Glycosylation(ModificationRule):
     title : TYPE
         Description
     """
-
     @classmethod
     def _parse(cls, rule_string):
         if rule_string.startswith("#"):
