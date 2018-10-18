@@ -33,6 +33,33 @@ symbol_to_residue = {
 residue_to_symbol = {value: key for key, value in symbol_to_residue.items()}
 
 
+symbol_to_long = {
+    "A": "Alanine",
+    "R": "Arginine",
+    "N": "Asparagine",
+    "D": "Aspartic Acid",
+    "C": "Cysteine",
+    "E": "Glutamic Acid",
+    "Q": "Glutamine",
+    "G": "Glycine",
+    "H": "Histidine",
+    "I": "Isoleucine",
+    "L": "Leucine",
+    "K": "Lysine",
+    "M": "Methionine",
+    "F": "Phenylalanine",
+    "P": "Proline",
+    "S": "Serine",
+    "T": "Threonine",
+    "W": "Tryptophan",
+    "Y": "Tyrosine",
+    "V": "Valine",
+}
+
+
+long_to_symbol = {value: key for key, value in symbol_to_long.items()}
+
+
 residue_table = {
     'Ala': 'C3H5NO',
     'Arg': 'C6H12N4O1',
@@ -267,6 +294,13 @@ class AminoAcidResidue(ResidueBase):
             return degeneracy_index[self.name]
         except KeyError:
             return False
+
+    @property
+    def long_name(self):
+        try:
+            return symbol_to_long[self.symbol]
+        except KeyError:
+            return self.name
 
 
 Residue = AminoAcidResidue
