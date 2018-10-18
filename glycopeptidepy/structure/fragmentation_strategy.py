@@ -119,6 +119,7 @@ class CADFragmentationStrategy(FragmentationStrategyBase):
 
 
 class StubGlycopeptideStrategy(FragmentationStrategyBase):
+
     def __init__(self, peptide, extended=True):
         super(StubGlycopeptideStrategy, self).__init__(peptide)
         self.extended = extended
@@ -131,6 +132,18 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         self._xylose = None
         self._hexa = None
         self._generator = None
+        # to be initialized closer to when the glycan composition will
+        # be used. Determine whether to use the fast-path __getitem__ or
+        # go through the slower but more general GlycanComposition.query
+        # method to look up monosaccharides.
+        self._use_query = False
+
+    def _guess_query_mode(self, glycan_composition):
+        # these guesses will work for N-glycans and common types of mucin-type O-glycans
+        # and GAG linkers
+        flag = ("Hex2NAc" in glycan_composition) or ("Glc2NAc" in glycan_composition
+                                                     ) or ("Gal2NAc" in glycan_composition)
+        return flag
 
     def _prepare_monosaccharide(self, name):
         return FrozenMonosaccharideResidue.from_iupac_lite(name)
@@ -212,6 +225,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
 
     def n_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
+        self._use_query = self._guess_query_mode(glycan)
         core_count = self.count_glycosylation_type(GlycosylationType.n_linked)
         per_site_shifts = []
         base_composition = self.peptide_composition()
@@ -233,10 +247,16 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 is_extended |= site['is_extended']
             is_glycosylated = (composition != base_composition)
             invalid = False
-            for key, value in names.items():
-                if glycan[key] < value:
-                    invalid = True
-                    break
+            if self._use_query:
+                for key, value in names.items():
+                    if glycan.query(key) < value:
+                        invalid = True
+                        break
+            else:
+                for key, value in names.items():
+                    if glycan[key] < value:
+                        invalid = True
+                        break
             if invalid:
                 continue
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
@@ -256,13 +276,20 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         hexose = self.hexose
         hexnac = self.hexnac
 
-        fucose_count = glycan['Fuc'] or glycan['dHex']
-        xylose_count = glycan['Xyl']
-        hexnac_in_aggregate = glycan['HexNAc']
-        hexose_in_aggregate = glycan["Hex"]
+        if self._use_query:
+            fucose_count = glycan.query('Fuc') or glycan.query('dHex')
+            xylose_count = glycan.query('Xyl')
+            hexnac_in_aggregate = glycan.query('HexNAc')
+            hexose_in_aggregate = glycan.query('Hex')
+        else:
+            fucose_count = glycan['Fuc'] or glycan['dHex']
+            xylose_count = glycan['Xyl']
+            hexnac_in_aggregate = glycan['HexNAc']
+            hexose_in_aggregate = glycan["Hex"]
 
         core_shifts = []
         base_hexnac = min(hexnac_in_aggregate + 1, 3)
+        print(base_hexnac)
         for hexnac_count in range(base_hexnac):
             if hexnac_count == 0:
                 shift = {
@@ -376,7 +403,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
 
     def o_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
-
+        self._use_query = self._guess_query_mode(glycan)
         core_count = self.count_glycosylation_type(GlycosylationType.o_linked)
         per_site_shifts = []
 
@@ -398,12 +425,16 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 composition += site['composition']
             is_glycosylated = (composition != base_composition)
             invalid = False
-            glycosylation_size = 0
-            for key, value in names.items():
-                glycosylation_size += value
-                if glycan[key] < value:
-                    invalid = True
-                    break
+            if self._use_query:
+                for key, value in names.items():
+                    if glycan.query(key) < value:
+                        invalid = True
+                        break
+            else:
+                for key, value in names.items():
+                    if glycan[key] < value:
+                        invalid = True
+                        break
             if invalid:
                 continue
             extended_key = ''.join(
@@ -426,9 +457,14 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         hexose = self.hexose
         hexnac = self.hexnac
 
-        fucose_count = glycan['Fuc'] or glycan['dHex']
-        hexnac_in_aggregate = glycan[hexnac]
-        hexose_in_aggregate = glycan[hexose]
+        if self._use_query:
+            fucose_count = glycan.query('Fuc') or glycan.query('dHex')
+            hexnac_in_aggregate = glycan.query('HexNAc')
+            hexose_in_aggregate = glycan.query('Hex')
+        else:
+            fucose_count = glycan['Fuc'] or glycan['dHex']
+            hexnac_in_aggregate = glycan['HexNAc']
+            hexose_in_aggregate = glycan["Hex"]
         core_shifts = []
         for hexnac_count in range(3):
             if hexnac_in_aggregate < hexnac_count:
@@ -507,7 +543,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
 
     def gag_linker_stub_fragments(self):
         glycan = self.glycan_composition()
-
+        self._use_query = self._guess_query_mode(glycan)
         core_count = self.count_glycosylation_type(GlycosylationType.glycosaminoglycan)
 
         per_site_shifts = []
@@ -529,12 +565,16 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                 composition += site['composition']
             is_glycosylated = (composition != base_composition)
             invalid = False
-            glycosylation_size = 0
-            for key, value in names.items():
-                glycosylation_size += value
-                if glycan[key] < value:
-                    invalid = True
-                    break
+            if self._use_query:
+                for key, value in names.items():
+                    if glycan.query(key) < value:
+                        invalid = True
+                        break
+            else:
+                for key, value in names.items():
+                    if glycan[key] < value:
+                        invalid = True
+                        break
             if invalid:
                 continue
             extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))

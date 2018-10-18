@@ -38,7 +38,7 @@ from .fragment import (
 from . import fragmentation_strategy
 from .fragmentation_strategy import (
     FragmentationStrategyBase, CADFragmentationStrategy, HCDFragmentationStrategy,
-    EXDFragmentationStrategy)
+    EXDFragmentationStrategy, StubGlycopeptideStrategy)
 
 from . import glycan
 from .glycan import (
@@ -81,7 +81,7 @@ __all__ = [
 
     "fragmentation_strategy",
     "FragmentationStrategyBase", "CADFragmentationStrategy", "HCDFragmentationStrategy",
-    "EXDFragmentationStrategy",
+    "EXDFragmentationStrategy", "StubGlycopeptideStrategy",
 
     "glycan",
     "TypedGlycan", "TypedGlycanComposition", "GlycosylationType",
