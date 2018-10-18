@@ -63,6 +63,12 @@ class TypedGlycanComposition(HashableGlycanComposition):
     def is_type(self, glycosylation_type):
         return self.glycosylation_type is GlycosylationType[glycosylation_type]
 
+    def as_modification(self):
+        from .modification import Glycosylation
+        return Glycosylation(self, metadata={
+            "glycosylation_type": self.glycosylation_type.name
+        })
+
 
 class GlycanCombination(Mapping):  # pragma: no cover
     def __init__(self, components):
@@ -180,6 +186,12 @@ class TypedGlycan(NamedGlycan):
     def is_type(self, glycosylation_type):
         return self.glycosylation_type == GlycosylationType[glycosylation_type]
 
+    def as_modification(self, encoding_format=None):
+        from .modification import Glycosylation
+        return Glycosylation(self, encoding_format, metadata={
+            "glycosylation_type": self.glycosylation_type.name
+        })
+
 
 class GlycanCompositionProxy(Mapping):
     def __init__(self, glycan_composition):
@@ -197,6 +209,9 @@ class GlycanCompositionProxy(Mapping):
     def __getitem__(self, key):
         return self.obj[key]
 
+    def __contains__(self, key):
+        return key in self.obj
+
     def keys(self):
         return self.obj.keys()
 
@@ -208,6 +223,9 @@ class GlycanCompositionProxy(Mapping):
 
     def clone(self, *args, **kwargs):
         return self.obj.clone(*args, **kwargs)
+
+    def query(self, query, exact=True, **kwargs):
+        return self.obj.query(query, exact=exact, **kwargs)
 
     def __repr__(self):
         return repr(self.obj)
