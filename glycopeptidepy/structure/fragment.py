@@ -26,10 +26,10 @@ fragment_pairing = {
 fragment_shift_composition = {
     'a': -Composition("CHO"),
     'b': -Composition({"H": 1}),
-    'c': Composition("NH3"),
+    'c': Composition("NH2"),
     'x': Composition("CO2") - Composition("H"),
     'y': Composition('H'),
-    'z': (-Composition("NH2"))
+    'z': (-Composition("NH"))
 }
 
 fragment_shift = {
