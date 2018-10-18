@@ -227,7 +227,7 @@ enzyme_rules = {
     'granzyme b': '(?<=IEP)D',
     'hydroxylamine': 'N(?=G)',
     'iodosobenzoic acid': 'W',
-    'lyc-c': "(?<=K)(?!P)",
+    'lys-c': "(?<=K)(?!P)",
     'ntcb': '\\w(?=C)',
     'pepsin ph1.3': '((?<=[^HKR][^P])[^R](?=[FLWY][^P]))|((?<=[^HKR][^P])[FLWY](?=\\w[^P]))',
     'pepsin ph2.0': '((?<=[^HKR][^P])[^R](?=[FL][^P]))|((?<=[^HKR][^P])[FL](?=\\w[^P]))',
@@ -237,7 +237,8 @@ enzyme_rules = {
     'thermolysin': '[^DE](?=[AFILMV])',
     'thrombin': '((?<=G)R(?=G))|((?<=[AFGILTVM][AFGILTVWA]P)R(?=[^DE][^DE]))',
     'trypsin': '([KR](?=[^P]))|((?<=W)K(?=P))|((?<=M)R(?=P))',
-    'none': '',
+    # No matches ever
+    'none': '^&$',
     'trypchymo': '(?<=[FYWLKR])(?!P)',
     'trypsin/p': '(?<=[KR])',
     'lys-c/p': '(?<=K)',
