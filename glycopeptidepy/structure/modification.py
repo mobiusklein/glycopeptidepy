@@ -887,12 +887,15 @@ class Glycosylation(ModificationRule):
             rule_string = rule_string[1:]
         format_type = "iupaclite"
         glycan_definition = rule_string
+        metadata = {}
         if rule_string.startswith(":"):
-            match = re.search(r":([^:]+?):(.+)", rule_string, re.DOTALL)
+            match = re.search(r":([^:]*?):(.+)", rule_string, re.DOTALL)
             if match:
                 metadata = match.group(1).split(",")
                 if '=' not in metadata[0]:
                     format_type = metadata[0]
+                    if not format_type:
+                        format_type = 'iupaclite'
                     metadata = metadata[1:]
                 metadata = dict([token.split("=") for token in metadata])
                 glycan_definition = match.group(2)
@@ -961,9 +964,11 @@ class Glycosylation(ModificationRule):
         template = "#:{}:{}"
         metadata = ",".join("%s=%s" % (k, v) for k, v in self.metadata.items())
         if metadata:
-            metadata = "{},{}".format(self.encoding_format, metadata)
+            if self.encoding_format != 'iupaclite':
+                metadata = "{},{}".format(self.encoding_format, metadata)
         else:
-            metadata = self.encoding_format
+            if self.encoding_format != 'iupaclite':
+                metadata = self.encoding_format
         if self.is_composition:
             return template.format(metadata, self.glycan.serialize())
         else:
