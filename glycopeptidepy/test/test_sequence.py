@@ -57,7 +57,7 @@ class PeptideSequenceSuiteBase(object):
             "y5": 574.2719 - HYDROGEN,
             "a4": 397.2082 - HYDROGEN,
             "a5": 510.2922 - HYDROGEN,
-            "z3": 360.1527 - HYDROGEN * 2,
+            "z3": 360.1527 - HYDROGEN,
         }
         for fragment, mass in mapping.items():
             fmass = seq.fragment(fragment).mass
