@@ -1,7 +1,8 @@
 from .structure.sequence import PeptideSequence, ProteinSequence
 from .structure.modification import (
     Modification, ModificationTable, RestrictedModificationTable,
-    ModificationRule, ModificationTarget, AnonymousModificationRule)
+    ModificationRule, ModificationTarget, AnonymousModificationRule,
+    Glycosylation)
 from .structure.fragment import (
     IonSeries, PeptideFragment, ChemicalShift,
     SimpleFragment, StubFragment)
@@ -20,4 +21,5 @@ __all__ = [
     "IonSeries", "PeptideFragment", "ChemicalShift", "SimpleFragment", "StubFragment",
     "Protease", "cleave",
     "HashableGlycanComposition", "GlycosylationType", "TypedGlycanComposition",
+    "Glycosylation",
 ]
