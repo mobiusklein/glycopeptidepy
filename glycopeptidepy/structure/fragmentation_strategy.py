@@ -277,12 +277,12 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         hexnac = self.hexnac
 
         if self._use_query:
-            fucose_count = glycan.query('Fuc') or glycan.query('dHex')
+            fucose_count = glycan.query('Fuc') + glycan.query('dHex')
             xylose_count = glycan.query('Xyl')
             hexnac_in_aggregate = glycan.query('HexNAc')
             hexose_in_aggregate = glycan.query('Hex')
         else:
-            fucose_count = glycan['Fuc'] or glycan['dHex']
+            fucose_count = glycan['Fuc'] + glycan['dHex']
             xylose_count = glycan['Xyl']
             hexnac_in_aggregate = glycan['HexNAc']
             hexose_in_aggregate = glycan["Hex"]
@@ -458,11 +458,11 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         hexnac = self.hexnac
 
         if self._use_query:
-            fucose_count = glycan.query('Fuc') or glycan.query('dHex')
+            fucose_count = glycan.query('Fuc') + glycan.query('dHex')
             hexnac_in_aggregate = glycan.query('HexNAc')
             hexose_in_aggregate = glycan.query('Hex')
         else:
-            fucose_count = glycan['Fuc'] or glycan['dHex']
+            fucose_count = glycan['Fuc'] + glycan['dHex']
             hexnac_in_aggregate = glycan['HexNAc']
             hexose_in_aggregate = glycan["Hex"]
         core_shifts = []
