@@ -585,12 +585,40 @@ class PeptideSequence(PeptideSequenceBase):
             self._build_fragment_index()
         return self._fragment_index[idx]
 
-    def get_fragments(self, kind, neutral_losses=None, **kwargs):
-        """Return a list of mass values for each fragment of `kind`"""
+    def get_fragments(self, kind, chemical_shifts=None, strategy=None, **kwargs):
+        """Generate fragments from this structure according to the strategy specified
+        by ``strategy``, returning an iterator over the sequence of theoretical fragments.
+
+        There may be multiple fragments for a single position, resulting in the iterator
+        yielding lists of fragment objects per step.
+
+        Parameters
+        ----------
+        kind : :class:`~.IonSeries` or :class:`str`
+            The name of the ion series to produce fragments from, either as a string or the
+            :class:`~.IonSeries` object to use
+        chemical_shifts : dict, optional
+            A :class:`~.Mapping` between :class:`~.AminoAcidResidue` and a listof acceptable chemical shifts to apply
+            to the produced fragments containing that :class:`~.AminoAcidResidue`, to be applied combinatorially.
+        strategy : :class:`~.FragmentationStrategyBase` type, optional
+            The strategy type to employ when producing fragments. Defaults to :class:`~.HCDFragmentationStrategy`.
+        **kwargs
+            Passed to ``strategy``
+
+        Returns
+        -------
+        :class:`~.FragmentationStrategyBase`
+            The fragmentation iterator
+        """
+        if strategy is None:
+            strategy = HCDFragmentationStrategy
+        losses = kwargs.pop('neutral_losses', [])
+        if losses and not chemical_shifts:
+            chemical_shifts = losses
         if kind == stub_glycopeptide_series:
             return ([frag] for frag in self.stub_fragments(True))
         else:
-            return HCDFragmentationStrategy(self, kind)
+            return strategy(self, kind, chemical_shifts=chemical_shifts, **kwargs)
 
     def drop_modification(self, position, modification_type):
         '''
@@ -665,19 +693,19 @@ class PeptideSequence(PeptideSequenceBase):
             except KeyError:
                 raise KeyError("Unknown Fragment %r" % (key,))
 
-    def _build_fragment_index(self, types=tuple('by'), neutral_losses=None):
+    def _build_fragment_index(self, types=tuple('bycz')):
         self._fragment_index = [[] for i in range(len(self) + 1)]
         for series in types:
             series = IonSeries(series)
             if series.direction > 0:
                 g = self.get_fragments(
-                    series, neutral_losses=neutral_losses)
+                    series)
                 for frags in g:
                     position = self._fragment_index[frags[0].position]
                     position.append(frags)
             else:
                 g = self.get_fragments(
-                    series, neutral_losses=neutral_losses)
+                    series)
                 for frags in g:
                     position = self._fragment_index[
                         len(self) - frags[0].position]
