@@ -663,9 +663,6 @@ class ModificationRule(object):
     def __ne__(self, other):
         return not self == other
 
-    def losses(self):
-        yield self.preferred_name, self.composition.clone()
-
     def as_spec_strings(self):
         for target in self.targets:
             yield "%s (%s)" % (self.title, target.serialize())
@@ -845,6 +842,7 @@ xylose_modification = ModificationRule.from_unimod({
 glycan_resolvers = dict()
 glycan_resolvers['glycoct'] = partial(glycoct.loads, structure_class=TypedGlycan)
 glycan_resolvers['iupac'] = partial(iupac.loads, structure_class=TypedGlycan)
+glycan_resolvers['iupac_simple'] = partial(iupac.loads, structure_class=TypedGlycan, dialect='simple')
 glycan_resolvers['linear_code'] = partial(linear_code.loads, structure_class=TypedGlycan)
 glycan_resolvers['iupaclite'] = TypedGlycanComposition.parse
 
@@ -995,10 +993,6 @@ class Glycosylation(ModificationRule):
                 Substituent("aglycone", composition=Composition()),
                 position=1, parent_loss=Composition("HO"))
 
-    def losses(self):
-        for i in []:
-            yield i
-
     def clone(self):
         return self.__class__(
             self._original, self.encoding_format, self.metadata)
@@ -1058,10 +1052,6 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
 
-    def losses(self, *args, **kwargs):
-        for label_loss in self.mass_ladder.items():
-            yield label_loss
-
     @property
     def glycosylation_type(self):
         return GlycosylationType.n_linked
@@ -1070,16 +1060,16 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         return self.__class__(self.mass)
 
 
-class OGlycanCoreGlycosylation(CoreGlycosylation):
+class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
     mass_ladder = {k: FrozenGlycanComposition.parse(k).total_composition() - Composition("H2O") for k in {
         "{HexNAc:1}",
         "{HexNAc:1; Hex:1}",
     }}
 
     def __init__(self, base_mass=_hexnac.mass()):
-        self.common_name = "OGlycanCoreGlycosylation"
+        self.common_name = "MucinOGlycanCoreGlycosylation"
         self.mass = base_mass
-        self.title = "O-Glycan Core Glycosylation"
+        self.title = "Mucin O-Glycan Core Glycosylation"
         self.unimod_name = "O-Glycosylation"
         self.preferred_name = self.unimod_name
         self.targets = [ModificationTarget("S"), ModificationTarget("T")]
@@ -1090,12 +1080,11 @@ class OGlycanCoreGlycosylation(CoreGlycosylation):
     def glycosylation_type(self):
         return GlycosylationType.o_linked
 
-    def losses(self, *args, **kwargs):
-        for label_loss in self.mass_ladder.items():
-            yield label_loss
-
     def clone(self):
         return self.__class__(self.mass)
+
+
+OGlycanCoreGlycosylation = MucinOGlycanCoreGlycosylation
 
 
 class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
@@ -1119,10 +1108,6 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
     @property
     def glycosylation_type(self):
         return GlycosylationType.glycosaminoglycan
-
-    def losses(self, *args, **kwargs):
-        for label_loss in self.mass_ladder.items():
-            yield label_loss
 
     def clone(self):
         return self.__class__(self.mass)
