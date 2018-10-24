@@ -270,7 +270,7 @@ class PeptideFragment(FragmentBase):
             return True
         else:
             for mod in self.modification_dict:
-                if mod in self.concerned_modifications:
+                if mod in self.concerned_modifications or mod.is_a(ModificationCategory.glycosylation):
                     return True
         return False
 
@@ -453,5 +453,7 @@ class IonSeries(object):
 
 IonSeries.b = IonSeries("b")
 IonSeries.y = IonSeries("y")
+IonSeries.c = IonSeries("c")
+IonSeries.z = IonSeries("z")
 IonSeries.oxonium_ion = IonSeries("oxonium_ion", includes_peptide=False)
 IonSeries.stub_glycopeptide = IonSeries("stub_glycopeptide")
