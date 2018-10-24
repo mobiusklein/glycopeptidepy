@@ -289,7 +289,6 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
 
         core_shifts = []
         base_hexnac = min(hexnac_in_aggregate + 1, 3)
-        print(base_hexnac)
         for hexnac_count in range(base_hexnac):
             if hexnac_count == 0:
                 shift = {
@@ -930,20 +929,53 @@ for key, value in _residue_to_neutral_loss.items():
 class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
     glycan_fragment_ladder = "Y"
 
-    def __init__(self, peptide, series, neutral_losses=None, max_chemical_shifts=1, max_glycan_cleavages=2):
-        super(EXDFragmentationStrategy, self).__init__(peptide, series, neutral_losses, max_chemical_shifts)
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, max_glycan_cleavages=2):
+        super(EXDFragmentationStrategy, self).__init__(peptide, series, chemical_shifts, max_chemical_shifts)
         self.max_glycan_cleavages = max_glycan_cleavages
+        self._glycan_fragment_cache = {}
 
     def _strip_glycosylation_from_modification_dict(self, modification_dict):
         glycosylations = []
         stripped_modifications = {}
         for position, glycosylation in sorted(self.glycosylation_manager.items()):
-            glycosylations.append(glycosylation)
+            glycosylations.append((position, glycosylation))
         for modification, count in modification_dict.items():
             if modification.is_tracked_for(ModificationCategory.glycosylation):
                 continue
             stripped_modifications[modification] = count
         return glycosylations, stripped_modifications
+
+    def _get_glycan_fragments(self, glycosylation, series, position):
+        try:
+            return self._glycan_fragment_cache[glycosylation, series, position]
+        except KeyError:
+            if glycosylation.rule.is_composition:
+                strat = StubGlycopeptideStrategy(self.peptide, False)
+                gc = strat.glycan_composition()
+                if glycosylation.rule.glycosylation_type == GlycosylationType.n_linked:
+                    gen = strat.n_glycan_composition_fragments(gc)
+                elif glycosylation.rule.glycosylation_type == GlycosylationType.o_linked:
+                    gen = strat.o_glycan_composition_fragments(gc)
+                elif glycosylation.rule.glycosylation_type == GlycosylationType.glycosaminoglycan:
+                    gen = strat.gag_linker_composition_fragments(gc)
+                else:
+                    gen = []
+                fragments = []
+                for frag_spec in gen:
+                    key = frag_spec['key']
+                    if not key:
+                        continue
+                    name = ''.join("%s%d" % kv for kv in sorted(key.items()))
+                    mass = frag_spec['mass']
+                    composition = frag_spec['composition']
+                    fragments.append(SimpleFragment(name, mass, 'Y', composition))
+                return fragments
+            else:
+                fragments = sorted(glycosylation.rule.get_fragments(
+                    series, max_cleavages=self.max_glycan_cleavages),
+                    key=lambda x: x.mass)
+                self._glycan_fragment_cache[glycosylation, series, position] = fragments
+                return fragments
 
     def partial_loss(self, fragment, glycan_fragment_ladder=None):
         if glycan_fragment_ladder is None:
@@ -955,7 +987,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
          stripped_modifications) = self._strip_glycosylation_from_modification_dict(
             base.modification_dict)
         base_composition = base.composition
-        for glycosylation in glycosylations:
+        for position, glycosylation in glycosylations:
             base_composition -= glycosylation.composition
         bare_fragment = PeptideFragment(
             fragment.series, fragment.position, dict(stripped_modifications),
@@ -965,10 +997,8 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
             composition=base_composition.clone())
 
         fragments = [
-            [None] + sorted(glycosylation.rule.get_fragments(
-                glycan_fragment_ladder, max_cleavages=self.max_glycan_cleavages),
-                key=lambda x: x.mass)
-            for glycosylation in glycosylations if not glycosylation.rule.is_composition
+            [None] + self._get_glycan_fragments(glycosylation, glycan_fragment_ladder, position)
+            for position, glycosylation in glycosylations
         ]
         fragment_combinations = product(*fragments)
         for fragment_set in fragment_combinations:
