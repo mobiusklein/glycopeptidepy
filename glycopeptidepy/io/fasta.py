@@ -558,7 +558,7 @@ class PEFFHeaderBlock(Mapping):
         return "%s" % '\n'.join('# %s=%s' % kv for kv in self.items())
 
     def __repr__(self):
-        return "{self.__class__.__name__}({self._mapping})".format(self=self)
+        return "{self.__class__.__name__}({self._storage})".format(self=self)
 
 
 class PEFFReader(ProteinFastaFileReader):
@@ -567,7 +567,7 @@ class PEFFReader(ProteinFastaFileReader):
         try:
             if 'b' not in self.handle.mode:
                 raise ValueError("PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
-        except AttributeError:
+        except (AttributeError, TypeError):
             pass
         self.version = (0, 0)
         self.blocks = []
