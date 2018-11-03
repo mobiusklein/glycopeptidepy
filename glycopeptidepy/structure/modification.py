@@ -484,7 +484,6 @@ class ModificationRule(object):
         self.options = kwargs
         self._n_term_target = None
         self._c_term_target = None
-        self.fragile = kwargs.get('fragile', False)
         self.preferred_name = self._get_preferred_name(self.names)
         self.aliases = aliases
         # The type of the parameter passed for amino_acid_specificity is variable
@@ -955,7 +954,6 @@ class Glycosylation(ModificationRule):
         self.names = {self.common_name, self.title, self.preferred_name}
         self.aliases = set()
         self.options = {}
-        self.fragile = True
         self._hash = hash(self.preferred_name)
 
     def _make_string(self):

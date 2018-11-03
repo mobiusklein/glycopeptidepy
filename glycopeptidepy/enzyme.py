@@ -42,6 +42,18 @@ class Protease(object):
         except KeyError:
             self.regex = re.compile(name)
 
+    def __eq__(self, other):
+        try:
+            return self.regex == other.regex
+        except AttributeError:
+            return False
+
+    def __hash__(self):
+        return hash(self.regex)
+
+    def __ne__(self, other):
+        return not (self == other)
+
     def __repr__(self):
         return "Protease(%s, %s)" % (self.name, self.regex.pattern)
 
