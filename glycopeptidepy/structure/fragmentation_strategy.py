@@ -3,8 +3,7 @@ from collections import defaultdict
 from itertools import product, combinations
 
 from glypy.structure.glycan_composition import (
-    FrozenGlycanComposition, FrozenMonosaccharideResidue,
-    MonosaccharideResidue)
+    FrozenMonosaccharideResidue)
 
 from glycopeptidepy.utils.collectiontools import descending_combination_counter
 from glycopeptidepy.structure import constants as structure_constants
@@ -50,8 +49,9 @@ glycosylation_type_to_core = {
 
 
 class FragmentationStrategyBase(object):
-    def __init__(self, peptide):
+    def __init__(self, peptide, *args, **kwargs):
         self.peptide = peptide
+        super(FragmentationStrategyBase, self).__init__(*args, **kwargs)
 
     def __repr__(self):
         return "%s(%s)" % (
@@ -118,11 +118,8 @@ class CADFragmentationStrategy(FragmentationStrategyBase):
         return self
 
 
-class StubGlycopeptideStrategy(FragmentationStrategyBase):
-
-    def __init__(self, peptide, extended=True):
-        super(StubGlycopeptideStrategy, self).__init__(peptide)
-        self.extended = extended
+class _MonosaccharideDefinitionCacher(object):
+    def __init__(self, *args, **kwargs):
         self._hexose = None
         self._hexnac = None
         self._neuac = None
@@ -131,19 +128,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         self._dhex = None
         self._xylose = None
         self._hexa = None
-        self._generator = None
-        # to be initialized closer to when the glycan composition will
-        # be used. Determine whether to use the fast-path __getitem__ or
-        # go through the slower but more general GlycanComposition.query
-        # method to look up monosaccharides.
-        self._use_query = False
-
-    def _guess_query_mode(self, glycan_composition):
-        # these guesses will work for N-glycans and common types of mucin-type O-glycans
-        # and GAG linkers
-        flag = ("Hex2NAc" in glycan_composition) or ("Glc2NAc" in glycan_composition
-                                                     ) or ("Gal2NAc" in glycan_composition)
-        return flag
+        super(_MonosaccharideDefinitionCacher, self).__init__(*args, **kwargs)
 
     def _prepare_monosaccharide(self, name):
         return FrozenMonosaccharideResidue.from_iupac_lite(name)
@@ -195,6 +180,26 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
         if self._hexa is None:
             self._hexa = self._prepare_monosaccharide("HexA")
         return self._hexa
+
+
+class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinitionCacher):
+
+    def __init__(self, peptide, extended=True, use_query=False):
+        super(StubGlycopeptideStrategy, self).__init__(peptide)
+        self.extended = extended
+        self._generator = None
+        # to be initialized closer to when the glycan composition will
+        # be used. Determine whether to use the fast-path __getitem__ or
+        # go through the slower but more general GlycanComposition.query
+        # method to look up monosaccharides.
+        self._use_query = use_query
+
+    def _guess_query_mode(self, glycan_composition):
+        # these guesses will work for N-glycans and common types of mucin-type O-glycans
+        # and GAG linkers
+        flag = ("Hex2NAc" in glycan_composition) or ("Glc2NAc" in glycan_composition
+                                                     ) or ("Gal2NAc" in glycan_composition)
+        return flag or self._use_query
 
     def count_glycosylation_type(self, glycotype):
         return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
@@ -351,30 +356,31 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                     # on the remaining core monosaccharides sequentially until
                     # exhausted.
                     if hexose_count == 3 and hexnac_in_aggregate >= 2 * core_count and self.extended:
-                        for extra_hexnac_count in range(0, 3):
+                        for extra_hexnac_count in range(0, hexnac_in_aggregate - hexnac_count + 1):
                             if extra_hexnac_count + hexnac_count > hexnac_in_aggregate:
                                 continue
-                            shift = {
-                                "mass": (
-                                    (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
-                                    hexose_count * hexose.mass()),
-                                "composition": (
-                                    (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
-                                    hexose_count * hexose.total_composition()),
-                                "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count},
-                                'is_extended': True
-                            }
-                            core_shifts.append(shift)
-                            if iteration_count < fucose_count:
-                                fucosylated = self.fucosylate_increment(shift)
-                                core_shifts.append(fucosylated)
-                                if iteration_count < xylose_count:
-                                    xylosylated = self.xylosylate_increment(fucosylated)
-                                    core_shifts.append(xylosylated)
+                            if extra_hexnac_count > 0:
+                                shift = {
+                                    "mass": (
+                                        (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                        hexose_count * hexose.mass()),
+                                    "composition": (
+                                        (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                        hexose_count * hexose.total_composition()),
+                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count},
+                                    'is_extended': True
+                                }
+                                core_shifts.append(shift)
+                                if iteration_count < fucose_count:
+                                    fucosylated = self.fucosylate_increment(shift)
+                                    core_shifts.append(fucosylated)
+                                    if iteration_count < xylose_count:
+                                        xylosylated = self.xylosylate_increment(fucosylated)
+                                        core_shifts.append(xylosylated)
                             if iteration_count < xylose_count:
                                 xylosylated = self.xylosylate_increment(shift)
                                 core_shifts.append(xylosylated)
-                            for extra_hexose_count in range(1, 3):
+                            for extra_hexose_count in range(1, hexose_in_aggregate - hexose_count + 1):
                                 if extra_hexose_count + hexose_count > hexose_in_aggregate:
                                     continue
                                 shift = {
@@ -511,24 +517,25 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase):
                     # exhausted.
                     if self.extended and hexnac_in_aggregate - hexnac_count >= 0:
                         for extra_hexnac_count in range(hexnac_in_aggregate - hexnac_count + 1):
-                            shift = {
-                                "mass": (
-                                    (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
-                                    (hexose_count) * hexose.mass()),
-                                "composition": (
-                                    (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
-                                    (hexose_count) * hexose.total_composition()),
-                                "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
-                                    hexose_count)},
-                                'is_extended': True,
-                            }
-                            core_shifts.append(shift)
-                            if iteration_count < fucose_count:
-                                fucosylated = self.fucosylate_increment(shift)
-                                core_shifts.append(fucosylated)
+                            if extra_hexnac_count:
+                                shift = {
+                                    "mass": (
+                                        (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
+                                        (hexose_count) * hexose.mass()),
+                                    "composition": (
+                                        (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
+                                        (hexose_count) * hexose.total_composition()),
+                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                        hexose_count)},
+                                    'is_extended': True,
+                                }
+                                core_shifts.append(shift)
+                                if iteration_count < fucose_count:
+                                    fucosylated = self.fucosylate_increment(shift)
+                                    core_shifts.append(fucosylated)
                             if hexose_in_aggregate > hexose_count and hexose_count > 0:
                                 for extra_hexose_count in range(hexose_in_aggregate - hexose_count):
-                                    if extra_hexose_count + hexose_count > 0:
+                                    if extra_hexose_count > 0 and extra_hexose_count + hexose_count > 0:
                                         shift = {
                                             "mass": (
                                                 (hexnac_count + extra_hexnac_count) * hexnac.mass()) + (
