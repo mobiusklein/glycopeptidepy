@@ -1,4 +1,9 @@
-from glycopeptidepy.enzyme import cleave
+import itertools
+from collections import defaultdict
+
+from glycopeptidepy.enzyme import Protease
+from glycopeptidepy.structure.residue import UnknownAminoAcidException
+from glycopeptidepy.structure.modification import SequenceLocation
 from glycopeptidepy.structure.sequence import PeptideSequence, list_to_sequence
 from glycopeptidepy.structure.parser import sequence_tokenizer_respect_sequons, sequence_tokenizer
 
@@ -100,3 +105,240 @@ def reverse_sequence(sequence, prefix_len=0, suffix_len=1, peptide_type=None, kn
     if original.glycan:
         rev_sequence.glycan = original.glycan.clone(propogate_composition_offset=False)
     return rev_sequence
+
+
+class ModificationSiteAssignmentCombinator(object):
+    def __init__(self, variable_site_map):
+        self.modification_to_site = variable_site_map
+        self.site_to_modification = self.transpose_sites()
+
+    def transpose_sites(self):
+        """Given a dictionary mapping between modification names and
+        an iterable of valid sites, create a dictionary mapping between
+        modification names and a list of valid sites plus the constant `None`
+
+        Returns
+        -------
+        dict
+        """
+        sites = defaultdict(list)
+        for mod, varsites in self.modification_to_site.items():
+            for site in varsites:
+                sites[site].append(mod)
+        for site in list(sites):
+            sites[site].append(None)
+        return sites
+
+    def _remove_empty_sites(self, site_mod_pairs):
+        return [sm for sm in site_mod_pairs if sm[1] is not None]
+
+    def assign(self):
+        sites = list(self.site_to_modification.keys())
+        choices = list(self.site_to_modification.values())
+        for selected in itertools.product(*choices):
+            site_mod_pairs = zip(sites, selected)
+            yield self._remove_empty_sites(site_mod_pairs)
+
+    def __iter__(self):
+        return self.assign()
+
+
+class PeptidoformGenerator(object):
+    def __init__(self, constant_modifications, variable_modifications, max_variable_modifications=None):
+        if max_variable_modifications is None:
+            max_variable_modifications = 4
+        self.constant_modifications = list(constant_modifications)
+        self.variable_modifications = list(variable_modifications)
+        self.max_variable_modifications = max_variable_modifications
+
+        (self.n_term_modifications,
+         self.c_term_modifications,
+         self.variable_modifications) = self.split_terminal_modifications(self.variable_modifications)
+
+    @staticmethod
+    def split_terminal_modifications(modifications):
+        """Group modification rules into three classes, N-terminal,
+        C-terminal, and Internal modifications.
+
+        A modification rule can be assigned to multiple groups if it
+        is valid at multiple sites.
+
+        Parameters
+        ----------
+        modifications : Iterable of ModificationRule
+            The modification rules
+
+        Returns
+        -------
+        n_terminal: list
+            list of N-terminal modification rules
+        c_terminal: list
+            list of C-terminal modification rules
+        internal: list
+            list of Internal modification rules
+        """
+        n_terminal = []
+        c_terminal = []
+        internal = []
+
+        for mod in modifications:
+            n_term = mod.n_term_targets
+            if n_term and all([t.amino_acid_targets is None for t in n_term]):
+                n_term_rule = mod.clone(n_term)
+                mod = mod - n_term_rule
+                n_terminal.append(n_term_rule)
+            c_term = mod.c_term_targets
+            if c_term and all([t.amino_acid_targets is None for t in c_term]):
+                c_term_rule = mod.clone(c_term)
+                mod = mod - c_term_rule
+                c_terminal.append(c_term_rule)
+            if (mod.targets):
+                internal.append(mod)
+
+        return n_terminal, c_terminal, internal
+
+    def prepare_peptide(self, sequence):
+        if not isinstance(sequence, PeptideSequence):
+            return PeptideSequence(str(sequence))
+        return sequence
+
+    def terminal_modifications(self, sequence):
+        n_term_modifications = [
+            mod for mod in self.n_term_modifications if mod.find_valid_sites(sequence)]
+        c_term_modifications = [
+            mod for mod in self.c_term_modifications if mod.find_valid_sites(sequence)]
+        # the case with unmodified termini
+        n_term_modifications.append(None)
+        c_term_modifications.append(None)
+
+    def apply_fixed_modifications(self, sequence):
+        has_fixed_n_term = False
+        has_fixed_c_term = False
+
+        for mod in self.constant_modifications:
+            for site in mod.find_valid_sites(sequence):
+                if site == SequenceLocation.n_term:
+                    has_fixed_n_term = True
+                elif site == SequenceLocation.c_term:
+                    has_fixed_c_term = True
+                sequence.add_modification(site, mod.name)
+        return has_fixed_n_term, has_fixed_c_term
+
+    def modification_sites(self, sequence):
+        variable_sites = {
+            mod.name: set(
+                mod.find_valid_sites(sequence)) for mod in self.variable_modifications}
+        modification_sites = ModificationSiteAssignmentCombinator(variable_sites)
+        return modification_sites
+
+    def apply_variable_modifications(self, sequence, assignments, n_term, c_term):
+        n_variable = 0
+        result = sequence.clone()
+        if n_term is not None:
+            result.n_term = n_term
+            n_variable += 1
+        if c_term is not None:
+            result.c_term = c_term
+            n_variable += 1
+        for site, mod in assignments:
+            if mod is not None:
+                result.add_modification(site, mod)
+                n_variable += 1
+        return result, n_variable
+
+    def generate_peptidoforms(self, sequence):
+        try:
+            sequence = self.prepare_peptide(sequence)
+        except UnknownAminoAcidException:
+            return
+        (n_term_modifications,
+         c_term_modifications) = self.terminal_modifications(sequence)
+
+        (has_fixed_n_term,
+         has_fixed_c_term) = self.apply_fixed_modifications(sequence)
+
+        if has_fixed_n_term:
+            n_term_modifications = [None]
+        if has_fixed_c_term:
+            c_term_modifications = [None]
+
+        modification_sites = self.modification_sites(sequence)
+
+        for n_term, c_term in itertools.product(n_term_modifications, c_term_modifications):
+            for assignments in modification_sites:
+                if len(assignments) > self.max_variable_modifications:
+                    continue
+                yield self.apply_variable_modifications(
+                    sequence, assignments, n_term, c_term)
+
+    def __call__(self, peptide):
+        return self.generate_peptidoforms(peptide)
+
+    @classmethod
+    def peptidoforms(cls, sequence, constant_modifications, variable_modifications, max_variable_modifications=4):
+        inst = cls(constant_modifications, variable_modifications,
+                   max_variable_modifications)
+        return inst(sequence)
+
+
+class ProteinDigestor(object):
+
+    def __init__(self, protease, constant_modifications=None, variable_modifications=None,
+                 max_missed_cleavages=2, min_length=6, max_length=60, semispecific=False,
+                 max_variable_modifications=None):
+        if constant_modifications is None:
+            constant_modifications = []
+        if variable_modifications is None:
+            variable_modifications = []
+        self.protease = self._prepare_protease(protease)
+        self.constant_modifications = constant_modifications
+        self.variable_modifications = variable_modifications
+        self.peptidoform_generator = PeptidoformGenerator(
+            self.constant_modifications,
+            self.variable_modifications,
+            max_variable_modifications=max_variable_modifications)
+        self.max_missed_cleavages = max_missed_cleavages
+        self.min_length = min_length
+        self.max_length = max_length
+        self.semispecific = semispecific
+        self.max_variable_modifications = max_variable_modifications
+
+    def _prepare_protease(self, protease):
+        if isinstance(protease, Protease):
+            pass
+        elif isinstance(protease, basestring):
+            protease = Protease(protease)
+        elif isinstance(protease, (list, tuple)):
+            protease = Protease.combine(*protease)
+        return protease
+
+    def cleave(self, sequence):
+        seqs = self.protease.cleave(
+            sequence, self.max_missed_cleavages,
+            min_length=self.min_length, max_length=self.max_length,
+            semispecific=self.semispecific)
+        for peptide, start, end, missed in seqs:
+            if "X" in peptide:
+                continue
+            yield peptide, start, end, missed
+
+    def _prepare_protein(self, protein):
+        if isinstance(protein, PeptideSequence):
+            return protein
+        return PeptideSequence(str(protein))
+
+    def digest(self, protein):
+        sequence = self._prepare_protein(protein)
+        for peptide, start, end, n_missed_cleavages in self.cleave(sequence):
+            if end - start > self.max_length:
+                continue
+            for inst in self.modify_string(peptide):
+                inst.count_missed_cleavages = n_missed_cleavages
+                inst.start_position = start
+                inst.end_position = end
+                yield inst
+
+    def modify_string(self, peptide):
+        for modified_peptide, n_variable_modifications in self.peptidoform_generator(peptide):
+            modified_peptide.count_variable_modifications = n_variable_modifications
+            yield modified_peptide
