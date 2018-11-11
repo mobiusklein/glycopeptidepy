@@ -8,7 +8,6 @@ from . import constants as structure_constants
 
 from .composition import Composition, formula
 from .fragment import (
-    PeptideFragment,
     SimpleFragment, IonSeries, _n_glycosylation, _o_glycosylation,
     _gag_linker_glycosylation)
 from .modification import (
@@ -21,7 +20,7 @@ from .fragmentation_strategy import (
     CADFragmentationStrategy,
     StubGlycopeptideStrategy)
 
-from glypy import GlycanComposition, Glycan, ReducedEnd
+from glypy import GlycanComposition, Glycan
 from glypy.structure.glycan_composition import (
     FrozenGlycanComposition, FrozenMonosaccharideResidue,
     MonosaccharideResidue)
