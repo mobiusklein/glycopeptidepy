@@ -13,7 +13,7 @@ from .structure.glycan import (
     HashableGlycanComposition, GlycosylationType, TypedGlycanComposition)
 
 
-def parse(self, string, peptide_class=PeptideSequence):
+def parse(string, peptide_class=PeptideSequence):
     return peptide_class(string)
 
 
