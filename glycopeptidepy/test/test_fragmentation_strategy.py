@@ -16,6 +16,21 @@ class StubGlycopeptideStrategyTest(unittest.TestCase):
         case = list(fragmentation_strategy.StubGlycopeptideStrategy(gp3, extended=True))
         self.assertEqual(ref, case)
 
+    def test_fucosylation(self):
+        gp = sequence.PeptideSequence(
+            'YLGN(#:glycosylation_type=N-Linked:{Fuc:2; Hex:5; HexNAc:4; Neu5Ac:1})ATAIFFLPDEGK')
+        fucosylated = []
+        for frag in gp.stub_fragments(extended=True, extended_fucosylation=False):
+            if frag.glycosylation['Fuc'] > 0:
+                fucosylated.append(frag)
+        assert fucosylated
+
+        fucosylated = []
+        for frag in gp.stub_fragments(extended=True, extended_fucosylation=True):
+            if frag.glycosylation['Fuc'] > 1:
+                fucosylated.append(frag)
+        assert fucosylated
+
 
 if __name__ == '__main__':
     unittest.main()
