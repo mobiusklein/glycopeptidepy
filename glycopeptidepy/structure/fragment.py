@@ -352,6 +352,14 @@ class StubFragment(SimpleFragment):
     def glycosylation_size(self):
         return sum(self.glycosylation.values())
 
+    @classmethod
+    def build_name_from_composition(cls, glycan_composition):
+        name = 'peptide'
+        extended_key = ''.join("%s%d" % kv for kv in sorted(glycan_composition.items()))
+        if len(extended_key) > 0:
+            name = "%s+%s" % (name, extended_key)
+        return name
+
     def __reduce__(self):
         proto = list(super(StubFragment, self).__reduce__())
         proto[1] = proto[1] + (self.glycosylation, self.is_extended)
