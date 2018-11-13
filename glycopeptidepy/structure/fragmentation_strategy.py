@@ -184,9 +184,10 @@ class _MonosaccharideDefinitionCacher(object):
 
 class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinitionCacher):
 
-    def __init__(self, peptide, extended=True, use_query=False):
+    def __init__(self, peptide, extended=True, use_query=False, extended_fucosylation=False, **kwargs):
         super(StubGlycopeptideStrategy, self).__init__(peptide)
         self.extended = extended
+        self.extended_fucosylation = extended_fucosylation
         self._generator = None
         # to be initialized closer to when the glycan composition will
         # be used. Determine whether to use the fast-path __getitem__ or
@@ -225,8 +226,20 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
         xylosylated['mass'] += self.xylose.mass()
         xylosylated['composition'] = xylosylated[
             'composition'] + self.xylose.total_composition()
-        xylosylated['key']["Fuc"] = 1
+        xylosylated['key']["Xyl"] = 1
         return xylosylated
+
+    def fucosylate_extended(self, shift, fucose_count):
+        result = [None for i in range(fucose_count)]
+        for i in range(1, fucose_count + 1):
+            fucosylated = shift.copy()
+            fucosylated['key'] = fucosylated['key'].copy()
+            fucosylated['mass'] += self.fucose.mass()
+            fucosylated['composition'] = fucosylated[
+                'composition'] + self.fucose.total_composition() * i
+            fucosylated['key']["Fuc"] = i
+            result[i - 1] = fucosylated
+        return result
 
     def n_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
@@ -240,36 +253,33 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
             core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
         for positions in product(*per_site_shifts):
-            key_base = 'peptide'
-            names = _AccumulatorBag()
+            aggregate_glycosylation = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
             is_extended = False
             for site in positions:
                 mass += site['mass']
-                names += (site['key'])
+                aggregate_glycosylation += (site['key'])
                 composition += site['composition']
                 is_extended |= site['is_extended']
             is_glycosylated = (composition != base_composition)
             invalid = False
             if self._use_query:
-                for key, value in names.items():
+                for key, value in aggregate_glycosylation.items():
                     if glycan.query(key) < value:
                         invalid = True
                         break
             else:
-                for key, value in names.items():
+                for key, value in aggregate_glycosylation.items():
                     if glycan[key] < value:
                         invalid = True
                         break
             if invalid:
                 continue
-            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
-            if len(extended_key) > 0:
-                key_base = "%s+%s" % (key_base, extended_key)
-            glycosylation = HashableGlycanComposition(names)
+            name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            glycosylation = HashableGlycanComposition(aggregate_glycosylation)
             yield StubFragment(
-                name=key_base,
+                name=name,
                 mass=mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
@@ -277,7 +287,7 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                 glycosylation=glycosylation,
                 is_extended=is_extended)
 
-    def n_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=1):
+    def n_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=0):
         hexose = self.hexose
         hexnac = self.hexnac
 
@@ -323,12 +333,18 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                 }
                 core_shifts.append(shift)
 
-                if iteration_count < fucose_count:
+                if not self.extended_fucosylation and iteration_count < fucose_count:
                     fucosylated = self.fucosylate_increment(shift)
                     core_shifts.append(fucosylated)
                     if iteration_count < xylose_count:
                         xylosylated = self.xylosylate_increment(fucosylated)
                         core_shifts.append(xylosylated)
+                elif fucose_count > 0:
+                    core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
+                    if iteration_count < xylose_count:
+                        xylosylated = self.xylosylate_increment(fucosylated)
+                        core_shifts.append(xylosylated)
+
                 if iteration_count < xylose_count:
                     xylosylated = self.xylosylate_increment(shift)
                     core_shifts.append(xylosylated)
@@ -342,12 +358,19 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                         'is_extended': False,
                     }
                     core_shifts.append(shift)
-                    if iteration_count < fucose_count:
+
+                    if not self.extended_fucosylation and iteration_count < fucose_count:
                         fucosylated = self.fucosylate_increment(shift)
                         core_shifts.append(fucosylated)
                         if iteration_count < xylose_count:
                             xylosylated = self.xylosylate_increment(fucosylated)
                             core_shifts.append(xylosylated)
+                    elif fucose_count > 0:
+                        core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
+                        if iteration_count < xylose_count:
+                            xylosylated = self.xylosylate_increment(fucosylated)
+                            core_shifts.append(xylosylated)
+
                     if iteration_count < xylose_count:
                         xylosylated = self.xylosylate_increment(shift)
                         core_shifts.append(xylosylated)
@@ -371,15 +394,20 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                                     'is_extended': True
                                 }
                                 core_shifts.append(shift)
-                                if iteration_count < fucose_count:
+
+                                if not self.extended_fucosylation and iteration_count < fucose_count:
                                     fucosylated = self.fucosylate_increment(shift)
                                     core_shifts.append(fucosylated)
                                     if iteration_count < xylose_count:
                                         xylosylated = self.xylosylate_increment(fucosylated)
                                         core_shifts.append(xylosylated)
-                            if iteration_count < xylose_count:
-                                xylosylated = self.xylosylate_increment(shift)
-                                core_shifts.append(xylosylated)
+                                elif fucose_count > 0:
+                                    core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
+
+                                if iteration_count < xylose_count:
+                                    xylosylated = self.xylosylate_increment(shift)
+                                    core_shifts.append(xylosylated)
+
                             for extra_hexose_count in range(1, hexose_in_aggregate - hexose_count + 1):
                                 if extra_hexose_count + hexose_count > hexose_in_aggregate:
                                     continue
@@ -395,12 +423,19 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                                     'is_extended': True
                                 }
                                 core_shifts.append(shift)
-                                if iteration_count < fucose_count:
+
+                                if not self.extended_fucosylation and iteration_count < fucose_count:
                                     fucosylated = self.fucosylate_increment(shift)
                                     core_shifts.append(fucosylated)
                                     if iteration_count < xylose_count:
                                         xylosylated = self.xylosylate_increment(fucosylated)
                                         core_shifts.append(xylosylated)
+                                elif fucose_count > 0:
+                                    core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
+                                    if iteration_count < xylose_count:
+                                        xylosylated = self.xylosylate_increment(fucosylated)
+                                        core_shifts.append(xylosylated)
+
                                 if iteration_count < xylose_count:
                                     xylosylated = self.xylosylate_increment(shift)
                                     core_shifts.append(xylosylated)
@@ -420,45 +455,41 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
             per_site_shifts.append(core_shifts)
         seen = set()
         for positions in product(*per_site_shifts):
-            key_base = 'peptide'
-            names = _AccumulatorBag()
+            aggregate_glycosylation = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
             for site in positions:
                 mass += site['mass']
-                names += (site['key'])
+                aggregate_glycosylation += (site['key'])
                 composition += site['composition']
             is_glycosylated = (composition != base_composition)
             invalid = False
             if self._use_query:
-                for key, value in names.items():
+                for key, value in aggregate_glycosylation.items():
                     if glycan.query(key) < value:
                         invalid = True
                         break
             else:
-                for key, value in names.items():
+                for key, value in aggregate_glycosylation.items():
                     if glycan[key] < value:
                         invalid = True
                         break
             if invalid:
                 continue
-            extended_key = ''.join(
-                "%s%d" % kv for kv in sorted(names.items()) if kv[1] > 0)
-            if len(extended_key) > 0:
-                key_base = "%s+%s" % (key_base, extended_key)
-            if key_base in seen:
+            name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            if name in seen:
                 continue
-            seen.add(key_base)
-            glycosylation = HashableGlycanComposition(names)
+            seen.add(name)
+            glycosylation = HashableGlycanComposition(aggregate_glycosylation)
             yield StubFragment(
-                name=key_base,
+                name=name,
                 mass=mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
                 glycosylation=glycosylation)
 
-    def o_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=1):
+    def o_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=0):
         hexose = self.hexose
         hexnac = self.hexnac
 
@@ -569,44 +600,41 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
             per_site_shifts.append(core_shifts)
         seen = set()
         for positions in product(*per_site_shifts):
-            key_base = 'peptide'
-            names = _AccumulatorBag()
+            aggregate_glycosylation = _AccumulatorBag()
             mass = base_mass
             composition = base_composition.clone()
             for site in positions:
                 mass += site['mass']
-                names += (site['key'])
+                aggregate_glycosylation += (site['key'])
                 composition += site['composition']
             is_glycosylated = (composition != base_composition)
             invalid = False
             if self._use_query:
-                for key, value in names.items():
+                for key, value in aggregate_glycosylation.items():
                     if glycan.query(key) < value:
                         invalid = True
                         break
             else:
-                for key, value in names.items():
+                for key, value in aggregate_glycosylation.items():
                     if glycan[key] < value:
                         invalid = True
                         break
             if invalid:
                 continue
-            extended_key = ''.join("%s%d" % kv for kv in sorted(names.items()))
-            if len(extended_key) > 0:
-                key_base = "%s+%s" % (key_base, extended_key)
-            if key_base in seen:
+            name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            if name in seen:
                 continue
-            seen.add(key_base)
-            glycosylation = HashableGlycanComposition(names)
+            seen.add(name)
+            glycosylation = HashableGlycanComposition(aggregate_glycosylation)
             yield StubFragment(
-                name=key_base,
+                name=name,
                 mass=mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries.stub_glycopeptide,
                 glycosylation=glycosylation)
 
-    def gag_linker_composition_fragments(self, glycan, core_count=1, iteration_count=1):
+    def gag_linker_composition_fragments(self, glycan, core_count=1, iteration_count=0):
         hexose = self.hexose
         xyl = self.xylose
         hexa = self.hexa
