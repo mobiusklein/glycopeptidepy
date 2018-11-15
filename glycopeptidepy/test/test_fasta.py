@@ -13,25 +13,28 @@ from glycopeptidepy.test.common import datafile
 
 class TestFastaIO(unittest.TestCase):
     def open_stream(self):
-        return open(datafile("proteins.fa"))
+        return open(datafile("proteins.fa"), 'rb')
 
     def test_fasta_parser(self):
-        n_proteins_in_fasta = 244
+        n_proteins_in_fasta = 243
         with self.open_stream() as f:
-            parser = fasta.ProteinFastaFileReader(f)
+            parser = fasta.ProteinFastaFileReader(f, index=True)
+            assert len(parser.index) == n_proteins_in_fasta
             i = 0
             for protein in parser:
                 i += 1
                 self.assertEqual(protein.name.db, 'sp')
-            self.assertEqual(i, n_proteins_in_fasta)
+            assert i == n_proteins_in_fasta
+            protein = parser['sp|Q9NYU2|UGGG1_HUMAN UDP-glucose:glycoprotein glucosyltransferase 1']
+            assert str(protein).endswith("KREEL")
 
     def test_fasta_writer(self):
-        outbuffer = StringIO()
+        outbuffer = BytesIO()
         writer = fasta.FastaFileWriter(outbuffer)
         writer.write("description", "PEPTIDE")
         writer.write("description2", "PROTEIN")
         content = outbuffer.getvalue()
-        reference = '''>description
+        reference = b'''>description
 PEPTIDE
 
 >description2
@@ -42,10 +45,12 @@ PROTEIN
         with self.open_stream() as f:
             parser = fasta.ProteinFastaFileReader(f)
             proteins = list(parser)
-        outbuffer = StringIO()
+        outbuffer = BytesIO()
         writer = fasta.ProteinFastaFileWriter(outbuffer)
         writer.writelines(proteins)
-        assert outbuffer.getvalue() == self.open_stream().read()
+        outbuffer.seek(0)
+        new_proteins = list(fasta.ProteinFastaFileReader(outbuffer))
+        assert proteins == new_proteins
 
 
 class TestHeaderParsing(unittest.TestCase):

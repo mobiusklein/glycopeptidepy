@@ -1,6 +1,8 @@
 import re
 import textwrap
+import warnings
 
+from io import BytesIO
 from collections import OrderedDict, defaultdict
 try:
     from collections.abc import Mapping, Sequence as SequenceABC
@@ -8,6 +10,7 @@ except ImportError:
     from collections import Mapping, Sequence as SequenceABC
 
 from glycopeptidepy.structure.sequence import ProteinSequence
+from glycopeptidepy.utils.sequence_tree import SuffixTree
 from glypy.utils.base import opener
 
 from six import text_type
@@ -271,7 +274,6 @@ class PEFFDeflineParser(DefLineParserBase):
                 try:
                     peff_cv_term(key, strict=True)
                 except KeyError:
-                    import warnings
                     warnings.warn("PEFF Key {} not recognized".format(key))
             if not (value.startswith("(") or " (" in value):
                 storage[key] = self.coerce_types(key, value)
@@ -395,14 +397,49 @@ default_parser = DispatchingDefLineParser([uniprot_parser, partial_uniprot_parse
 
 
 class FastaFileReader(object):
-    def __init__(self, path, defline_parser=default_parser, encoding='utf8'):
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False):
         self.state = "defline"
         self.handle = opener(path, 'rb')
-        self.defline = None
-        self.sequence_chunks = []
         self.defline_parser = defline_parser
         self.encoding = encoding
         self._generator = None
+        self._index = None
+        if index:
+            self._build_index()
+
+    def _build_index(self):
+        try:
+            pos = self.handle.tell()
+            self.handle.seek(0)
+        except (AttributeError, ValueError, TypeError) as ex:
+            print(ex)
+            pos = None
+        indexer = FastaIndexer(encoding=self.encoding)
+        index = indexer.build_index(self.handle)
+        if pos is not None:
+            self.handle.seek(pos)
+        self._index = index
+
+    @property
+    def index(self):
+        return self._index
+
+    def __getitem__(self, key):
+        if self.index is not None:
+            try:
+                pos = self.handle.tell()
+                self.handle.seek(0)
+            except (AttributeError, ValueError, TypeError):
+                pos = None
+            start, end = self.index[key]
+            self.handle.seek(start)
+            data = self.handle.read(end - start)
+            value = next(self._parse_lines(BytesIO(data)))
+            if pos is not None:
+                self.handle.seek(pos)
+            return value
+        else:
+            raise ValueError("No index was built")
 
     def process_result(self, d):
         return d
@@ -412,14 +449,20 @@ class FastaFileReader(object):
 
     def __next__(self):
         if self._generator is None:
-            self._generator = self._parse_lines()
+            if self.index is None:
+                self._generator = self._parse_lines(self.handle)
+            else:
+                self._generator = (self[k] for k in self.index)
         return next(self._generator)
 
     def next(self):
         return self.__next__()
 
-    def _parse_lines(self):
-        for line in self.handle:
+    def _parse_lines(self, stream):
+        sequence_pattern = re.compile(r"^(\s+|>)")
+        sequence_chunks = []
+        defline = None
+        for line in stream:
             line = line.strip()
             try:
                 line = line.decode(self.encoding)
@@ -427,36 +470,36 @@ class FastaFileReader(object):
                 pass
             if self.state == 'defline':
                 if line.startswith(">"):
-                    self.defline = line[1:]
+                    defline = line[1:]
                     self.state = "sequence"
                 else:
                     continue
             else:
-                if not re.match(r"^(\s+|>)", line):
-                    self.sequence_chunks.append(line)
+                if not sequence_pattern.match(line):
+                    sequence_chunks.append(line)
                 else:
-                    if self.defline is not None:
+                    if defline is not None:
                         try:
                             yield self.process_result({
-                                "name": self.defline_parser(self.defline),
-                                "sequence": ''.join(self.sequence_chunks)
+                                "name": self.defline_parser(defline),
+                                "sequence": ''.join(sequence_chunks)
                             })
                         except KeyError as e:
-                            print(e)
+                            warnings.warn(e)
                             pass
-                    self.sequence_chunks = []
-                    self.defline = None
+                    sequence_chunks = []
+                    defline = None
                     self.state = 'defline'
                     if line[0] == '>':
-                        self.defline = re.sub(r"[\n\r]", "", line[1:])
+                        defline = re.sub(r"[\n\r]", "", line[1:])
                         self.state = "sequence"
 
-        if len(self.sequence_chunks) > 0:
+        if len(sequence_chunks) > 0:
             try:
                 yield self.process_result(
                     {
-                        "name": self.defline_parser(self.defline),
-                        "sequence": ''.join(self.sequence_chunks)
+                        "name": self.defline_parser(defline),
+                        "sequence": ''.join(sequence_chunks)
                     })
             except Exception as e:
                 pass
@@ -467,8 +510,8 @@ FastaFileParser = FastaFileReader
 
 class ProteinFastaFileReader(FastaFileReader):
 
-    def __init__(self, path, defline_parser=default_parser, encoding='utf8'):
-        super(ProteinFastaFileReader, self).__init__(path, defline_parser, encoding)
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False):
+        super(ProteinFastaFileReader, self).__init__(path, defline_parser, encoding, index=index)
 
     def process_result(self, d):
         p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
@@ -480,17 +523,23 @@ ProteinFastaFileParser = ProteinFastaFileReader
 
 class FastaFileWriter(object):
 
-    def __init__(self, handle):
+    def __init__(self, handle, encoding='utf8'):
         self.handle = handle
+        self.encoding = encoding
 
     def write(self, defline, sequence):
-        defline = str(defline)
-        if not defline.startswith(">"):
-            defline = ">" + defline
+        if isinstance(defline, FastaHeader):
+            defline = str(defline).encode(self.encoding)
+        elif isinstance(defline, text_type):
+            defline = defline.encode(self.encoding)
+        if not defline.startswith(b">"):
+            defline = b">" + defline
+        if isinstance(sequence, text_type):
+            sequence = sequence.encode(self.encoding)
         self.handle.write(defline)
-        self.handle.write("\n")
+        self.handle.write(b"\n")
         self.handle.write(sequence)
-        self.handle.write("\n\n")
+        self.handle.write(b"\n\n")
 
     def writelines(self, iterable):
         for defline, seq in iterable:
@@ -498,10 +547,13 @@ class FastaFileWriter(object):
 
 
 class ProteinFastaFileWriter(FastaFileWriter):
+    def __init__(self, handle, encoding='utf8', line_length=80):
+        super(ProteinFastaFileWriter, self).__init__(handle, encoding)
+        self.line_length = line_length
 
     def write(self, protein):
         defline = str(protein.name)
-        seq = '\n'.join(textwrap.wrap(protein.get_sequence(), 80))
+        seq = '\n'.join(textwrap.wrap(protein.get_sequence(), self.line_length))
         super(ProteinFastaFileWriter, self).write(defline, seq)
 
     def writelines(self, iterable):
@@ -562,8 +614,8 @@ class PEFFHeaderBlock(Mapping):
 
 
 class PEFFReader(ProteinFastaFileReader):
-    def __init__(self, path, defline_parser=PEFFDeflineParser(False)):
-        super(PEFFReader, self).__init__(opener(path, 'rb'), defline_parser, encoding='ascii')
+    def __init__(self, path, defline_parser=PEFFDeflineParser(False), index=False):
+        super(PEFFReader, self).__init__(opener(path, 'rb'), defline_parser, encoding='ascii', index=index)
         try:
             if 'b' not in self.handle.mode:
                 raise ValueError("PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
@@ -616,6 +668,9 @@ class PEFFReader(ProteinFastaFileReader):
 class PEFFWriter(ProteinFastaFileWriter):
     version = (1, 0)
 
+    def __init__(self, handle, line_length=80):
+        super(PEFFWriter, self).__init__(handle, 'ascii', line_length)
+
     def write_header(self, blocks, comments=None):
         if comments is None:
             comments = []
@@ -628,3 +683,127 @@ class PEFFWriter(ProteinFastaFileWriter):
         for block in blocks:
             self.handle.write(str(block))
             self.handle.write("\n# //\n")
+
+
+class FastaIndexer(object):
+    def __init__(self, read_size=1000000, encoding='utf8', defline_parser=default_parser):
+        self.read_size = int(read_size)
+        self.encoding = encoding
+        self.defline_parser = defline_parser
+
+    def _chunk_iterator(self, stream):
+        delim = b"\n>"
+        read_size = self.read_size
+        f = stream
+        buff = f.read(read_size)
+        started_with_with_delim = buff.startswith(delim)
+        parts = buff.split(delim)
+        tail = parts[-1]
+        front = parts[:-1]
+        i = 0
+        for part in front:
+            i += 1
+            if part == b'':
+                continue
+            if i == 1:
+                if started_with_with_delim:
+                    yield delim + part
+                else:
+                    yield part
+            else:
+                yield delim + part
+        running = True
+        while running:
+            buff = f.read(read_size)
+            if len(buff) == 0:
+                running = False
+                buff = tail
+            else:
+                buff = tail + buff
+            parts = buff.split(delim)
+            tail = parts[-1]
+            front = parts[:-1]
+            for part in front:
+                yield delim + part
+        yield delim + tail
+
+    def _generate_offsets(self, stream):
+        i = 0
+        defline_pattern = re.compile(br"\s*>([^\n\r]+)[\n\r]+")
+        for line in self._chunk_iterator(stream):
+            match = defline_pattern.match(line)
+            if match:
+                yield i, match.group(1)
+            i += len(line)
+        yield i, None
+
+    def _handle_defline(self, defline):
+        defline = defline.decode(self.encoding)
+        if self.defline_parser:
+            try:
+                defline = self.defline_parser(defline)
+            except UnparsableDeflineError:
+                warnings.warn("Could not parse defline %r" % (defline,))
+        return defline
+
+    def build_index(self, stream):
+        index = OrderedDict()
+        g = self._generate_offsets(stream)
+        last_offset = 0
+        last_defline = None
+        for offset, defline in g:
+            if last_defline is not None:
+                index[self._handle_defline(last_defline)] = (last_offset, offset)
+            last_defline = defline
+            last_offset = offset
+        assert last_defline is None
+        return FastaIndex(index)
+
+
+class FastaIndex(object):
+    def __init__(self, mapping):
+        self.mapping = mapping
+        self._suffix = None
+
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __iter__(self):
+        return iter(self.mapping)
+
+    def __contains__(self, key):
+        return key in self.mapping
+
+    def keys(self):
+        return self.mapping.keys()
+
+    def values(self):
+        return self.mapping.values()
+
+    def items(self):
+        return self.mapping.items()
+
+    def __len__(self):
+        return len(self.mapping)
+
+    def _build_suffix_tree(self):
+        sfx_tree = SuffixTree()
+        for k in self:
+            sfx_tree.add_ngram(str(k), k)
+        return sfx_tree
+
+    def suffix(self, key):
+        if self._suffix is None:
+            self._suffix = self._build_suffix_tree()
+        return self._suffix.subsequences_of(key)
+
+    def query(self, **kwargs):
+        queries = kwargs.items()
+        matches = []
+        for key in self.keys():
+            for k, v in queries:
+                if key[k] != v:
+                    break
+            else:
+                matches.append(key)
+        return matches
