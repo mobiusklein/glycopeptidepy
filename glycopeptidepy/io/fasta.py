@@ -462,16 +462,17 @@ class FastaFileReader(object):
         sequence_pattern = re.compile(r"^(\s+|>)")
         sequence_chunks = []
         defline = None
+        state = 'defline'
         for line in stream:
             line = line.strip()
             try:
                 line = line.decode(self.encoding)
             except AttributeError:
                 pass
-            if self.state == 'defline':
+            if state == 'defline':
                 if line.startswith(">"):
                     defline = line[1:]
-                    self.state = "sequence"
+                    state = "sequence"
                 else:
                     continue
             else:
@@ -489,10 +490,10 @@ class FastaFileReader(object):
                             pass
                     sequence_chunks = []
                     defline = None
-                    self.state = 'defline'
+                    state = 'defline'
                     if line[0] == '>':
                         defline = re.sub(r"[\n\r]", "", line[1:])
-                        self.state = "sequence"
+                        state = "sequence"
 
         if len(sequence_chunks) > 0:
             try:
@@ -501,7 +502,7 @@ class FastaFileReader(object):
                         "name": self.defline_parser(defline),
                         "sequence": ''.join(sequence_chunks)
                     })
-            except Exception as e:
+            except KeyError as e:
                 pass
 
 
