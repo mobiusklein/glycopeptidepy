@@ -356,25 +356,7 @@ class PeptideSequence(PeptideSequenceBase):
         seq.c_term = c_term
         return seq
 
-    def __init__(self, sequence=None, parser_function=None, **kwargs):
-        if parser_function is None:
-            parser_function = sequence_tokenizer
-        self._mass = 0.0
-        self.sequence = []
-        self.modification_index = ModificationIndex()
-        self._fragment_index = None
-        self._glycan = None
-        self._glycan_composition = None
-
-        self._glycosylation_manager = GlycosylationManager(self)
-
-        self._n_term = None
-        self._c_term = None
-
-        self._fragments_map = {}
-        self._total_composition = None
-        self._peptide_composition = None
-
+    def _init_from_string(self, sequence, parser_function, **kwargs):
         if sequence == "" or sequence is None:
             pass
         else:
@@ -406,6 +388,54 @@ class PeptideSequence(PeptideSequenceBase):
                 self.n_term = self.n_term.modify(Modification(n_term))
             if c_term != structure_constants.C_TERM_DEFAULT:
                 self.c_term = self.c_term.modify(Modification(c_term))
+
+    def _init_from_components(self, seq_list, glycan, n_term=None, c_term=None, **kwargs):
+        self.mass = 0
+        self.sequence = []
+        i = 0
+        for res, mods in seq_list:
+            self.mass += res.mass
+            for mod in mods:
+                if mod.is_tracked_for(ModificationCategory.glycosylation):
+                    self._glycosylation_manager[i] = mod
+                self.modification_index[mod] += 1
+                self.mass += mod.mass
+            i += 1
+            self.sequence.append(self.position_class([res, list(mods)]))
+
+        if glycan is not None:
+            self._glycosylation_manager.aggregate = glycan.clone()
+
+        self.n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
+        self.c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
+
+        if n_term is not None:
+            self.n_term = self.n_term.modify(n_term)
+        if c_term is not None:
+            self.c_term = self.c_term.modify(c_term)
+
+    def _initialize_fields(self):
+        self._mass = 0.0
+        self.sequence = []
+        self.modification_index = ModificationIndex()
+        self._fragment_index = None
+        self._glycan = None
+        self._glycan_composition = None
+
+        self._glycosylation_manager = GlycosylationManager(self)
+
+        self._n_term = None
+        self._c_term = None
+
+        self._fragments_map = {}
+        self._total_composition = None
+        self._peptide_composition = None
+
+    def __init__(self, sequence=None, parser_function=None, **kwargs):
+        if parser_function is None:
+            parser_function = sequence_tokenizer
+        self._initialize_fields()
+        self._init_from_string(sequence, parser_function, **kwargs)
 
     def _invalidate(self):
         self._total_composition = None
@@ -757,7 +787,16 @@ class PeptideSequence(PeptideSequenceBase):
         return self.get_sequence()
 
     def clone(self):
-        inst = self.__class__(sequence=str(self))
+        inst = self.__class__()
+        if self._glycosylation_manager.aggregate is not None:
+            glycan = self._glycosylation_manager.aggregate.clone()
+            glycan.composition_offset = Composition("H2O")
+        else:
+            glycan = None
+        inst._init_from_components(
+            self.sequence, glycan,
+            self.n_term.modification,
+            self.c_term.modification)
         return inst
 
     def insert(self, position, residue, modifications=None):
