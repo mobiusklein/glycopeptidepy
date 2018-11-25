@@ -59,7 +59,24 @@ class FragmentationStrategyBase(object):
             self.peptide)
 
 
-class CADFragmentationStrategy(FragmentationStrategyBase):
+class _GlycanFragmentingStrategyBase(object):
+
+    def __init__(self, *args, **kwargs):
+        super(_GlycanFragmentingStrategyBase, self).__init__(*args, **kwargs)
+
+    def _guess_max_glycan_cleavages(self):
+        glycans = self.peptide.glycosylation_manager.items()
+        counter = 0
+        for pos, glycan in glycans:
+            rule = glycan.rule
+            if not rule.is_composition and not rule.is_core:
+                new_count = rule.glycan.count_branches()
+                if new_count > counter:
+                    counter = new_count
+        return counter
+
+
+class CADFragmentationStrategy(FragmentationStrategyBase, _GlycanFragmentingStrategyBase):
     """Generate glycopeptide fragments derived from glycosidic
     bond cleavages as in lower energy CAD fragmentation
 
@@ -69,8 +86,10 @@ class CADFragmentationStrategy(FragmentationStrategyBase):
         The maximum number of glycan cleavages to allow
     """
 
-    def __init__(self, peptide, max_cleavages=2):
-        super(CADFragmentationStrategy, self).__init__(peptide)
+    def __init__(self, peptide, max_cleavages=None, **kwargs):
+        super(CADFragmentationStrategy, self).__init__(peptide, **kwargs)
+        if max_cleavages is None:
+            max_cleavages = self._guess_max_glycan_cleavages()
         self.max_cleavages = max_cleavages
         self._generator = self._build_fragments(self.max_cleavages)
 
@@ -192,6 +211,18 @@ class _MonosaccharideDefinitionCacher(object):
 
 
 class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinitionCacher):
+
+    """A fragmentation strategy that generates intact peptide + glycan Y fragments from
+    glycopeptides where the glycan structure is not fully known. When the structure is
+    known, :class:`CADFragmentationStrategy` should be used instead
+
+    Attributes
+    ----------
+    extended : bool
+        Whether to fragment beyond the conserved core
+    extended_fucosylation : bool
+        Whether to consider multiple ``Fuc`` residues per fragment rather than one per core
+    """
 
     def __init__(self, peptide, extended=True, use_query=False, extended_fucosylation=False, **kwargs):
         super(StubGlycopeptideStrategy, self).__init__(peptide)
@@ -985,11 +1016,13 @@ for key, value in _residue_to_neutral_loss.items():
     exd_sidechain_losses[R(key)].extend(value)
 
 
-class EXDFragmentationStrategy(PeptideFragmentationStrategyBase):
+class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragmentingStrategyBase):
     glycan_fragment_ladder = "Y"
 
-    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, max_glycan_cleavages=2):
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, max_glycan_cleavages=None):
         super(EXDFragmentationStrategy, self).__init__(peptide, series, chemical_shifts, max_chemical_shifts)
+        if max_glycan_cleavages is None:
+            max_glycan_cleavages = self._guess_max_glycan_cleavages()
         self.max_glycan_cleavages = max_glycan_cleavages
         self._glycan_fragment_cache = {}
 
