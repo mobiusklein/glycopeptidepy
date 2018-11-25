@@ -31,6 +31,7 @@ from .glycan import (
     GlycosylationType, GlycosylationManager,
     glycosylation_site_detectors, GlycanCompositionProxy)
 
+from ..utils.memoize import memoize
 from ..utils.iterators import peekable
 from ..utils.collectiontools import (
     descending_combination_counter, _AccumulatorBag)
@@ -211,7 +212,9 @@ class TerminalGroup(MoleculeBase):
     __slots__ = ("base_composition", "_mass", "_modification")
 
     def __init__(self, base_composition, modification=None):
-        self.base_composition = Composition(base_composition)
+        if not isinstance(base_composition, Composition):
+            base_composition = Composition(base_composition)
+        self.base_composition = base_composition
         self._modification = None
         self._mass = None
         if modification is not None:
@@ -289,6 +292,11 @@ class TerminalGroup(MoleculeBase):
         return str(self)
 
 
+@memoize(100)
+def _make_terminal_group(base_composition_formula, modification=None):
+    return TerminalGroup(base_composition_formula, modification)
+
+
 class PeptideSequence(PeptideSequenceBase):
     '''
     Represents a peptide that may have post-translational modifications
@@ -357,12 +365,22 @@ class PeptideSequence(PeptideSequenceBase):
         return seq
 
     def _init_from_string(self, sequence, parser_function, **kwargs):
+        """Initialize a :class:`PeptideSequence` from a parse-able string.
+
+        Parameters
+        ----------
+        sequence : :class:`str`
+            The string to parse
+        parser_function : :class:`Callable`
+            The parsing function to use
+        """
         if sequence == "" or sequence is None:
             pass
         else:
             seq_list, modifications, glycan, n_term, c_term = parser_function(
                 sequence)
             i = 0
+            self.sequence = [None for _ in seq_list]
             for item in seq_list:
                 res = Residue(item[0])
                 self.mass += res.mass
@@ -375,46 +393,58 @@ class PeptideSequence(PeptideSequenceBase):
                         mods.append(mod)
                         self.modification_index[mod] += 1
                         self.mass += mod.mass
+                self.sequence[i] = self.position_class([res, mods])
                 i += 1
-                self.sequence.append(self.position_class([res, mods]))
 
             if glycan != "":
                 self._glycosylation_manager.aggregate = glycan.clone()
 
             self.glycan = glycan if glycan != "" else None
-            self.n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
-            self.c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
+            self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT)
+            self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT)
             if n_term != structure_constants.N_TERM_DEFAULT:
                 self.n_term = self.n_term.modify(Modification(n_term))
             if c_term != structure_constants.C_TERM_DEFAULT:
                 self.c_term = self.c_term.modify(Modification(c_term))
 
-    def _init_from_components(self, seq_list, glycan, n_term=None, c_term=None, **kwargs):
-        self.mass = 0
-        self.sequence = []
+    def _init_from_components(self, seq_list, glycan_composition=None, n_term=None, c_term=None, **kwargs):
+        """Initialize a :class:`PeptideSequence`'s state from a sequence of (
+        :class:`~.AminoAcidResidue`, [:class:`~.Modification`, ]) pairs, with optional extra information
+        defining the glycan composition aggregate and the terminal groups
+
+        Parameters
+        ----------
+        seq_list : :class:`Sequence`
+            The sequence of (:class:`~.AminoAcidResidue`, [:class:`~.Modification`, ])
+        glycan_composition : :class:`~.GlycanComposition`, optional
+            The aggregate glycan composition associated with the sequence not fully specified
+            by the modifications in ``seq_list``.
+        n_term : :class:`~.Modification`, optional
+            The N-terminal modification, if any
+        c_term : :class:`~.Modification`, optional
+            The C-terminal modification, if any
+        """
+        mass = 0
+        self.sequence = [None for _ in seq_list]
         i = 0
         for res, mods in seq_list:
-            self.mass += res.mass
+            mass += res.mass
             for mod in mods:
                 if mod.is_tracked_for(ModificationCategory.glycosylation):
                     self._glycosylation_manager[i] = mod
                 self.modification_index[mod] += 1
-                self.mass += mod.mass
+                mass += mod.mass
+            self.sequence[i] = self.position_class([res, list(mods)])
             i += 1
-            self.sequence.append(self.position_class([res, list(mods)]))
-
-        if glycan is not None:
-            self._glycosylation_manager.aggregate = glycan.clone()
-
-        self.n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
-        self.c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
-
-        if n_term is not None:
-            self.n_term = self.n_term.modify(n_term)
-        if c_term is not None:
-            self.c_term = self.c_term.modify(c_term)
+        self.mass = mass
+        if glycan_composition is not None:
+            self._glycosylation_manager.aggregate = glycan_composition.clone()
+        self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term)
+        self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term)
 
     def _initialize_fields(self):
+        """Initialize all mutable fields to their default, empty values.
+        """
         self._mass = 0.0
         self.sequence = []
         self.modification_index = ModificationIndex()
