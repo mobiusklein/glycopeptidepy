@@ -60,12 +60,21 @@ class FragmentationStrategyBase(object):
 
 
 class CADFragmentationStrategy(FragmentationStrategyBase):
+    """Generate glycopeptide fragments derived from glycosidic
+    bond cleavages as in lower energy CAD fragmentation
+
+    Attributes
+    ----------
+    max_cleavages : int
+        The maximum number of glycan cleavages to allow
+    """
+
     def __init__(self, peptide, max_cleavages=2):
         super(CADFragmentationStrategy, self).__init__(peptide)
         self.max_cleavages = max_cleavages
-        self.iterator = self._generator(self.max_cleavages)
+        self._generator = self._build_fragments(self.max_cleavages)
 
-    def _generator(self, max_cleavages=2):
+    def _build_fragments(self, max_cleavages=2):
         glycans = self.peptide.glycosylation_manager.items()
         n = len(glycans)
         base_composition = self.peptide.peptide_composition()
@@ -109,7 +118,7 @@ class CADFragmentationStrategy(FragmentationStrategyBase):
                     yield f
 
     def __next__(self):
-        return next(self.iterator)
+        return next(self._generator)
 
     def next(self):
         return self.__next__()
