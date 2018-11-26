@@ -324,45 +324,49 @@ class PeptideSequence(PeptideSequenceBase):
     position_class = list
 
     @classmethod
-    def from_iterable(cls, iterable):
-        seq = cls(None)
-        n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
-        c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
-        i = 0
-        for pos, next_pos in peekable(iterable):
-            i += 1
+    def from_iterable(cls, iterable, glycan_composition=None, n_term=None, c_term=None, text=None, **kwargs):
+        seq = cls()
+        if text is None:
+            iterable = list(iterable)
             try:
-                resid, mods = pos
-            except ValueError:
-                if i == 0:
-                    n_term = pos
-                elif next_pos is peekable.sentinel:
-                    c_term = pos
-                else:
-                    raise
-            if not isinstance(resid, Residue):
-                resid = Residue(symbol=resid)
-            seq.mass += resid.mass
-            mod_list = []
-            for mod in mods:
-                if mod == "":
-                    continue
-                if not isinstance(mod, Modification):
-                    mod = Modification(mod)
-                if mod.is_tracked_for(ModificationCategory.glycosylation):
-                    seq._glycosylation_manager[i] = mod
-                mod_list.append(mod)
-                seq.mass += mod.mass
-                seq.modification_index[mod.name] += 1
-            seq.sequence.append(cls.position_class([resid, mod_list]))
-        if not isinstance(n_term, MoleculeBase):
-            n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT, n_term)
-        if not isinstance(c_term, MoleculeBase):
-            c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT, c_term)
-
-        seq.n_term = n_term
-        seq.c_term = c_term
+                if isinstance(iterable[0][0], basestring):
+                    text = True
+            except IndexError:
+                text = True
+        if text:
+            seq._init_from_parsed_string(iterable, glycan_composition, n_term, c_term)
+        else:
+            seq._init_from_components(iterable, glycan_composition, n_term, c_term, **kwargs)
         return seq
+
+    def _init_from_parsed_string(self, seq_list, glycan=None, n_term=None, c_term=None, **kwargs):
+        i = 0
+        self.sequence = [None for _ in seq_list]
+        for item in seq_list:
+            res = Residue(item[0])
+            self.mass += res.mass
+            mods = []
+            for mod in item[1]:
+                if mod != '':
+                    mod = Modification(mod)
+                    if mod.is_tracked_for(ModificationCategory.glycosylation):
+                        self._glycosylation_manager[i] = mod
+                    mods.append(mod)
+                    self.modification_index[mod] += 1
+                    self.mass += mod.mass
+            self.sequence[i] = self.position_class([res, mods])
+            i += 1
+
+        has_glycan = glycan != "" and glycan is not None
+        if has_glycan:
+            self._glycosylation_manager.aggregate = glycan.clone()
+
+        self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT)
+        self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT)
+        if n_term != structure_constants.N_TERM_DEFAULT and n_term is not None:
+            self.n_term = self.n_term.modify(Modification(n_term))
+        if c_term != structure_constants.C_TERM_DEFAULT and c_term is not None:
+            self.c_term = self.c_term.modify(Modification(c_term))
 
     def _init_from_string(self, sequence, parser_function, **kwargs):
         """Initialize a :class:`PeptideSequence` from a parse-able string.
@@ -379,33 +383,7 @@ class PeptideSequence(PeptideSequenceBase):
         else:
             seq_list, modifications, glycan, n_term, c_term = parser_function(
                 sequence)
-            i = 0
-            self.sequence = [None for _ in seq_list]
-            for item in seq_list:
-                res = Residue(item[0])
-                self.mass += res.mass
-                mods = []
-                for mod in item[1]:
-                    if mod != '':
-                        mod = Modification(mod)
-                        if mod.is_tracked_for(ModificationCategory.glycosylation):
-                            self._glycosylation_manager[i] = mod
-                        mods.append(mod)
-                        self.modification_index[mod] += 1
-                        self.mass += mod.mass
-                self.sequence[i] = self.position_class([res, mods])
-                i += 1
-
-            if glycan != "":
-                self._glycosylation_manager.aggregate = glycan.clone()
-
-            self.glycan = glycan if glycan != "" else None
-            self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT)
-            self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT)
-            if n_term != structure_constants.N_TERM_DEFAULT:
-                self.n_term = self.n_term.modify(Modification(n_term))
-            if c_term != structure_constants.C_TERM_DEFAULT:
-                self.c_term = self.c_term.modify(Modification(c_term))
+            self._init_from_parsed_string(seq_list, glycan, n_term, c_term, **kwargs)
 
     def _init_from_components(self, seq_list, glycan_composition=None, n_term=None, c_term=None, **kwargs):
         """Initialize a :class:`PeptideSequence`'s state from a sequence of (
