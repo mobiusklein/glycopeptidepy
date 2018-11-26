@@ -2,6 +2,8 @@ import re
 
 from functools import partial
 
+from six import string_types as basestring
+
 from glypy import Substituent, Glycan
 from glypy.io import glycoct, iupac, linear_code, wurcs
 from glypy.structure.glycan_composition import (

@@ -1,3 +1,5 @@
+from six import string_types as basestring
+
 from ..base import ModificationBase
 
 from .source import ModificationTable
