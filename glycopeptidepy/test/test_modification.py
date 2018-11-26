@@ -1,7 +1,9 @@
 import unittest
 
 from glycopeptidepy.structure import sequence, modification, residue
+from glycopeptidepy.structure import Composition
 
+from glypy.io import glycoct
 
 n_glycan_rule = '#:glycoct:RES 1b:b-dglc-HEX-1:5 2s:n-acetyl 3b:b-dglc-HEX-1:5 \
 4s:n-acetyl 5b:b-dman-HEX-1:5 6b:a-dman-HEX-1:5 7b:a-dman-HEX-1:5 LIN \
@@ -48,14 +50,14 @@ class TestModifcationTarget(unittest.TestCase):
 class TestGlycosylationRule(unittest.TestCase):
     def test_parse(self):
         rule = modification.Glycosylation.try_parse(n_glycan_rule)
-        base_mass = modification.glycoct.loads("\
+        base_mass = glycoct.loads("\
             RES 1b:b-dglc-HEX-1:5 2s:n-acetyl \
             3b:b-dglc-HEX-1:5 4s:n-acetyl \
             5b:b-dman-HEX-1:5 6b:a-dman-HEX-1:5 \
             7b:a-dman-HEX-1:5 LIN 1:1d(2+1)2n \
             2:1o(4+1)3d 3:3d(2+1)4n 4:3o(4+1)5d \
             5:5o(3+1)6d 6:5o(6+1)7d").mass()
-        dehydrated_mass = base_mass - modification.Composition("H2O").mass
+        dehydrated_mass = base_mass - Composition("H2O").mass
         self.assertAlmostEqual(rule.mass, dehydrated_mass, 3)
 
 
