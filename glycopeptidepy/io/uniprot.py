@@ -112,6 +112,10 @@ class Peptide(PeptideBase):
     feature_type = 'peptide'
 
 
+class MatureProtein(PeptideBase):
+    feature_type = 'mature protein'
+
+
 class Domain(UniProtFeatureBase):
     feature_type = 'domain'
 

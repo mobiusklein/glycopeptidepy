@@ -123,76 +123,11 @@ class PEFFDeflineParser(DefLineParserBase):
     detect_pattern = re.compile(r"^>?\S+:\S+")
     has_feature_index = re.compile(r"^\(?(\d+):")
 
-    class PEFFFeature(SequenceABC):
-        def __init__(self, *fields, **kwargs):
-            self.fields = tuple(fields)
-            self.id = kwargs.get('id')
-            self.feature_type = kwargs.get("feature_type")
-
-        def __eq__(self, other):
-            return tuple(self) == tuple(other)
-
-        def __ne__(self, other):
-            return not (self == other)
-
-        def __hash__(self):
-            return hash(str(self))
-
-        def __getitem__(self, i):
-            return self.fields[i]
-
-        def __len__(self):
-            return len(self.fields)
-
-        def __repr__(self):
-            return repr(tuple(self))
-
-        def __str__(self):
-            return "(%s%s)" % (
-                '%r:' % self.id if self.id is not None else '',
-                '|'.join(map(str, self)), )
-
-    class PEFFFastaHeader(FastaHeader):
-        def __init__(self, mapping, original=None):
-            self._feature_map = {}
-            FastaHeader.__init__(self, mapping, original=original)
-            self._init_feature_id_map()
-
-        def _init_feature_id_map(self):
-            for key, values in self.items():
-                if isinstance(values, list):
-                    for feature in values:
-                        if hasattr(feature, 'id'):
-                            feature_id = feature.id
-                            if feature_id is not None:
-                                self._feature_map[feature_id] = feature
-                else:
-                    feature = values
-                    if hasattr(feature, 'id'):
-                        feature_id = feature.id
-                        if feature_id is not None:
-                            self._feature_map[feature_id] = feature
-
-        def _make_defline(self):
-            template = text_type(
-                ">{self.Prefix}:{self.Tag} {rest}")
-            rest_parts = []
-            for key, value in self.items():
-                if key in ("Prefix", "Tag"):
-                    continue
-                part = '\\{key}={fmt_value}'
-                if isinstance(value, ((int, float, text_type, str))):
-                    fmt_value = str(value)
-                else:
-                    fmt_value = ''.join(map(str, value))
-                rest_parts.append(part.format(key=key, fmt_value=fmt_value))
-            return template.format(self=self, rest=' '.join(rest_parts))
-
     def __init__(self, validate=True):
         self.validate = validate
 
     def _make_header(self, mapping, defline):
-        return self.PEFFFastaHeader(mapping, defline)
+        return PEFFFastaHeader(mapping, defline)
 
     def extract_parenthesis_list(self, text):
         chunks = []
@@ -237,7 +172,7 @@ class PEFFDeflineParser(DefLineParserBase):
             result = []
             for i, v in enumerate(value):
                 result.append(self._coerce_value(key, v, i))
-            return self.PEFFFeature(*result, feature_type=key, id=feature_id)
+            return PEFFFeature(*result, feature_type=key, id=feature_id)
         else:
             return self._coerce_value(key, value, 0)
 
@@ -281,6 +216,73 @@ class PEFFDeflineParser(DefLineParserBase):
                 # multi-value
                 storage[key] = [self.coerce_types(key, v) for v in self.extract_parenthesis_list(value)]
         return storage
+
+
+class PEFFFeature(SequenceABC):
+    def __init__(self, *fields, **kwargs):
+        self.fields = tuple(fields)
+        self.id = kwargs.get('id')
+        self.feature_type = kwargs.get("feature_type")
+
+    def __eq__(self, other):
+        return tuple(self) == tuple(other)
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return hash(str(self))
+
+    def __getitem__(self, i):
+        return self.fields[i]
+
+    def __len__(self):
+        return len(self.fields)
+
+    def __repr__(self):
+        return repr(tuple(self))
+
+    def __str__(self):
+        return "(%s%s)" % (
+            '%r:' % self.id if self.id is not None else '',
+            '|'.join(map(str, self)), )
+
+
+class PEFFFastaHeader(FastaHeader):
+    def __init__(self, mapping, original=None):
+        self._feature_map = {}
+        FastaHeader.__init__(self, mapping, original=original)
+        self._init_feature_id_map()
+
+    def _init_feature_id_map(self):
+        for key, values in self.items():
+            if isinstance(values, list):
+                for feature in values:
+                    if hasattr(feature, 'id'):
+                        feature_id = feature.id
+                        if feature_id is not None:
+                            self._feature_map[feature_id] = feature
+            else:
+                feature = values
+                if hasattr(feature, 'id'):
+                    feature_id = feature.id
+                    if feature_id is not None:
+                        self._feature_map[feature_id] = feature
+
+    def _make_defline(self):
+        template = text_type(
+            ">{self.Prefix}:{self.Tag} {rest}")
+        rest_parts = []
+        for key, value in self.items():
+            if key in ("Prefix", "Tag"):
+                continue
+            part = '\\{key}={fmt_value}'
+            if isinstance(value, ((int, float, text_type, str))):
+                fmt_value = str(value)
+            else:
+                fmt_value = ''.join(map(str, value))
+            rest_parts.append(part.format(key=key, fmt_value=fmt_value))
+        return template.format(self=self, rest=' '.join(rest_parts))
 
 
 class CallableDefLineParser(DefLineParserBase):
@@ -562,8 +564,8 @@ class ProteinFastaFileWriter(FastaFileWriter):
             self.write(protein)
 
 
-def read(f, defline_parser=default_parser, reader_type=ProteinFastaFileParser):
-    return reader_type(f, defline_parser=defline_parser)
+def read(f, defline_parser=default_parser, reader_type=ProteinFastaFileParser, **kwargs):
+    return reader_type(f, defline_parser=defline_parser, **kwargs)
 
 
 class PEFFHeaderBlock(Mapping):
@@ -808,3 +810,28 @@ class FastaIndex(object):
             else:
                 matches.append(key)
         return matches
+
+
+class _UniprotToPeffConverter(object):
+
+    feature_to_peff_term = {
+        'signal peptide': ('Processed', 'PEFF:0001021'),
+        'mature protein': ('Processed', 'PEFF:0001020'),
+        "transit peptide": ('Processed', 'PEFF:0001022'),
+        # 'peptide': ('Processed', ),
+        'propeptide': ('Processed', 'PEFF:0001034'),
+    }
+
+    def __call__(self, record):
+        features = defaultdict(list)
+        features['Prefix'] = 'sp'
+        features['Tag'] = record.accessions[0]
+        features['PName'] = record.recommended_name
+        for feature in record.features:
+            try:
+                key = self.feature_to_peff_term[feature.feature_type]
+                features[key].append(PEFFFeature(feature.start + 1, feature.end, feature.feature_type))
+            except KeyError:
+                continue
+        header = PEFFFastaHeader(dict(features))
+        return ProteinSequence(header, record.sequence)
