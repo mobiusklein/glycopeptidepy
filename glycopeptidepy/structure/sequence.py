@@ -209,7 +209,7 @@ def _calculate_mass(sequence):
 
 
 class TerminalGroup(MoleculeBase):
-    __slots__ = ("base_composition", "_mass", "_modification")
+    __slots__ = ("base_composition", "mass", "_modification")
 
     def __init__(self, base_composition, modification=None):
         if not isinstance(base_composition, Composition):
@@ -219,6 +219,7 @@ class TerminalGroup(MoleculeBase):
         self._mass = None
         if modification is not None:
             self.modification = modification
+        self.mass = self._calculate_mass()
 
     def _calculate_mass(self):
         base_mass = self.base_composition.mass
@@ -232,12 +233,6 @@ class TerminalGroup(MoleculeBase):
 
     def __reduce__(self):
         return self.__class__, (self.base_composition, self.modification)
-
-    @property
-    def mass(self):
-        if self._mass is None:
-            self._mass = self._calculate_mass()
-        return self._mass
 
     @property
     def modification(self):
@@ -361,12 +356,19 @@ class PeptideSequence(PeptideSequenceBase):
         if has_glycan:
             self._glycosylation_manager.aggregate = glycan.clone()
 
-        self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT)
-        self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT)
-        if n_term != structure_constants.N_TERM_DEFAULT and n_term is not None:
-            self.n_term = self.n_term.modify(Modification(n_term))
-        if c_term != structure_constants.C_TERM_DEFAULT and c_term is not None:
-            self.c_term = self.c_term.modify(Modification(c_term))
+        if isinstance(n_term, basestring):
+            if n_term != structure_constants.N_TERM_DEFAULT:
+                n_term = Modification(n_term)
+            else:
+                n_term = None
+        if isinstance(c_term, basestring):
+            if c_term != structure_constants.C_TERM_DEFAULT:
+                c_term = Modification(c_term)
+            else:
+                c_term = None
+        n_term_group = _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term)
+        c_term_group = _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term)
+        self._init_termini(n_term_group, c_term_group)
 
     def _init_from_string(self, sequence, parser_function, **kwargs):
         """Initialize a :class:`PeptideSequence` from a parse-able string.
@@ -417,8 +419,14 @@ class PeptideSequence(PeptideSequenceBase):
         self.mass = mass
         if glycan_composition is not None:
             self._glycosylation_manager.aggregate = glycan_composition.clone()
-        self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term)
-        self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term)
+        self._init_termini(
+            _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term),
+            _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term))
+
+    def _init_termini(self, n_term, c_term):
+        self._n_term = n_term
+        self._c_term = c_term
+        self._mass += n_term.mass + c_term.mass
 
     def _initialize_fields(self):
         """Initialize all mutable fields to their default, empty values.
@@ -1073,7 +1081,10 @@ class NamedSequence(PeptideSequence):
 
     def __repr__(self):
         string = super(NamedSequence, self).__str__()
-        return ">%s\n%s" % (self.name, string)
+        name = str(self.name)
+        if name.startswith(">"):
+            name = name[1:]
+        return ">%s\n%s" % (name, string)
 
 
 class AnnotatedSequence(NamedSequence):
