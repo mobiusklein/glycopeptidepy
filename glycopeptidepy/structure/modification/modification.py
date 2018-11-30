@@ -94,4 +94,6 @@ class Modification(ModificationBase):
         return self.rule.get_fragments(*args, **kwargs)
 
 
+# Late bind the ModificationRule's modification_tp field to avoid
+# cyclic dependencies
 ModificationRule.modification_tp = Modification

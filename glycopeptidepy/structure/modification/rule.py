@@ -467,3 +467,17 @@ class AminoAcidSubstitution(AnonymousModificationRule):
 
     def __repr__(self):
         return "{name}:{delta}".format(**self.__dict__)
+
+
+TMT10plex = [
+    ('TMT10-126', 125.12044953),
+    ('TMT10-127N', 126.1174845),
+    ('TMT10-127C', 126.1238045),
+    ('TMT10-128N', 127.1208395),
+    ('TMT10-128C', 127.1271595),
+    ('TMT10-129N', 128.1241945),
+    ('TMT10-129C', 128.1305135),
+    ('TMT10-130N', 129.1275485),
+    ('TMT10-130C', 129.1338685),
+    ('TMT10-131', 130.13090353)
+]
