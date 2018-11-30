@@ -276,9 +276,10 @@ class GlycosylationManager(dict):
     def __init__(self, parent, aggregate=None):
         self.parent = parent
         self._aggregate = None
-        self.aggregate = aggregate
         self._proxy = None
         self._type_track = None
+        if aggregate is not None:
+            self.aggregate = aggregate
 
     def invalidate(self):
         self._proxy = None
