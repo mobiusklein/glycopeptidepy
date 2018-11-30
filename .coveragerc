@@ -3,6 +3,7 @@ plugins = Cython.Coverage
 omit = 
     */_vendor/*
     */data/*
+    */_modification.py
 
 [report]
 # Regexes for lines to exclude from consideration
