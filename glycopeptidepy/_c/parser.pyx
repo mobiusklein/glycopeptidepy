@@ -10,7 +10,12 @@ cdef object glycan_parser = FrozenGlycanComposition.parse
 from glycopeptidepy.structure import constants as structure_constants
 
 
-def sequence_tokenizer(str sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
+ctypedef fused sequence_encoded_t:
+    str
+    object
+
+
+def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     '''A simple stateful sequence parser implementing a formally context-free language
     describing components of a polypeptide sequence with N-, C- and internal modifications,
     as well as a glycan composition written at the end.
@@ -24,7 +29,8 @@ def sequence_tokenizer(str sequence, object implicit_n_term=None, object implici
     glycan: :class:`glypy.composition.glycan_composition.FrozenGlycanComposition`
     '''
     cdef:
-        str state, glycan, current_aa, current_mod, next_char
+        str state
+        sequence_encoded_t glycan, current_aa, current_mod, next_char
         list mods, chunks, current_mods
         int paren_level, i, n
 
@@ -158,3 +164,6 @@ def sequence_tokenizer(str sequence, object implicit_n_term=None, object implici
             pass
 
     return chunks, mods, glycan, n_term, c_term
+
+sequence_tokenizer = _sequence_tokenizer[object]
+str_sequence_tokenizer = _sequence_tokenizer[str]

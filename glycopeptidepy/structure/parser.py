@@ -154,6 +154,13 @@ def sequence_tokenizer(sequence, implicit_n_term=None, implicit_c_term=None, gly
     return chunks, mods, glycan, n_term, c_term
 
 
+try:
+    _sequence_tokenizer = sequence_tokenizer
+    from glycopeptidepy._c.parser import sequence_tokenizer
+except ImportError:
+    pass
+
+
 def prefix_to_postfix_modifications(sequence):
     '''Transform a chunk-list from modification-on-the-left to
     modification-on-the-right association rules.

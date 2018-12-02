@@ -77,3 +77,10 @@ class _AccumulatorBag(Mapping):
 
     def __repr__(self):
         return "_AccumulatorBag(%r)" % dict(self.store)
+
+
+try:
+    _descending_combination_counter = descending_combination_counter
+    from glycopeptidepy._c.collectiontools import descending_combination_counter
+except ImportError:
+    has_c = False
