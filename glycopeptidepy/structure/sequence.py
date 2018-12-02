@@ -301,8 +301,6 @@ class PeptideSequence(PeptideSequenceBase):
     ----------
     sequence: list
         The underlying container for positions in the amino acid sequence
-    modification_index: ModificationIndex
-        A count of different modifications attached to the amino acid sequence
     n_term: :class:`TerminalGroup`
     c_term: :class:`TerminalGroup`
         Terminal modifications (N-terminus and C-terminus respectively) which
@@ -337,9 +335,10 @@ class PeptideSequence(PeptideSequenceBase):
     def _init_from_parsed_string(self, seq_list, glycan=None, n_term=None, c_term=None, **kwargs):
         i = 0
         self.sequence = [None for _ in seq_list]
+        mass = 0
         for item in seq_list:
-            res = Residue(item[0])
-            self.mass += res.mass
+            res = Residue.parse(item[0])
+            mass += res.mass
             mods = []
             for mod in item[1]:
                 if mod != '':
@@ -347,11 +346,10 @@ class PeptideSequence(PeptideSequenceBase):
                     if mod.is_tracked_for(ModificationCategory.glycosylation):
                         self._glycosylation_manager[i] = mod
                     mods.append(mod)
-                    self.modification_index[mod] += 1
-                    self.mass += mod.mass
+                    mass += mod.mass
             self.sequence[i] = self.position_class([res, mods])
             i += 1
-
+        self.mass = mass
         has_glycan = glycan != "" and glycan is not None
         if has_glycan:
             self._glycosylation_manager.aggregate = glycan.clone()
@@ -412,7 +410,6 @@ class PeptideSequence(PeptideSequenceBase):
             for mod in mods:
                 if mod.is_tracked_for(ModificationCategory.glycosylation):
                     self._glycosylation_manager[i] = mod
-                self.modification_index[mod] += 1
                 mass += mod.mass
             self.sequence[i] = self.position_class([res, list(mods)])
             i += 1
@@ -433,7 +430,6 @@ class PeptideSequence(PeptideSequenceBase):
         """
         self._mass = 0.0
         self.sequence = []
-        self.modification_index = ModificationIndex()
         self._fragment_index = None
         self._glycan = None
         self._glycan_composition = None
@@ -694,7 +690,6 @@ class PeptideSequence(PeptideSequenceBase):
         try:
             drop_mod = self.sequence[position][1].pop(dropped_index)
             self.mass -= drop_mod.mass
-            self.modification_index[drop_mod.name] -= 1
             if drop_mod.is_tracked_for(ModificationCategory.glycosylation):
                 self._glycosylation_manager.pop(position)
         except (IndexError, ValueError):
@@ -722,7 +717,6 @@ class PeptideSequence(PeptideSequenceBase):
 
             self.sequence[position][1].append(mod)
             self.mass += mod.mass
-            self.modification_index[mod.name] += 1
             if mod.is_tracked_for(ModificationCategory.glycosylation):
                 self._glycosylation_manager[position] = mod
 
@@ -850,7 +844,6 @@ class PeptideSequence(PeptideSequenceBase):
         else:
             next_pos.append([modification])
             self.mass += modification.mass
-            self.modification_index[modification.name] += 1
         self.sequence.append(self.position_class(next_pos))
         self._retrack_sequence()
 
@@ -860,8 +853,6 @@ class PeptideSequence(PeptideSequenceBase):
             sequence = PeptideSequence(sequence)
         self.sequence.extend(sequence.sequence)
         self.mass += sequence.mass - sequence.n_term.mass - sequence.c_term.mass
-        for mod, count in sequence.modification_index.items():
-            self.modification_index[mod] += count
         self._retrack_sequence()
 
     def leading_extend(self, sequence):
@@ -870,8 +861,6 @@ class PeptideSequence(PeptideSequenceBase):
             sequence = PeptideSequence(sequence)
         self.sequence = sequence.sequence + self.sequence
         self.mass += sequence.mass - sequence.n_term.mass - sequence.c_term.mass
-        for mod, count in sequence.modification_index.items():
-            self.modification_index[mod] += count
         self._retrack_sequence()
 
     @property
@@ -993,7 +982,7 @@ class PeptideSequence(PeptideSequenceBase):
                 yield f
 
         elif allow_ambiguous and all_series:
-            if self.modification_index[_n_glycosylation] > 0:
+            if self.glycosylation_manager.count_glycosylation_type(GlycosylationType.n_linked) > 0:
                 _offset = Composition()
                 total = (self.glycan_composition).clone()
                 total_count = sum(total.values())
