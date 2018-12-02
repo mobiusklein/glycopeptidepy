@@ -151,30 +151,39 @@ class MemoizedResidueMetaclass(type):
     '''
 
     def __call__(self, symbol=None, name=None, *args, **kwargs):
-        if not hasattr(self, "_cache"):
-            self._cache = dict()
+        try:
+            cache = self._cache
+        except AttributeError:
+            cache = self._cache = dict()
         try:
             if symbol is not None:
-                return self._cache[symbol]
+                return cache[symbol]
             elif name is not None:
-                return self._cache[name]
+                return cache[name]
             else:
                 raise Exception("Must provide a symbol or name parameter")
         except KeyError:
             if symbol is not None:
                 inst = type.__call__(self, symbol=symbol, *args, **kwargs)
-                self._cache[inst.symbol] = inst
-                self._cache[inst.name] = inst
+                cache[inst.symbol] = inst
+                cache[inst.name] = inst
                 return inst
 
             elif name is not None:
                 inst = type.__call__(self, name=name, *args, **kwargs)
-                self._cache[inst.symbol] = inst
-                self._cache[inst.name] = inst
+                cache[inst.symbol] = inst
+                cache[inst.name] = inst
                 return inst
             else:
                 raise UnknownAminoAcidException(
                     "Cannot find a AminoAcidResidue for %r" % ((symbol, name),))
+
+    def parse(self, symbol):
+        try:
+            cache = self._cache
+            return cache[symbol]
+        except (AttributeError, KeyError):
+            return self(symbol)
 
 
 @add_metaclass(MemoizedResidueMetaclass)

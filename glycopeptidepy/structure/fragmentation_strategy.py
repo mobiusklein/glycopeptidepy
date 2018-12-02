@@ -328,6 +328,25 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                 is_extended=is_extended)
 
     def n_glycan_composition_fragments(self, glycan, core_count=1, iteration_count=0):
+        """Generate theoretical N-glycan Y fragment compositions containing the core motif
+        plus a portion of the extended branches if :attr:`extended` is used. Unless :attr:`extend
+
+        Parameters
+        ----------
+        glycan : :class:`~.GlycanComposition`
+            Description
+        core_count : int, optional
+            The total number of glycans attached to the peptide
+        iteration_count : int, optional
+            The core index. Unless :attr:`extended_fucosylation` is true, this will
+            limit the number of Fucose residues to one per core at most, and if
+            the iteration count exceeds the number of cores no Fucose will be added
+
+        Returns
+        -------
+        list of dict
+            The compositions corresponding to the theoretical fragments
+        """
         hexose = self.hexose
         hexnac = self.hexnac
 
@@ -373,12 +392,13 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                 }
                 core_shifts.append(shift)
 
-                if not self.extended_fucosylation and iteration_count < fucose_count:
-                    fucosylated = self.fucosylate_increment(shift)
-                    core_shifts.append(fucosylated)
-                    if iteration_count < xylose_count:
-                        xylosylated = self.xylosylate_increment(fucosylated)
-                        core_shifts.append(xylosylated)
+                if not self.extended_fucosylation:
+                    if iteration_count < fucose_count:
+                        fucosylated = self.fucosylate_increment(shift)
+                        core_shifts.append(fucosylated)
+                        if iteration_count < xylose_count:
+                            xylosylated = self.xylosylate_increment(fucosylated)
+                            core_shifts.append(xylosylated)
                 elif fucose_count > 0:
                     core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
                     if iteration_count < xylose_count:
@@ -399,12 +419,13 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                     }
                     core_shifts.append(shift)
 
-                    if not self.extended_fucosylation and iteration_count < fucose_count:
-                        fucosylated = self.fucosylate_increment(shift)
-                        core_shifts.append(fucosylated)
-                        if iteration_count < xylose_count:
-                            xylosylated = self.xylosylate_increment(fucosylated)
-                            core_shifts.append(xylosylated)
+                    if not self.extended_fucosylation:
+                        if iteration_count < fucose_count:
+                            fucosylated = self.fucosylate_increment(shift)
+                            core_shifts.append(fucosylated)
+                            if iteration_count < xylose_count:
+                                xylosylated = self.xylosylate_increment(fucosylated)
+                                core_shifts.append(xylosylated)
                     elif fucose_count > 0:
                         core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
                         if iteration_count < xylose_count:
@@ -435,12 +456,13 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                                 }
                                 core_shifts.append(shift)
 
-                                if not self.extended_fucosylation and iteration_count < fucose_count:
-                                    fucosylated = self.fucosylate_increment(shift)
-                                    core_shifts.append(fucosylated)
-                                    if iteration_count < xylose_count:
-                                        xylosylated = self.xylosylate_increment(fucosylated)
-                                        core_shifts.append(xylosylated)
+                                if not self.extended_fucosylation:
+                                    if iteration_count < fucose_count:
+                                        fucosylated = self.fucosylate_increment(shift)
+                                        core_shifts.append(fucosylated)
+                                        if iteration_count < xylose_count:
+                                            xylosylated = self.xylosylate_increment(fucosylated)
+                                            core_shifts.append(xylosylated)
                                 elif fucose_count > 0:
                                     core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
 
@@ -464,12 +486,13 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                                 }
                                 core_shifts.append(shift)
 
-                                if not self.extended_fucosylation and iteration_count < fucose_count:
-                                    fucosylated = self.fucosylate_increment(shift)
-                                    core_shifts.append(fucosylated)
-                                    if iteration_count < xylose_count:
-                                        xylosylated = self.xylosylate_increment(fucosylated)
-                                        core_shifts.append(xylosylated)
+                                if not self.extended_fucosylation:
+                                    if iteration_count < fucose_count:
+                                        fucosylated = self.fucosylate_increment(shift)
+                                        core_shifts.append(fucosylated)
+                                        if iteration_count < xylose_count:
+                                            xylosylated = self.xylosylate_increment(fucosylated)
+                                            core_shifts.append(xylosylated)
                                 elif fucose_count > 0:
                                     core_shifts.extend(self.fucosylate_extended(shift, fucose_count))
                                     if iteration_count < xylose_count:
@@ -919,10 +942,15 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         k: k.composition for k in modifications_of_interest
     }
 
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1):
+        super(HCDFragmentationStrategy, self).__init__(peptide, series, chemical_shifts, max_chemical_shifts)
+        self._last_modification_set = None
+        self._last_modification_variants = None
+
     def _get_core_for(self, glycosylation):
         try:
             if not glycosylation.rule.is_core:
-                glycosylation = glycosylation_type_to_core[glycosylation.rule.glycosylation_type]
+                glycosylation = glycosylation_type_to_core[glycosylation.rule.glycosylation_type]()
             return glycosylation
         except KeyError:
             raise ValueError("Cannot determine which core to use for {}".format(
@@ -948,14 +976,18 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
     def _get_modifications_of_interest(self, fragment):
         modifications = dict(fragment.modification_dict)
-        modifications_of_interest = defaultdict(
-            int, {k: v for k, v in modifications.items()
-                  if k in self.modifications_of_interest})
-        delta_composition = sum(
-            (self.modification_compositions[k] * v
-             for k, v in modifications_of_interest.items()),
-            Composition())
-        return modifications_of_interest, delta_composition
+        delta_composition = Composition()
+        other_modifications = dict()
+        modifications_of_interest = defaultdict(int)
+
+        for k, v in modifications.items():
+            if k.rule in self.modifications_of_interest:
+                modifications_of_interest[k] = v
+                delta_composition += self.modification_compositions[k.rule] * v
+            else:
+                other_modifications[k] = v
+
+        return modifications_of_interest, delta_composition, other_modifications
 
     def _replace_cores(self, modifications_of_interest):
         n_cores = modifications_of_interest.pop(_n_glycosylation, 0)
@@ -981,18 +1013,24 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
     def partial_loss(self, fragment):
         (modifications_of_interest,
-         delta_composition) = self._get_modifications_of_interest(fragment)
+         delta_composition,
+         other_modifications) = self._get_modifications_of_interest(fragment)
+
         base_composition = fragment.composition - delta_composition
+
         self._replace_cores(modifications_of_interest)
-        other_modifications = {
-            k: v for k, v in fragment.modification_dict.items()
-            if k not in self.modifications_of_interest
-        }
-        for updated_modifications, extra_composition in self._generate_modification_variants(
-                modifications_of_interest, other_modifications):
+
+        if (modifications_of_interest, other_modifications) == self._last_modification_set:
+            variants = self._last_modification_variants
+        else:
+            variants = list(self._generate_modification_variants(modifications_of_interest, other_modifications))
+            self._last_modification_set = modifications_of_interest, other_modifications
+            self._last_modification_variants = variants
+
+        series = fragment.series
+        for updated_modifications, extra_composition in variants:
             yield PeptideFragment(
-                fragment.series, fragment.position, dict(updated_modifications), fragment.bare_mass,
-                golden_pairs=fragment.golden_pairs,
+                series, fragment.position, dict(updated_modifications), fragment.bare_mass,
                 flanking_amino_acids=fragment.flanking_amino_acids,
                 composition=base_composition + extra_composition)
 
@@ -1084,7 +1122,6 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
         bare_fragment = PeptideFragment(
             fragment.series, fragment.position, dict(stripped_modifications),
             fragment.bare_mass,
-            golden_pairs=fragment.golden_pairs,
             flanking_amino_acids=fragment.flanking_amino_acids,
             composition=base_composition.clone())
 
@@ -1108,7 +1145,6 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
             extended_fragment = PeptideFragment(
                 bare_fragment.series, bare_fragment.position, new_modifications,
                 bare_fragment.bare_mass,
-                golden_pairs=bare_fragment.golden_pairs,
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
                 composition=bare_fragment.composition + delta_composition)
             yield extended_fragment

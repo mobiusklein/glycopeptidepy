@@ -59,7 +59,13 @@ def format_negative_composition(composition):
     return "-%s" % formula({k: -v for k, v in composition.items()})
 
 
-class ChemicalShift(object):
+try:
+    from glycopeptidepy._c.structure.fragment import ChemicalShiftBase as _ChemicalShiftBase
+except ImportError:
+    _ChemicalShiftBase = object
+
+
+class ChemicalShift(_ChemicalShiftBase):
     def __init__(self, name, composition=None):
         if composition is None:
             composition = generic_chemical_shifts_composition[name]
@@ -177,14 +183,12 @@ class PeptideFragment(FragmentBase):
          _modification_xylose])
 
     __slots__ = ("kind", "position", "modification_dict", "bare_mass",
-                 "golden_pairs", "flanking_amino_acids", "glycosylation",
+                 "flanking_amino_acids", "glycosylation",
                  "_chemical_shift", "composition", 'mass')
 
-    def __init__(self, kind, position, modification_dict, mass, golden_pairs=None,
+    def __init__(self, kind, position, modification_dict, mass,
                  flanking_amino_acids=None, glycosylation=None, chemical_shift=None,
                  composition=None):
-        if golden_pairs is None:
-            golden_pairs = []
         self.kind = kind
 
         # The mass value is the bare backbone's mass
@@ -199,7 +203,6 @@ class PeptideFragment(FragmentBase):
         self.flanking_amino_acids = flanking_amino_acids
         self.position = position
 
-        self.golden_pairs = golden_pairs
         self.glycosylation = glycosylation
         self.chemical_shift = chemical_shift
 
@@ -208,8 +211,9 @@ class PeptideFragment(FragmentBase):
     def _update_mass_with_modifications(self):
         for key, value in self.modification_dict.items():
             self.mass += (key).mass * value
-        if self.chemical_shift is not None:
-            self.mass += self.chemical_shift.mass
+        chemical_shift = self.get_chemical_shift()
+        if chemical_shift is not None:
+            self.mass += chemical_shift.mass
 
     def get_series(self):
         return self.kind
@@ -217,7 +221,7 @@ class PeptideFragment(FragmentBase):
     def clone(self):
         return self.__class__(
             self.series, self.position, dict(self.modification_dict),
-            self.bare_mass, self.golden_pairs, tuple(
+            self.bare_mass, tuple(
                 self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,
@@ -233,7 +237,7 @@ class PeptideFragment(FragmentBase):
     def __reduce__(self):
         return self.__class__, (
             self.kind, self.position, self.modification_dict, self.bare_mass,
-            self.golden_pairs, self.flanking_amino_acids, self.glycosylation,
+            self.flanking_amino_acids, self.glycosylation,
             self.chemical_shift, self.composition)
 
     def base_name(self):
@@ -290,6 +294,14 @@ class PeptideFragment(FragmentBase):
             "modification_dict": self.modification_dict, "flanking_amino_acids": self.flanking_amino_acids,
             "chemical_shift": self.chemical_shift
         }
+
+
+# try:
+#     _PeptideFragment = PeptideFragment
+#     from glycopeptidepy._c.structure.fragment import PeptideFragment as _CPeptideFragment
+#     PeptideFragment = _CPeptideFragment
+# except ImportError:
+#     pass
 
 
 class SimpleFragment(FragmentBase):
@@ -385,8 +397,14 @@ class MemoizedIonSeriesMetaclass(type):
                 raise KeyError("Cannot find an IonSeries for %r" % (name))
 
 
+try:
+    from glycopeptidepy._c.structure.fragment import IonSeriesBase as _IonSeriesBase
+except ImportError:
+    _IonSeriesBase = object
+
+
 @add_metaclass(MemoizedIonSeriesMetaclass)
-class IonSeries(object):
+class IonSeries(_IonSeriesBase):
 
     @classmethod
     def get(cls, name):

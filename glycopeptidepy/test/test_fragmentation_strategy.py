@@ -31,6 +31,13 @@ class StubGlycopeptideStrategyTest(unittest.TestCase):
                 fucosylated.append(frag)
         assert fucosylated
 
+    def test_fucosylation_mechanism_limited(self):
+        gp = sequence.PeptideSequence("VLGFKPKPPKN(N-Glycosylation)ESLETYPLMMK{Fuc:2; Hex:8; HexNAc:6; Neu5Ac:4}")
+        strategy = fragmentation_strategy.StubGlycopeptideStrategy(gp, extended=True)
+        assert len(strategy.n_glycan_composition_fragments(strategy.glycan_composition(), 1, 0)) == 69
+        assert len(strategy.n_glycan_composition_fragments(strategy.glycan_composition(), 1, 1)) == 69
+        assert len(strategy.n_glycan_composition_fragments(strategy.glycan_composition(), 1, 2)) == 35
+
 
 if __name__ == '__main__':
     unittest.main()
