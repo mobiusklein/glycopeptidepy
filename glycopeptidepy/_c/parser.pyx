@@ -15,7 +15,16 @@ ctypedef fused sequence_encoded_t:
     object
 
 
-def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
+cdef enum ParserState:
+    start,
+    n_term,
+    aa,
+    mod,
+    c_term,
+
+
+
+cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     '''A simple stateful sequence parser implementing a formally context-free language
     describing components of a polypeptide sequence with N-, C- and internal modifications,
     as well as a glycan composition written at the end.
@@ -29,15 +38,16 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
     glycan: :class:`glypy.composition.glycan_composition.FrozenGlycanComposition`
     '''
     cdef:
-        str state
-        sequence_encoded_t glycan, current_aa, current_mod, next_char
+        ParserState state
+        sequence_encoded_t current_aa, current_mod, next_char
+        object glycan
         list mods, chunks, current_mods
         int paren_level, i, n
 
     if glycan_parser_function is None:
         glycan_parser_function = glycan_parser
 
-    state = "start"  # [start, n_term, aa, mod, c_term]
+    state = ParserState.start  # [start, n_term, aa, mod, c_term]
     n_term = implicit_n_term or structure_constants.N_TERM_DEFAULT
     c_term = implicit_c_term or structure_constants.C_TERM_DEFAULT
     mods = []
@@ -55,23 +65,23 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
         # Transition from aa to mod when encountering the start of a modification
         # internal to the sequence
         if next_char == "(":
-            if state == "aa":
-                state = "mod"
+            if state == ParserState.aa:
+                state = ParserState.mod
                 assert paren_level == 0
                 paren_level += 1
 
             # Transition to n_term when starting on an open parenthesis
-            elif state == "start":
-                state = "n_term"
+            elif state == ParserState.start:
+                state = ParserState.n_term
                 paren_level += 1
 
             else:
                 paren_level += 1
-                if not (state in {"n_term", "c_term"} and paren_level == 1):
+                if not (state in {ParserState.n_term, ParserState.c_term} and paren_level == 1):
                     current_mod += next_char
 
         elif next_char == ")":
-            if state == "aa":
+            if state == ParserState.aa:
                 raise Exception(
                     "Invalid Sequence. ) found outside of modification, Position {0}. {1}".format(i, sequence))
             else:
@@ -79,8 +89,8 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
                 if paren_level == 0:
                     mods.append(current_mod)
                     current_mods.append(current_mod)
-                    if state == "mod":
-                        state = 'aa'
+                    if state == ParserState.mod:
+                        state = ParserState.aa
                         # If we encounter multiple modifications in separate parentheses
                         # in a row, attach them to the previous position
                         if current_aa == "":
@@ -88,16 +98,16 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
                         else:
                             chunks.append([current_aa, current_mods])
 
-                    elif state == "n_term":
+                    elif state == ParserState.n_term:
                         if sequence[i + 1] != "-":
                             raise Exception("Malformed N-terminus for " + sequence)
                         # Only one modification on termini
                         n_term = current_mod
-                        state = "aa"
+                        state = ParserState.aa
                         # Jump ahead past - into the amino acid sequence
                         i += 1
 
-                    elif state == "c_term":
+                    elif state == ParserState.c_term:
                         # Only one modification on termini
                         c_term = current_mod
 
@@ -108,7 +118,7 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
                     current_mod += next_char
 
         elif next_char == "|":
-            if state == "aa":
+            if state == ParserState.aa:
                 raise Exception("Invalid Sequence. | found outside of modification")
             else:
                 current_mods.append(current_mod)
@@ -116,15 +126,15 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
                 current_mod = ""
 
         elif next_char == "{":
-            if (state == 'aa' or (state == "c_term" and paren_level == 0)):
+            if (state == ParserState.aa or (state == ParserState.c_term and paren_level == 0)):
                 glycan = sequence[i:]
                 break
-            elif (state in {"mod", "n_term", "c_term"}) and paren_level > 0:
+            elif (state in {ParserState.mod, ParserState.n_term, ParserState.c_term}) and paren_level > 0:
                 current_mod += next_char
 
         elif next_char == "-":
-            if state == "aa":
-                state = "c_term"
+            if state == ParserState.aa:
+                state = ParserState.c_term
                 if(current_aa != ""):
                     current_mods.append(current_mod)
                     chunks.append([current_aa, current_mods])
@@ -134,10 +144,10 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
             else:
                 current_mod += next_char
 
-        elif state == "start":
-            state = "aa"
+        elif state == ParserState.start:
+            state = ParserState.aa
             current_aa = next_char
-        elif state == "aa":
+        elif state == ParserState.aa:
             if(current_aa != ""):
                 current_mods.append(current_mod)
                 chunks.append([current_aa, current_mods])
@@ -145,7 +155,7 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
                 current_mods = []
                 current_aa = ""
             current_aa = next_char
-        elif state in {"n_term", "mod", "c_term"}:
+        elif state in {ParserState.n_term, ParserState.mod, ParserState.c_term}:
             current_mod += next_char
         else:
             raise Exception(
@@ -161,9 +171,12 @@ def _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None
         try:
             glycan = glycan_parser_function(glycan)
         except Exception as e:
-            pass
+            print(e, glycan)
 
     return chunks, mods, glycan, n_term, c_term
 
-sequence_tokenizer = _sequence_tokenizer[object]
-str_sequence_tokenizer = _sequence_tokenizer[str]
+
+def sequence_tokenizer(object sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
+    if isinstance(sequence, str):
+        return _sequence_tokenizer[str](<str>sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
+    return _sequence_tokenizer[object](sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
