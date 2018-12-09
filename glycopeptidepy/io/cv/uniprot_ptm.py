@@ -1,5 +1,9 @@
 import re
-from glycopeptidepy.structure.modification import ModificationRule
+from glycopeptidepy.structure.residue import long_to_symbol
+from glycopeptidepy.structure.modification import (
+    ModificationRule,
+    ModificationTarget,
+    SequenceLocation)
 from glypy import Composition
 
 
@@ -32,12 +36,30 @@ class UniProtPTMListParser(object):  # pragma: no cover
             counts[symbol] = count
         return Composition(counts)
 
+    def _translate_position(self, position):
+        t = {
+            'Anywhere': SequenceLocation.anywhere,
+            'N-terminal': SequenceLocation.n_term,
+            'C-terminal': SequenceLocation.c_term
+        }
+        return t.get(position, 'Anywhere')
+
+    def _translate_amino_acid(self, target):
+        try:
+            symbol = long_to_symbol[target]
+        except KeyError:
+            return None
+        return symbol
+
     def parse_entry(self):
         ptm_id = None
         accession = None
         # feature_key = None
         mass_difference = None
         correction_formula = None
+        target = None
+        position = None
+
         keywords = []
         crossref = []
         while True:
@@ -49,6 +71,10 @@ class UniProtPTMListParser(object):  # pragma: no cover
             elif typecode == "FT":
                 # feature_key = line
                 pass
+            elif typecode == 'TG':
+                target = self._translate_amino_acid(line.strip("."))
+            elif typecode == 'PP':
+                position = self._translate_position(line.strip('.'))
             elif typecode == "CF":
                 correction_formula = self._formula_parser(line)
             elif typecode == "MM":
@@ -56,14 +82,16 @@ class UniProtPTMListParser(object):  # pragma: no cover
             elif typecode == "KW":
                 keywords.append(line.strip("."))
             elif typecode == "DR":
-                crossref.append(line.strip('.'))
+                crossref.append(':'.join(line.strip('.').split("; ")))
             elif typecode == "//":
                 break
         if mass_difference is None or correction_formula is None:
             return None
+        mod_target = ModificationTarget([target] if target else None, position)
         rule = ModificationRule(
-            [], ptm_id, monoisotopic_mass=mass_difference, composition=correction_formula,
-            alt_names={accession}, categories=keywords)
+            [mod_target], ptm_id, monoisotopic_mass=mass_difference, composition=correction_formula,
+            alt_names={accession} | set(crossref), categories=keywords)
+        rule.preferred_name = ptm_id
         return rule
 
     def build_table(self):

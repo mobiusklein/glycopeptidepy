@@ -416,7 +416,7 @@ class FastaFileReader(object):
         except (AttributeError, ValueError, TypeError) as ex:
             print(ex)
             pos = None
-        indexer = FastaIndexer(encoding=self.encoding)
+        indexer = FastaIndexer(encoding=self.encoding, defline_parser=self.defline_parser)
         index = indexer.build_index(self.handle)
         if pos is not None:
             self.handle.seek(pos)
@@ -433,7 +433,10 @@ class FastaFileReader(object):
                 self.handle.seek(0)
             except (AttributeError, ValueError, TypeError):
                 pos = None
-            start, end = self.index[key]
+            if isinstance(key, int):
+                start, end = self.index.values()[key]
+            else:
+                start, end = self.index[key]
             self.handle.seek(start)
             data = self.handle.read(end - start)
             value = next(self._parse_lines(BytesIO(data)))
@@ -485,10 +488,10 @@ class FastaFileReader(object):
                         try:
                             yield self.process_result({
                                 "name": self.defline_parser(defline),
-                                "sequence": ''.join(sequence_chunks)
+                                "sequence": ''.join(sequence_chunks).replace(" ", "")
                             })
                         except KeyError as e:
-                            warnings.warn(e)
+                            warnings.warn(str(e))
                             pass
                     sequence_chunks = []
                     defline = None
@@ -502,9 +505,10 @@ class FastaFileReader(object):
                 yield self.process_result(
                     {
                         "name": self.defline_parser(defline),
-                        "sequence": ''.join(sequence_chunks)
+                        "sequence": ''.join(sequence_chunks).replace(" ", "")
                     })
             except KeyError as e:
+                warnings.warn(str(e))
                 pass
 
 
@@ -805,33 +809,11 @@ class FastaIndex(object):
         matches = []
         for key in self.keys():
             for k, v in queries:
-                if key[k] != v:
+                try:
+                    if key[k] != v:
+                        break
+                except KeyError:
                     break
             else:
                 matches.append(key)
         return matches
-
-
-class _UniprotToPeffConverter(object):
-
-    feature_to_peff_term = {
-        'signal peptide': ('Processed', 'PEFF:0001021'),
-        'mature protein': ('Processed', 'PEFF:0001020'),
-        "transit peptide": ('Processed', 'PEFF:0001022'),
-        # 'peptide': ('Processed', ),
-        'propeptide': ('Processed', 'PEFF:0001034'),
-    }
-
-    def __call__(self, record):
-        features = defaultdict(list)
-        features['Prefix'] = 'sp'
-        features['Tag'] = record.accessions[0]
-        features['PName'] = record.recommended_name
-        for feature in record.features:
-            try:
-                key = self.feature_to_peff_term[feature.feature_type]
-                features[key].append(PEFFFeature(feature.start + 1, feature.end, feature.feature_type))
-            except KeyError:
-                continue
-        header = PEFFFastaHeader(dict(features))
-        return ProteinSequence(header, record.sequence)

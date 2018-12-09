@@ -157,6 +157,10 @@ class Domain(UniProtFeatureBase):
     def name(self, value):
         self._name = value
 
+    @property
+    def description(self):
+        return self.name
+
 
 class RegionOfInterest(Domain):
     feature_type = 'region of interest'
@@ -199,12 +203,57 @@ class ModifiedResidue(UniProtFeatureBase):
         self.position = position
         self.modification = modification
 
+    @property
+    def name(self):
+        return self.modification
+
+    @property
+    def description(self):
+        return self.modification
+
+    @property
+    def start(self):
+        return self.position
+
+    @property
+    def end(self):
+        return self.position + 1
+
     @classmethod
     def fromxml(cls, feature):
         return cls(
             int(feature.find(
                 ".//up:position", nsmap).attrib['position']) - 1,
             feature.attrib["description"])
+
+
+class SequenceVariant(UniProtFeatureBase):
+    feature_type = "sequence variant"
+
+    def __init__(self, position, original, variation):
+        self.position = position
+        self.original = original
+        self.variation = variation
+
+    @property
+    def start(self):
+        return self.position
+
+    @property
+    def end(self):
+        return self.position + 1
+
+    @classmethod
+    def fromxml(cls, feature):
+        position = int(feature.find(
+            ".//up:position", nsmap).attrib['position']) - 1
+        original = feature.find(".//up:original", nsmap).text
+        variation = feature.find(".//up:variation", nsmap).text
+        return cls(position, original, variation)
+
+    @property
+    def description(self):
+        return "%s->%s" % (self.original, self.variation)
 
 
 class Site(Domain):
@@ -245,8 +294,12 @@ UniProtProtein = make_struct("UniProtProtein", (
 
 
 def get_etree_for(accession):
-    tree = etree.parse(urlopen(uri_template.format(accession=accession)))
+    tree = etree.parse(_open_url_for(accession))
     return tree
+
+
+def _open_url_for(accession):
+    return urlopen(uri_template.format(accession=accession))
 
 
 def parse(tree, error=False):
@@ -294,7 +347,7 @@ def parse(tree, error=False):
             if error:
                 raise
             else:
-                warnings.warn("An exception %s occurred while parsing feature type %s" % (e, feature_type))
+                warnings.warn("An exception %r occurred while parsing feature type %s" % (e, feature_type))
     keywords = set()
     for kw in tree.findall(".//up:keyword", nsmap):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
