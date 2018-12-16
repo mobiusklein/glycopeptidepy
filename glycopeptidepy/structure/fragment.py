@@ -296,12 +296,12 @@ class PeptideFragment(FragmentBase):
         }
 
 
-# try:
-#     _PeptideFragment = PeptideFragment
-#     from glycopeptidepy._c.structure.fragment import PeptideFragment as _CPeptideFragment
-#     PeptideFragment = _CPeptideFragment
-# except ImportError:
-#     pass
+try:
+    _PeptideFragment = PeptideFragment
+    from glycopeptidepy._c.structure.fragment import PeptideFragment as _CPeptideFragment
+    PeptideFragment = _CPeptideFragment
+except ImportError:
+    pass
 
 
 class SimpleFragment(FragmentBase):

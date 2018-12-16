@@ -1027,7 +1027,7 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             self._last_modification_set = modifications_of_interest, other_modifications
             self._last_modification_variants = variants
 
-        series = fragment.series
+        series = self.series
         for updated_modifications, extra_composition in variants:
             yield PeptideFragment(
                 series, fragment.position, dict(updated_modifications), fragment.bare_mass,
