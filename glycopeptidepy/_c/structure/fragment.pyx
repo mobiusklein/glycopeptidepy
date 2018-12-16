@@ -179,7 +179,7 @@ cdef class PeptideFragment(FragmentBase):
     cpdef clone(self):
         return self.__class__(
             self.series, self.position, dict(self.modification_dict),
-            self.bare_mass, tuple(
+            self.bare_mass, list(
                 self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,

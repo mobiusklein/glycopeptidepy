@@ -930,16 +930,16 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
 
 class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
-    modifications_of_interest = set([
+    modifications_of_interest = {k.name: k for k in ([
         _n_glycosylation,
         _modification_hexnac,
         _o_glycosylation,
         _gag_linker_glycosylation,
         _modification_xylose
-    ])
+    ])}
 
     modification_compositions = {
-        k: k.composition for k in modifications_of_interest
+        k.name: k.composition for k in modifications_of_interest.values()
     }
 
     def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1):
@@ -981,9 +981,9 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         modifications_of_interest = defaultdict(int)
 
         for k, v in modifications.items():
-            if k.rule in self.modifications_of_interest:
+            if k.name in self.modifications_of_interest:
                 modifications_of_interest[k] = v
-                delta_composition += self.modification_compositions[k.rule] * v
+                delta_composition += self.modification_compositions[k.name] * v
             else:
                 other_modifications[k] = v
 
@@ -996,20 +996,26 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
         # Convert core glycosylation into the residual monosaccharides remaining
         # after dissociation
-        modifications_of_interest[_modification_hexnac] += n_cores * 2 + o_cores
-        modifications_of_interest[_modification_xylose] += gag_cores
+        hexnac_cores = n_cores * 2 + o_cores
+        if hexnac_cores:
+            modifications_of_interest[_modification_hexnac] += hexnac_cores
+        if gag_cores:
+            modifications_of_interest[_modification_xylose] += gag_cores
         return modifications_of_interest
 
     def _generate_modification_variants(self, interesting_modifications, other_modifications):
+        variants = []
         for varied_modifications in descending_combination_counter(interesting_modifications):
-            updated_modifications = other_modifications.copy()
-            updated_modifications.update(
-                {k: v for k, v in varied_modifications.items() if v != 0})
+            updated_modifications = ModificationIndex(other_modifications)
+            for k, v in varied_modifications.items():
+                if v != 0:
+                    updated_modifications[k] += v
 
             extra_composition = Composition()
             for mod, mod_count in varied_modifications.items():
-                extra_composition += self.modification_compositions[mod] * mod_count
-            yield updated_modifications, extra_composition
+                extra_composition += self.modification_compositions[mod.name] * mod_count
+            variants.append((updated_modifications, extra_composition))
+        return variants
 
     def partial_loss(self, fragment):
         (modifications_of_interest,
@@ -1023,16 +1029,19 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         if (modifications_of_interest, other_modifications) == self._last_modification_set:
             variants = self._last_modification_variants
         else:
-            variants = list(self._generate_modification_variants(modifications_of_interest, other_modifications))
             self._last_modification_set = modifications_of_interest, other_modifications
-            self._last_modification_variants = variants
+            variants = self._last_modification_variants = self._generate_modification_variants(
+                modifications_of_interest, other_modifications)
 
         series = self.series
+        fragments = []
         for updated_modifications, extra_composition in variants:
-            yield PeptideFragment(
-                series, fragment.position, dict(updated_modifications), fragment.bare_mass,
-                flanking_amino_acids=fragment.flanking_amino_acids,
-                composition=base_composition + extra_composition)
+            fragments.append(
+                PeptideFragment(
+                    series, fragment.position, dict(updated_modifications), fragment.bare_mass,
+                    flanking_amino_acids=fragment.flanking_amino_acids,
+                    composition=base_composition + extra_composition))
+        return fragments
 
 
 # Cooper, H. J., Hudgins, R. R., Håkansson, K., & Marshall, A. G. (2002).
