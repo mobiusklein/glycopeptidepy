@@ -43,11 +43,13 @@ def make_extensions():
         extensions = cythonize([
             Extension("glycopeptidepy._c.collectiontools", sources=['glycopeptidepy/_c/collectiontools.pyx']),
             Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.pyx']),
+            Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/fragment.pyx']),
         ], compiler_directives=cython_directives, force=force_cythonize)
     except ImportError:
         extensions = [
             Extension("glycopeptidepy._c.collectiontools", sources=['glycopeptidepy/_c/collectiontools.c']),
             Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.c']),
+            Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/fragment.c']),
         ]
     return extensions
 
