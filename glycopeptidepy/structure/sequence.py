@@ -879,8 +879,10 @@ class PeptideSequence(PeptideSequenceBase):
     def glycosylation_sites(self):
         return self.n_glycan_sequon_sites
 
-    def stub_fragments(self, extended=False, extended_fucosylation=False, **kwargs):
-        return StubGlycopeptideStrategy(
+    def stub_fragments(self, extended=False, extended_fucosylation=False, strategy=None, **kwargs):
+        if strategy is None:
+            strategy = StubGlycopeptideStrategy
+        return strategy(
             self, extended, extended_fucosylation=extended_fucosylation, **kwargs)
 
     def _glycan_structural_dissociation(self, max_cleavages=2):
