@@ -1089,7 +1089,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
             return self._glycan_fragment_cache[glycosylation, series, position]
         except KeyError:
             if glycosylation.rule.is_composition:
-                strat = StubGlycopeptideStrategy(self.peptide, False)
+                strat = StubGlycopeptideStrategy(self.peptide, True)
                 gc = strat.glycan_composition()
                 if glycosylation.rule.glycosylation_type == GlycosylationType.n_linked:
                     gen = strat.n_glycan_composition_fragments(gc)
