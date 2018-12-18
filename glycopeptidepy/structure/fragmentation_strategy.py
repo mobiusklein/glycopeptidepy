@@ -1152,7 +1152,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 delta_composition += subfragment.composition
 
             extended_fragment = PeptideFragment(
-                bare_fragment.series, bare_fragment.position, new_modifications,
+                bare_fragment.series, bare_fragment.position, dict(new_modifications),
                 bare_fragment.bare_mass,
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
                 composition=bare_fragment.composition + delta_composition)
