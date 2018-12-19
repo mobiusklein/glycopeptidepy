@@ -186,6 +186,10 @@ class MemoizedResidueMetaclass(type):
             return self(symbol)
 
 
+def _AminoAcidResidue_reconstructor():
+    return AminoAcidResidue.__new__(AminoAcidResidue)
+
+
 @add_metaclass(MemoizedResidueMetaclass)
 class AminoAcidResidue(ResidueBase):
     '''
@@ -281,6 +285,9 @@ class AminoAcidResidue(ResidueBase):
             return self.name != other.name and self.symbol != other.symbol
         except AttributeError:
             return self.name != other and self.symbol != other
+
+    def __reduce__(self):
+        return _AminoAcidResidue_reconstructor, (), self.__getstate__()
 
     def __getstate__(self):
         return [self.name, self.symbol, self.mass, self.composition, self.neutral_loss]

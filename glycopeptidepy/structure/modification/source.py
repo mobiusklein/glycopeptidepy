@@ -109,12 +109,12 @@ class ModificationTable(ModificationSource):
 
     @classmethod
     def register_new_rule(cls, rule):
-        cls._custom_rules[rule.preferred_name] = rule
+        cls._custom_rules[rule.name] = rule
 
     @classmethod
     def remove_rule(cls, rule):
         try:
-            cls._custom_rules.pop(rule.preferred_name)
+            cls._custom_rules.pop(rule.name)
         except AttributeError:
             cls._custom_rules.pop(rule)
 

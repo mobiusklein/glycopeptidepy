@@ -22,3 +22,11 @@ class ResidueBase(MoleculeBase):
     '''
     A base type for classes describing amino acid residues
     '''
+
+
+try:
+    from glycopeptidepy._c.structure.base import (
+        AminoAcidResidueBase as ResidueBase,
+        ModificationBase)
+except ImportError:
+    pass

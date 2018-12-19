@@ -5,6 +5,7 @@ from collections import Iterable
 
 from six import string_types as basestring
 
+from ..base import ModificationBase
 from ..composition import Composition
 from ..residue import AminoAcidResidue
 
@@ -33,7 +34,17 @@ class _ModificationResolver(object):
         raise ModificationNameResolutionError(name)
 
 
-class ModificationRule(object):
+try:
+    from glycopeptidepy._c.structure.modification.rule import ModificationRuleBase
+except ImportError:
+    ModificationRuleBase = ModificationBase
+
+
+def _ModificationRule_reconstructor(tp):
+    return tp.__new__(tp)
+
+
+class ModificationRule(ModificationRuleBase):
     '''Represent the name, mass, and position specifities associated with a given modification.
     Additionally stores information on metadata about this rule computed from these values and
     categorical information from expert sources.
@@ -55,9 +66,6 @@ class ModificationRule(object):
     options : dict
         Arbitrary information from external sources about this modification
         rule and its phenomena.
-    preferred_name : str
-        The name for this modification preferred for using in user-facing
-        displays
     title : str
         A formal or "full" name for this modification that may be its chemical name
         or some other more verbose representation which is used to identify it but
@@ -166,9 +174,9 @@ class ModificationRule(object):
             self.names.update(name.split(" or "))
         self.categories = set(categories)
         self.options = kwargs
-        self._n_term_target = None
-        self._c_term_target = None
-        self.preferred_name = self._get_preferred_name(self.names)
+        self._n_term_targets = None
+        self._c_term_targets = None
+        self.name = self._get_preferred_name(self.names)
         self.aliases = aliases
         # The type of the parameter passed for amino_acid_specificity is variable
         # so select the method correct for the passed type
@@ -196,15 +204,11 @@ class ModificationRule(object):
             self.categories.update(
                 target.classification)
         self.categories = list(self.categories)
-        self._hash = hash(self.preferred_name)
+        self._hash = hash(self.name)
 
     @property
     def is_standard(self):
         return True
-
-    @property
-    def name(self):
-        return self.preferred_name
 
     def clone(self, propagated_targets=None):
         if propagated_targets is None:
@@ -268,11 +272,11 @@ class ModificationRule(object):
 
     def serialize(self):
         '''A string representation for inclusion in sequences'''
-        return self.preferred_name
+        return self.name
 
     def __repr__(self):
-        rep = "{preferred_name}:{mass}".format(
-            **self.__dict__)
+        rep = "{name}:{mass}".format(
+            name=self.name, mass=self.mass)
         return rep
 
     def __add__(self, other):
@@ -288,7 +292,7 @@ class ModificationRule(object):
             dup.composition = new_composition
             dup.names = self.names | other.names
             dup.aliases = self.aliases | other.aliases
-            dup.preferred_name = self._get_preferred_name(dup.names)
+            dup.name = self._get_preferred_name(dup.names)
             dup.options.update(other.options)
             return dup
         else:
@@ -307,28 +311,66 @@ class ModificationRule(object):
     def __call__(self, **kwargs):
         return self.modification_tp(self, **kwargs)
 
+    def __reduce__(self):
+        return _ModificationRule_reconstructor, (self.__class__, ), self.__getstate__()
+
+    def __getstate__(self):
+        state = {}
+        state['targets'] = self.targets
+        state['mass'] = self.mass
+        state['composition'] = self.composition
+        state['aliases'] = self.aliases
+        state['options'] = self.options
+        state['categories'] = self.categories
+        state['neutral_losses'] = self.neutral_losses
+        state['names'] = self.names
+        state['unimod_name'] = self.unimod_name
+        state['title'] = self.title
+        state['name'] = self.name
+        state['common_name'] = self.common_name
+        state['_n_term_targets'] = self.n_term_targets
+        state['_c_term_targets'] = self.c_term_targets
+        return state
+
+    def __setstate__(self, state):
+        self.targets = state['targets']
+        self.mass = state['mass']
+        self.composition = state['composition']
+        self.aliases = state['aliases']
+        self.options = state['options']
+        self.categories = state['categories']
+        self.names = state['names']
+        self.neutral_losses = state['neutral_losses']
+        self.title = state['title']
+        self.name = state['name']
+        self.common_name = state['common_name']
+        self.unimod_name = state['unimod_name']
+        self._n_term_targets = state['_n_term_targets']
+        self._c_term_targets = state['_c_term_targets']
+        self._hash = hash(self.name)
+
     def is_a(self, category):
         return category in self.categories
 
     @property
     def n_term_targets(self):
-        if self._n_term_target is None:
+        if self._n_term_targets is None:
             solutions = []
             for target in self.targets:
                 if target.position_modifier == SequenceLocation.n_term:
                     solutions.append(target)
-            self._n_term_target = solutions
-        return self._n_term_target
+            self._n_term_targets = solutions
+        return self._n_term_targets
 
     @property
     def c_term_targets(self):
-        if self._c_term_target is None:
+        if self._c_term_targets is None:
             solutions = []
             for target in self.targets:
                 if target.position_modifier == SequenceLocation.c_term:
                     solutions.append(target)
-            self._c_term_target = solutions
-        return self._c_term_target
+            self._c_term_targets = solutions
+        return self._c_term_targets
 
     def __hash__(self):
         return self._hash
@@ -455,18 +497,18 @@ class AminoAcidSubstitution(AnonymousModificationRule):
         self.original = (original_residue)
         self.substitution = (substitution_residue)
         self.delta = (self.substitution).mass - (self.original).mass
-        self.preferred_name = self.common_name
+        self.name = self.common_name
         self.names = {self.common_name}
         self.options = kwargs
         self.categories = [ModificationCategory['substitution']]
         self.aliases = set()
-        self._hash = hash(self.preferred_name)
+        self._hash = hash(self.name)
 
     def serialize(self):
         return "@" + self.name
 
     def __repr__(self):
-        return "{name}:{delta}".format(**self.__dict__)
+        return "{name}:{delta}".format(name=self.name, delta=self.delta)
 
 
 TMT10plex = [

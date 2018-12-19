@@ -6,6 +6,10 @@ from .source import ModificationTable
 from .rule import ModificationRule
 
 
+def _Modifcation_reconstructor():
+    return Modification.__new__(Modification)
+
+
 class Modification(ModificationBase):
 
     """Represents a molecular modification, which may be bound at a given position,
@@ -30,7 +34,7 @@ class Modification(ModificationBase):
             rule = self._resolve_name(rule)
             name = rule.name
         else:
-            name = rule.preferred_name
+            name = rule.name
 
         self.name = name
         self.mass = rule.mass
@@ -73,6 +77,9 @@ class Modification(ModificationBase):
 
     def __ne__(self, other):
         return not self == other
+
+    def __reduce__(self):
+        return _Modifcation_reconstructor, (), self.__getstate__()
 
     def __getstate__(self):
         return [self.name, self.mass, self.rule, self.composition]

@@ -1,8 +1,12 @@
 from glypy.composition.ccomposition cimport CComposition
+from cpython.sequence cimport PySequence_GetItem
 
 
 cdef class AminoAcidResidueBase(object):
-    
+    '''
+    A base type for classes describing amino acid residues
+    '''
+
     def __copy__(self):
         return self.clone()
 
@@ -24,9 +28,9 @@ cdef class ModificationBase(object):
 
 cdef class SequencePosition(object):
 
-    def __init__(self, amino_acid, modifications):
-        self.amino_acid = amino_acid
-        self.modifications = modifications
+    def __init__(self, parts):
+        self.amino_acid = PySequence_GetItem(parts, 0)
+        self.modifications = PySequence_GetItem(parts, 1)
 
     def __iter__(self):
         yield self.amino_acid
@@ -39,6 +43,15 @@ cdef class SequencePosition(object):
             return self.modifications
         else:
             raise IndexError(i)
+
+    def __eq__(self, other):
+        return self.amino_acid == other.amino_acid and self.modifications == other.modifications
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __reduce__(self):
+        return self.__class__, ((self.amino_acid, self.modifications),)
 
     def __len__(self):
         return 2

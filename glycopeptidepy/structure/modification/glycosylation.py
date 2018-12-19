@@ -94,6 +94,10 @@ def parse_glycan(glycan_format, encoded_string):
         raise KeyError("Could not resolve glycan parser for %r (%r)" % (glycan_format, encoded_string))
 
 
+def _Glycosylation_reconstructor(string):
+    return Glycosylation.try_parse(string)
+
+
 @ModificationRule.resolve.register
 class Glycosylation(ModificationRule):
     """
@@ -113,8 +117,6 @@ class Glycosylation(ModificationRule):
     options : dict
         Description
     parser : TYPE
-        Description
-    preferred_name : TYPE
         Description
     title : TYPE
         Description
@@ -187,15 +189,22 @@ class Glycosylation(ModificationRule):
 
         self._simple_configuration()
 
+    def __reduce__(self):
+        return _Glycosylation_reconstructor, (self.name, )
+
     def _simple_configuration(self):
         self.title = self.common_name
-        self.preferred_name = self.common_name
+        self.name = self.common_name
         self.unimod_name = self.common_name
         self.categories = [ModificationCategory.glycosylation]
-        self.names = {self.common_name, self.title, self.preferred_name}
+        self.names = {self.common_name, self.title, self.name}
         self.aliases = set()
         self.options = {}
-        self._hash = hash(self.preferred_name)
+        self._hash = hash(self.name)
+        self.neutral_losses = []
+        self._n_term_targets = None
+        self._c_term_targets = None
+        self.targets = set()
 
     def _make_string(self):
         template = "#:{}:{}"
@@ -262,14 +271,21 @@ class CoreGlycosylation(Glycosylation):
         return []
 
     def _common_init(self):
-        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
+        self.names = {self.unimod_name, self.title, self.name, self.common_name}
         self.options = {}
         self.aliases = set()
         self.categories = [ModificationCategory.glycosylation]
-        self._hash = hash(self.preferred_name)
+        self._hash = hash(self.name)
+        self.neutral_losses = []
+        self._n_term_targets = None
+        self._c_term_targets = None
+        self.targets = set()
 
     def clone(self):
         return self.__class__()
+
+    def __reduce__(self):
+        return self.__class__, (self.mass, )
 
 
 class NGlycanCoreGlycosylation(CoreGlycosylation):
@@ -286,7 +302,7 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.mass = base_mass
         self.title = "N-Glycan Core Glycosylation"
         self.unimod_name = "N-Glycosylation"
-        self.preferred_name = self.unimod_name
+        self.name = self.unimod_name
         self.targets = [(ModificationTarget("N"))]
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
@@ -310,7 +326,7 @@ class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
         self.mass = base_mass
         self.title = "Mucin O-Glycan Core Glycosylation"
         self.unimod_name = "O-Glycosylation"
-        self.preferred_name = self.unimod_name
+        self.name = self.unimod_name
         self.targets = [ModificationTarget("S"), ModificationTarget("T")]
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
@@ -339,7 +355,7 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
         self.mass = base_mass
         self.title = "Glycosaminoglycan Linker Glycosylation"
         self.unimod_name = "GAG-Linker"
-        self.preferred_name = self.unimod_name
+        self.name = self.unimod_name
         self.targets = [ModificationTarget("S")]
         self.composition = _hexnac.total_composition().clone()
         self._common_init()
@@ -359,7 +375,7 @@ class OGlcNAcylation(CoreGlycosylation):
 
     def __init__(self, base_mass=_hexnac.mass()):
         self.common_name = "O-GlcNAc"
-        self.preferred_name = self.common_name
+        self.name = self.common_name
         self.mass = base_mass
         self.title = self.common_name
         self.unimod_name = self.common_name
@@ -375,6 +391,10 @@ class OGlcNAcylation(CoreGlycosylation):
         return self.__class__(self.mass)
 
 
+def _GlycanFragment_reconstructor():
+    return GlycanFragment.__new__(GlycanFragment)
+
+
 class GlycanFragment(Glycosylation):
     @property
     def is_composition(self):
@@ -388,15 +408,36 @@ class GlycanFragment(Glycosylation):
         return []
 
     def __init__(self, fragment):
-        self.common_name = fragment.name
         self.mass = fragment.mass
-        self.title = fragment.name
-        self.unimod_name = fragment.name
-        self.preferred_name = self.unimod_name
-        self.targets = []
+        self.name = self.unimod_name = self.title = self.common_name = fragment.name
+        self.names = {self.name, }
         self.composition = fragment.composition
-        self.names = {self.unimod_name, self.title, self.preferred_name, self.common_name}
-        self.options = {}
-        self.aliases = set()
+
         self.categories = [ModificationCategory.glycosylation]
-        self._hash = hash(self.preferred_name)
+        self.aliases = set()
+        self.targets = set()
+        self.options = {}
+        self._hash = hash(self.name)
+
+    def __reduce__(self):
+        return _GlycanFragment_reconstructor, (), self.__getstate__()
+
+    def __getstate__(self):
+        state = {
+            'name': self.name,
+            'composition': self.composition,
+            'mass': self.mass,
+        }
+        return state
+
+    def __setstate__(self, state):
+        self.mass = state['mass']
+        self.name = self.unimod_name = self.title = self.common_name = state['name']
+        self.names = {self.name, }
+        self.composition = state['composition']
+
+        self.categories = [ModificationCategory.glycosylation]
+        self.aliases = set()
+        self.targets = set()
+        self.options = {}
+        self._hash = hash(self.name)

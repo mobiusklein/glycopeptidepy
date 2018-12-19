@@ -89,7 +89,7 @@ class TestModificationRule(unittest.TestCase):
 
     def test_serialize(self):
         mod = modification.Modification("Deamidation")
-        assert mod.rule.serialize() == mod.rule.preferred_name
+        assert mod.rule.serialize() == mod.rule.name
 
 
 class TestAminoAcidSubstitution(unittest.TestCase):

@@ -118,15 +118,16 @@ class PeptideSequenceSuiteBase(object):
         self.assertAlmostEqual(p.mass, ref_mass, 5)
 
     def test_picklability(self):
-        original = self.parse_sequence(p3)
-        duplicate = pickle.loads(pickle.dumps(original))
-        self.assertEqual(
-            sequence._total_composition(original),
-            sequence._total_composition(duplicate))
-        self.assertEqual(original, duplicate)
-        self.assertEqual(original.total_mass, duplicate.total_mass)
-        self.assertEqual(original.total_composition(), duplicate.total_composition())
-        self.assertTrue(original.full_structure_equality(duplicate))
+        for s in [p3, p8]:
+            original = self.parse_sequence(s)
+            duplicate = pickle.loads(pickle.dumps(original))
+            self.assertEqual(
+                sequence._total_composition(original),
+                sequence._total_composition(duplicate))
+            self.assertEqual(original, duplicate)
+            self.assertEqual(original.total_mass, duplicate.total_mass)
+            self.assertEqual(original.total_composition(), duplicate.total_composition())
+            self.assertTrue(original.full_structure_equality(duplicate))
 
     def test_total_mass(self):
         seq = self.parse_sequence(p3)

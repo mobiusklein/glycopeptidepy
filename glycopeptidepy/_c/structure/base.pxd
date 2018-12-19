@@ -1,6 +1,8 @@
+cimport cython
 from glypy.composition.ccomposition cimport CComposition
 
 
+@cython.freelist(100)
 cdef class AminoAcidResidueBase(object):
     cdef:
         public str name
@@ -14,16 +16,15 @@ cdef class AminoAcidResidueBase(object):
 
 
 
+@cython.freelist(100000)
 cdef class ModificationBase(object):
     cdef:
-        public str name
+        public basestring name
         public double mass
         public CComposition composition
 
 
-
-
-
+@cython.freelist(100000)
 cdef class SequencePosition(object):
     cdef:
         public AminoAcidResidueBase amino_acid

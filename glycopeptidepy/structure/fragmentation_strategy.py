@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-from collections import defaultdict
-from itertools import product, combinations
+from collections import defaultdict, Counter
+from itertools import product, combinations, combinations_with_replacement
 
 from glypy.structure.glycan_composition import (
-    FrozenMonosaccharideResidue)
+    FrozenMonosaccharideResidue,
+    FrozenGlycanComposition,
+    MonosaccharideResidue)
 
-from glycopeptidepy.utils.collectiontools import descending_combination_counter
+from glycopeptidepy.utils.collectiontools import descending_combination_counter, _AccumulatorBag
 from glycopeptidepy.structure import constants as structure_constants
 from glycopeptidepy.structure.composition import (
     Composition)
@@ -31,7 +33,6 @@ from glycopeptidepy.structure.fragment import (
 from glycopeptidepy.structure.residue import (
     AminoAcidResidue as R,
     residue_to_neutral_loss as _residue_to_neutral_loss)
-from ..utils.collectiontools import _AccumulatorBag
 
 
 _n_glycosylation = NGlycanCoreGlycosylation()
@@ -48,6 +49,23 @@ glycosylation_type_to_core = {
 }
 
 
+oxonium_ion_series = IonSeries.oxonium_ion
+
+
+def remove_labile_modifications(residue):
+    has_copied = False
+    try:
+        for position, substituent in residue.substituents():
+            if substituent.name in ("sulfate", "phosphate"):
+                if not has_copied:
+                    residue = residue.clone(
+                        monosaccharide_type=MonosaccharideResidue)
+                residue.drop_substituent(position, substituent)
+    except AttributeError:
+        pass
+    return residue
+
+
 class FragmentationStrategyBase(object):
     def __init__(self, peptide, *args, **kwargs):
         self.peptide = peptide
@@ -57,6 +75,18 @@ class FragmentationStrategyBase(object):
         return "%s(%s)" % (
             self.__class__.__name__,
             self.peptide)
+
+    def next(self):
+        return self.__next__()
+
+    def __iter__(self):
+        return self
+
+    def peptide_composition(self):
+        return self.peptide.peptide_composition()
+
+    def total_composition(self):
+        return self.peptide.total_composition()
 
 
 class _GlycanFragmentingStrategyBase(object):
@@ -210,7 +240,36 @@ class _MonosaccharideDefinitionCacher(object):
         return self._hexa
 
 
-class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinitionCacher):
+class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
+    def __init__(self, peptide, use_query=False, *args, **kwargs):
+        super(GlycanCompositionFragmentStrategyBase, self).__init__(peptide, *args, **kwargs)
+        # to be initialized closer to when the glycan composition will
+        # be used. Determine whether to use the fast-path __getitem__ or
+        # go through the slower but more general GlycanComposition.query
+        # method to look up monosaccharides.
+        self._use_query = use_query
+        self._generator = None
+
+    def __next__(self):
+        if self._generator is None:
+            self._generator = self.stub_fragments()
+        return next(self._generator)
+
+    def glycan_composition(self):
+        return self.peptide.glycan_composition
+
+    def _guess_query_mode(self, glycan_composition):
+        # these guesses will work for N-glycans and common types of mucin-type O-glycans
+        # and GAG linkers
+        flag = ("Hex2NAc" in glycan_composition) or ("Glc2NAc" in glycan_composition
+                                                     ) or ("Gal2NAc" in glycan_composition)
+        return flag or self._use_query
+
+    def count_glycosylation_type(self, glycotype):
+        return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
+
+
+class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
 
     """A fragmentation strategy that generates intact peptide + glycan Y fragments from
     glycopeptides where the glycan structure is not fully known. When the structure is
@@ -225,31 +284,9 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
     """
 
     def __init__(self, peptide, extended=True, use_query=False, extended_fucosylation=False, **kwargs):
-        super(StubGlycopeptideStrategy, self).__init__(peptide)
         self.extended = extended
         self.extended_fucosylation = extended_fucosylation
-        self._generator = None
-        # to be initialized closer to when the glycan composition will
-        # be used. Determine whether to use the fast-path __getitem__ or
-        # go through the slower but more general GlycanComposition.query
-        # method to look up monosaccharides.
-        self._use_query = use_query
-
-    def _guess_query_mode(self, glycan_composition):
-        # these guesses will work for N-glycans and common types of mucin-type O-glycans
-        # and GAG linkers
-        flag = ("Hex2NAc" in glycan_composition) or ("Glc2NAc" in glycan_composition
-                                                     ) or ("Gal2NAc" in glycan_composition)
-        return flag or self._use_query
-
-    def count_glycosylation_type(self, glycotype):
-        return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
-
-    def glycan_composition(self):
-        return self.peptide.glycan_composition
-
-    def peptide_composition(self):
-        return self.peptide.peptide_composition()
+        super(StubGlycopeptideStrategy, self).__init__(peptide, use_query)
 
     def fucosylate_increment(self, shift):
         fucosylated = shift.copy()
@@ -777,16 +814,170 @@ class StubGlycopeptideStrategy(FragmentationStrategyBase, _MonosaccharideDefinit
                 raise ValueError("Unknown Glycan Class Detected")
         return (a for a in [])
 
+
+class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
+
+    def __init__(self, peptide, use_query=False, oxonium=True, all_series=False, allow_ambiguous=False,
+                 include_large_glycan_fragments=True, maximum_fragment_size=5, *args, **kwargs):
+        self.oxonium = oxonium
+        self.all_series = all_series
+        self.allow_ambiguous = allow_ambiguous
+        self.maximum_fragment_size = maximum_fragment_size
+        self.include_large_glycan_fragments = include_large_glycan_fragments
+        super(OxoniumIonStrategy, self).__init__(peptide, use_query=use_query, *args, **kwargs)
+
     def __next__(self):
         if self._generator is None:
-            self._generator = self.stub_fragments()
+            self._generator = self._build_generator()
         return next(self._generator)
 
-    def next(self):
-        return self.__next__()
+    def _oxonium_fragments_get_monosaccharide_list(self, glycan):
+        monosaccharides = dict(glycan)
+        for mono, count in list(monosaccharides.items()):
+            dissociated = remove_labile_modifications(mono)
+            if dissociated != mono:
+                monosaccharides[dissociated] = count
+        return monosaccharides
 
-    def __iter__(self):
-        return self
+    def _glycan_structural_dissociation(self, max_cleavages=2):
+        return CADFragmentationStrategy(self.peptide, max_cleavages)
+
+    def _oxonium_ions(self):
+        water = Composition("H2O")
+        water2 = water * 2
+        side_chain_plus_carbon = Composition("CH2O")
+        two_side_chains_plus_carbon = side_chain_plus_carbon * 2
+        water2_plus_sidechain_plus_carbon = water2 + side_chain_plus_carbon
+        water_plus_two_side_chains_plus_carbon = water + two_side_chains_plus_carbon
+
+        glycan = (self.glycan_composition()).clone()
+
+        monosaccharides = self._oxonium_fragments_get_monosaccharide_list(glycan)
+        for k in monosaccharides:
+            key = str(k)
+            mass = k.mass()
+            composition = k.total_composition()
+            yield SimpleFragment(
+                name=key, mass=mass,
+                composition=composition,
+                kind=oxonium_ion_series)
+            yield SimpleFragment(
+                name=key + "-H2O", mass=mass - water.mass,
+                composition=composition - water,
+                kind=oxonium_ion_series)
+            yield SimpleFragment(
+                name=key + "-H4O2", mass=mass - water2.mass,
+                composition=composition - (
+                    water2), kind=oxonium_ion_series)
+            yield SimpleFragment(
+                name=key + "-C2H4O2", mass=mass - two_side_chains_plus_carbon.mass,
+                composition=composition - (
+                    two_side_chains_plus_carbon), kind=oxonium_ion_series)
+            yield SimpleFragment(
+                name=key + "-CH6O3",
+                mass=mass - water2_plus_sidechain_plus_carbon.mass,
+                composition=composition - water2_plus_sidechain_plus_carbon,
+                kind=oxonium_ion_series)
+            yield SimpleFragment(
+                name=key + "-C2H6O3",
+                mass=mass - water_plus_two_side_chains_plus_carbon.mass,
+                composition=composition - water_plus_two_side_chains_plus_carbon,
+                kind=oxonium_ion_series)
+        for i in range(2, 4):
+            for kk in combinations_with_replacement(sorted(monosaccharides, key=str), i):
+                invalid = False
+                for k, v in Counter(kk).items():
+                    if monosaccharides[k] < v:
+                        invalid = True
+                        break
+                if invalid:
+                    continue
+                key = ''.join(map(str, kk))
+                mass = sum(k.mass() for k in kk)
+                composition = sum((k.total_composition()
+                                   for k in kk), Composition())
+                yield SimpleFragment(
+                    name=key, mass=mass, kind=oxonium_ion_series, composition=composition)
+                yield SimpleFragment(
+                    name=key + "-H2O", mass=mass - water.mass, kind=oxonium_ion_series,
+                    composition=composition - water)
+                yield SimpleFragment(
+                    name=key + "-H4O2", mass=mass - water2.mass, kind=oxonium_ion_series,
+                    composition=composition - (water2))
+
+    def _ambiguous_all_series(self):
+        water = Composition("H2O")
+        _hexnac = self.hexnac
+        _hexose = self.hexose
+        _neuac = self.neuac
+
+        if self.peptide.glycosylation_manager.count_glycosylation_type(GlycosylationType.n_linked) > 0:
+            _offset = Composition()
+            total = (self.glycan_composition()).clone()
+            total_count = sum(total.values())
+
+            base = FrozenGlycanComposition(Hex=3, HexNAc=2)
+            remainder = total - base
+
+            peptide_base_composition = self.total_composition() - total.total_composition()
+            stub_composition = peptide_base_composition + base.total_composition() - water
+            stub_mass = stub_composition.mass
+
+            # GlycanComposition's clone semantics do not propagate the
+            # composition_offset attribute yet. Should it?
+            remainder.composition_offset = _offset
+            remainder_elemental_composition = remainder.total_composition()
+            remainder_mass = remainder.mass()
+
+            for composition in descending_combination_counter(remainder):
+                frag_size = sum(composition.values())
+
+                # Don't waste time on compositions that are impossible under
+                # common enzymatic pathways in this already questionable
+                # stop-gap
+                if composition.get(_hexnac, 0) + composition.get(
+                        _hexose, 0) < composition.get(_neuac, 0):
+                    continue
+
+                composition = FrozenGlycanComposition(composition)
+                composition.composition_offset = _offset
+
+                elemental_composition = composition.total_composition()
+                composition_mass = elemental_composition.mass
+
+                if frag_size > 2 and self.include_large_glycan_fragments and frag_size < self.maximum_fragment_size:
+                    string_form = composition.serialize()
+                    yield SimpleFragment(
+                        name=string_form, mass=composition_mass,
+                        composition=elemental_composition, kind=oxonium_ion_series)
+                    yield SimpleFragment(
+                        name=string_form + "-H2O", mass=composition_mass - water.mass,
+                        composition=elemental_composition - water, kind=oxonium_ion_series)
+
+                if (total_count - frag_size) < (self.maximum_fragment_size + 4):
+                    f = StubFragment(
+                        name="peptide+" + str(total - composition),
+                        mass=stub_mass + remainder_mass - composition_mass,
+                        composition=stub_composition + remainder_elemental_composition - elemental_composition,
+                        is_glycosylated=True,
+                        kind=IonSeries.stub_glycopeptide,
+                        glycosylation=composition,
+                        is_extended=None)
+                    yield f
+
+    def _build_generator(self):
+        if self.oxonium:
+            for f in self._oxonium_ions():
+                yield f
+        if self.peptide.glycosylation_manager.is_fully_specified_topologies() and self.all_series:
+            for f in self._glycan_structural_dissociation():
+                yield f
+        elif self.allow_ambiguous and self.all_series:
+            for f in self._ambiguous_all_series():
+                yield f
+        elif self.all_series:
+            raise TypeError(
+                "Cannot generate B/Y fragments from non-Glycan {}".format(self.glycan))
 
 
 class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
@@ -874,12 +1065,6 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             return self.step()
         else:
             raise StopIteration()
-
-    def next(self):
-        return self.__next__()
-
-    def __iter__(self):
-        return self
 
     def track_glycosylation(self, index, glycosylation):
         self.glycosylation_manager[self.index] = glycosylation
