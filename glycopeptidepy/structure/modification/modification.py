@@ -10,16 +10,34 @@ def _Modifcation_reconstructor():
     return Modification.__new__(Modification)
 
 
-class Modification(ModificationBase):
+class ModificationInstanceBase(ModificationBase):
+    def is_a(self, category):
+        return self.rule.is_a(category)
+
+
+try:
+    _has_c = True
+    from glycopeptidepy._c.structure.modification.modification import ModificationInstanceBase
+except ImportError:
+    _has_c = False
+    pass
+
+
+class Modification(ModificationInstanceBase):
 
     """Represents a molecular modification, which may be bound at a given position,
     or may be present at multiple locations. This class pulls double duty,
     and when describing the total number of modifications of a type on a molecule, its
     position attributes are unused."""
 
-    _table = ModificationTable()
+    # If the C extension base class is available, do not declare redundant slot
+    # descriptors.
+    if not _has_c:
+        __slots__ = ["name", "mass", "rule", "composition", "_hash"]
+    else:
+        __slots__ = []
 
-    __slots__ = ["name", "mass", "rule", "composition", "_hash"]
+    _table = ModificationTable()
 
     @classmethod
     def register_new_rule(cls, rule):
@@ -90,9 +108,6 @@ class Modification(ModificationBase):
 
     def clone(self):
         return self.__class__(self.rule)
-
-    def is_a(self, category):
-        return self.rule.is_a(category)
 
     def is_tracked_for(self, category):
         return self.rule.is_tracked_for(category)

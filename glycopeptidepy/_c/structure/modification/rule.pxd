@@ -4,9 +4,9 @@ from glycopeptidepy._c.structure.base cimport ModificationBase
 cdef class ModificationRuleBase(ModificationBase):
     cdef:
         public set names
-        public set categories
+        public list categories
 
-        public str preferred_name
-        public str title
-        public str common_name
-        public str unimod_name
+        public basestring preferred_name
+        public basestring title
+        public basestring common_name
+        public basestring unimod_name

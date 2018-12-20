@@ -9,6 +9,8 @@ from cpython.tuple cimport PyTuple_GetItem
 
 from glypy.composition.ccomposition cimport CComposition
 
+from glycopeptidepy._c.structure.base cimport ModificationBase
+
 from glycopeptidepy.structure.modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
@@ -121,6 +123,9 @@ cdef class FragmentBase(object):
         self._name = name
 
 
+cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylation
+
+
 cdef class PeptideFragment(FragmentBase):
     concerned_modifications = set(
         [_n_glycosylation,
@@ -153,21 +158,22 @@ cdef class PeptideFragment(FragmentBase):
         self._hash = hash(self._name)
 
 
-    cdef _update_mass_with_modifications(self):
+    cdef void _update_mass_with_modifications(self):
         cdef:
             list modifications
             ChemicalShiftBase chemical_shift
             size_t i, n
-            object k, v
+            ModificationBase mod
+            object v
             tuple mod_count
 
         modifications = PyDict_Items(self.modification_dict)
         n = PyList_GET_SIZE(modifications)
         for i in range(n):
             mod_count = <tuple>PyList_GetItem(modifications, i)
-            k = <object>PyTuple_GetItem(mod_count, 0)
+            mod = <ModificationBase>PyTuple_GetItem(mod_count, 0)
             v = <object>PyTuple_GetItem(mod_count, 1)
-            self.mass += PyFloat_AsDouble(k.mass) * PyInt_AsLong(v)
+            self.mass += mod.mass * PyInt_AsLong(v)
 
         chemical_shift = self.get_chemical_shift()
         if chemical_shift is not None:
@@ -209,13 +215,13 @@ cdef class PeptideFragment(FragmentBase):
         cdef:
             list fragment_name, mod_rule_counts
             tuple mod_rule_count
-            object mod_rule
+            ModificationBase mod_rule
             int count
             str name
             ChemicalShiftBase chemical_shift
 
         fragment_name = []
-        fragment_name.append(str(self.get_series()))
+        fragment_name.append(self.get_series().name)
         fragment_name.append(str(self.position))
 
         mod_rule_counts = PyDict_Items(self.modification_dict)
@@ -223,14 +229,14 @@ cdef class PeptideFragment(FragmentBase):
 
         for i in range(n):
             mod_rule_count = <tuple>PyList_GetItem(mod_rule_counts, i)
-            mod_rule = <object>PyTuple_GetItem(mod_rule_count, 0)
-            if mod_rule in self.concerned_modifications or mod_rule.is_a(ModificationCategory.glycosylation):
+            mod_rule = <ModificationBase>PyTuple_GetItem(mod_rule_count, 0)
+            if mod_rule.is_a(ModificationCategory_glycosylation):
                 count = PyInt_AsLong(<object>PyTuple_GetItem(mod_rule_count, 1))
                 if count > 1:
                     fragment_name.extend(
-                        ['+', str(count), str(mod_rule.name)])
+                        ['+', str(count), mod_rule.name])
                 elif count == 1:
-                    fragment_name.extend(['+', str(mod_rule.name)])
+                    fragment_name.extend(['+', mod_rule.name])
                 else:
                     pass
 
@@ -247,7 +253,7 @@ cdef class PeptideFragment(FragmentBase):
             return True
         else:
             for mod in self.modification_dict:
-                if mod in self.concerned_modifications or mod.is_a(ModificationCategory.glycosylation):
+                if mod.is_a(ModificationCategory_glycosylation):
                     return True
         return False
 

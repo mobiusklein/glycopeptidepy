@@ -37,7 +37,9 @@ class _ModificationResolver(object):
 try:
     from glycopeptidepy._c.structure.modification.rule import ModificationRuleBase
 except ImportError:
-    ModificationRuleBase = ModificationBase
+    class ModificationRuleBase(ModificationBase):
+        def is_a(self, category):
+            return category in self.categories
 
 
 def _ModificationRule_reconstructor(tp):
@@ -172,7 +174,7 @@ class ModificationRule(ModificationRuleBase):
         self.names = {self.unimod_name, self.common_name, self.title} | alt_names
         for name in list(self.names):
             self.names.update(name.split(" or "))
-        self.categories = set(categories)
+        self.categories = list(categories)
         self.options = kwargs
         self._n_term_targets = None
         self._c_term_targets = None
@@ -200,10 +202,11 @@ class ModificationRule(ModificationRuleBase):
             raise ValueError("Could not interpret target specificity from %r" % (
                 amino_acid_specificity,))
         self.neutral_losses = neutral_losses
+        categories = set(self.categories)
         for target in self.targets:
-            self.categories.update(
+            categories.update(
                 target.classification)
-        self.categories = list(self.categories)
+        self.categories = list(categories)
         self._hash = hash(self.name)
 
     @property
@@ -348,9 +351,6 @@ class ModificationRule(ModificationRuleBase):
         self._n_term_targets = state['_n_term_targets']
         self._c_term_targets = state['_c_term_targets']
         self._hash = hash(self.name)
-
-    def is_a(self, category):
-        return category in self.categories
 
     @property
     def n_term_targets(self):

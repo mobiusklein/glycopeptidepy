@@ -62,4 +62,4 @@ cdef class PeptideFragment(FragmentBase):
 
     cpdef clone(self)
 
-    cdef _update_mass_with_modifications(self)
+    cdef void _update_mass_with_modifications(self)

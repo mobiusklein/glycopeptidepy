@@ -47,6 +47,8 @@ def make_extensions():
             Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.pyx']),
             Extension("glycopeptidepy._c.structure.modification.rule",
                       sources=['glycopeptidepy/_c/structure/modification/rule.pyx']),
+            Extension("glycopeptidepy._c.structure.modification.modification",
+                      sources=['glycopeptidepy/_c/structure/modification/modification.pyx']),
         ], compiler_directives=cython_directives, force=force_cythonize)
     except ImportError:
         extensions = [
@@ -54,6 +56,10 @@ def make_extensions():
             Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.c']),
             Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.c']),
             Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.c']),
+            Extension("glycopeptidepy._c.structure.modification.rule",
+                      sources=['glycopeptidepy/_c/structure/modification/rule.c']),
+            Extension("glycopeptidepy._c.structure.modification.modification",
+                      sources=['glycopeptidepy/_c/structure/modification/modification.c']),
         ]
     return extensions
 

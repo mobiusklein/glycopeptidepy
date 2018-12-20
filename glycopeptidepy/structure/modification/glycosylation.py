@@ -64,14 +64,8 @@ xylose_modification = ModificationRule.from_unimod({
     "specificity": [{
         "position": "Anywhere",
         "hidden": True,
-        "site": "T",
-        "classification": "Other glycosylation",
-        "spec_group": 3
-    }, {
-        "position": "Anywhere",
-        "hidden": True,
         "site": "S",
-        "classification": "Other glycosylation",
+        "classification": "O-linked glycosylation",
         "spec_group": 2
     }],
 })

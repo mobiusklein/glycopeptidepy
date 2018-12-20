@@ -34,7 +34,6 @@ class ModificationCategory(Enum):
     isotopic_label = 6
     post_translational = 7
     other = 8
-    other_glycosylation = 9
     multiple = 10
     pre_translational = 11
     co_translational = 12
@@ -42,9 +41,10 @@ class ModificationCategory(Enum):
 
 
 ModificationCategory.substitution.add_name("AA substitution")
-ModificationCategory.other_glycosylation.add_name("Other glycosylation")
+ModificationCategory.glycosylation.add_name("other_glycosylation")
 ModificationCategory.glycosylation.add_name("N-linked glycosylation")
 ModificationCategory.glycosylation.add_name("O-linked glycosylation")
+ModificationCategory.glycosylation.add_name("Other glycosylation")
 ModificationCategory.chemical_derivative.add_name("Chemical derivative")
 ModificationCategory.post_translational.add_name("Post-translational")
 ModificationCategory.multiple.add_name("Multiple")

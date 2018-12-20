@@ -5,8 +5,8 @@ from glypy.composition.ccomposition cimport CComposition
 @cython.freelist(100)
 cdef class AminoAcidResidueBase(object):
     cdef:
-        public str name
-        public str symbol
+        public basestring name
+        public basestring symbol
         public double mass
         public CComposition composition
         public object neutral_loss
@@ -22,6 +22,8 @@ cdef class ModificationBase(object):
         public basestring name
         public double mass
         public CComposition composition
+
+    cpdef bint is_a(self, object category)
 
 
 @cython.freelist(100000)

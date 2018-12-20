@@ -4,6 +4,16 @@ from ..utils.memoize import memoize
 from glypy.utils.multimap import MultiMap
 from six import add_metaclass
 
+
+try:
+    # check to see if the C base class exists so we
+    # do not allocate additional slots
+    _has_c = True
+    from glycopeptidepy._c.structure import base
+    del base
+except ImportError:
+    _has_c = False
+
 symbol_to_residue = {
     'A': 'Ala',
     'R': 'Arg',
@@ -213,7 +223,12 @@ class AminoAcidResidue(ResidueBase):
         Whether this amino acid may stand for other amino acids
 
     '''
-    __slots__ = ["name", "symbol", "mass", "composition", "neutral_loss"]
+    # If the C extension base class is available, do not declare redundant slot
+    # descriptors.
+    if _has_c:
+        __slots__ = ["neutral_loss", ]
+    else:
+        __slots__ = ["name", "symbol", "mass", "composition", "neutral_loss"]
 
     @staticmethod
     @memoize()

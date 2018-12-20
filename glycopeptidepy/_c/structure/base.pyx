@@ -25,6 +25,9 @@ cdef class ModificationBase(object):
     def __copy__(self):
         return self.clone()
 
+    cpdef bint is_a(self, object category):
+        return False
+
 
 cdef class SequencePosition(object):
 
