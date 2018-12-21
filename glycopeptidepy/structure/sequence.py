@@ -2,6 +2,8 @@ from six import string_types as basestring
 
 from collections import namedtuple
 
+from glypy.utils import make_struct
+
 from . import PeptideSequenceBase, MoleculeBase
 from . import constants as structure_constants
 
@@ -271,7 +273,7 @@ def _make_terminal_group(base_composition_formula, modification=None):
     return TerminalGroup(base_composition_formula, modification)
 
 
-class SequencePosition(namedtuple('SequencePosition', ['amino_acid', 'modifications'])):
+class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):
     def __new__(self, parts):
         return super(SequencePosition, self).__new__(self, *parts)
 

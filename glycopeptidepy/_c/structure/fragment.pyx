@@ -126,22 +126,15 @@ cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylat
 
 
 cdef class PeptideFragment(FragmentBase):
-    concerned_modifications = set(
-        [_n_glycosylation,
-         _modification_hexnac,
-         _o_glycosylation,
-         _gag_linker_glycosylation,
-         _modification_xylose])
 
-    def __init__(self, kind, position, modification_dict, mass,
-                 flanking_amino_acids=None, glycosylation=None, chemical_shift=None,
-                 composition=None):
+    def __init__(self, kind, position, modification_dict, mass, flanking_amino_acids=None,
+                 glycosylation=None, chemical_shift=None, composition=None):
         self.kind = kind
 
         # The mass value is the bare backbone's mass
-        self.bare_mass = mass
+        self.bare_mass = PyFloat_AsDouble(mass)
         self.modification_dict = modification_dict
-        self.mass = mass
+        self.mass = self.bare_mass
         self.composition = composition
         self._chemical_shift = None
 
@@ -204,7 +197,7 @@ cdef class PeptideFragment(FragmentBase):
     def base_name(self):
         """Simply return string like b2, y3 with no modification information."""
         fragment_name = []
-        fragment_name.append(str(self.series))
+        fragment_name.append(self.get_series().name)
         fragment_name.append(str(self.position))
         return ''.join(fragment_name)
 

@@ -47,6 +47,14 @@ cdef class SequencePosition(object):
         else:
             raise IndexError(i)
 
+    def __setitem__(self, i, value):
+        if i == 0:
+            self.amino_acid = value
+        elif i == 1:
+            self.modifications = value
+        else:
+            raise IndexError(i)
+
     def __eq__(self, other):
         return self.amino_acid == other.amino_acid and self.modifications == other.modifications
 
