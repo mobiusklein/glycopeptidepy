@@ -1,7 +1,7 @@
 cimport cython
-
+from cpython cimport PyObject
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
-from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items
+from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next
 from cpython.int cimport PyInt_AsLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
@@ -15,11 +15,11 @@ from glycopeptidepy.structure.modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
 
-_n_glycosylation = NGlycanCoreGlycosylation()
-_o_glycosylation = OGlycanCoreGlycosylation()
-_gag_linker_glycosylation = GlycosaminoglycanLinkerGlycosylation()
-_modification_hexnac = Modification("HexNAc").rule
-_modification_xylose = Modification("Xyl").rule
+cdef ModificationBase _n_glycosylation = NGlycanCoreGlycosylation()
+cdef ModificationBase _o_glycosylation = OGlycanCoreGlycosylation()
+cdef ModificationBase _gag_linker_glycosylation = GlycosaminoglycanLinkerGlycosylation()
+cdef ModificationBase _modification_hexnac = Modification("HexNAc").rule
+cdef ModificationBase _modification_xylose = Modification("Xyl").rule
 
 
 @cython.freelist(100)
@@ -36,7 +36,6 @@ cdef class ChemicalShiftBase(object):
 
     def is_loss(self):
         return self.mass < 0
-
 
 
 cdef class IonSeriesBase(object):
@@ -107,9 +106,9 @@ cdef class FragmentBase(object):
 
     cpdef str get_fragment_name(self):
         parts = [self._name]
-        chemical_shift = self.chemical_shift
+        chemical_shift = self.get_chemical_shift()
         if chemical_shift is not None:
-            parts.append(str(chemical_shift))
+            parts.append(chemical_shift.name)
         return ''.join(parts)
 
     @property
@@ -160,20 +159,18 @@ cdef class PeptideFragment(FragmentBase):
 
     cdef void _update_mass_with_modifications(self):
         cdef:
-            list modifications
             ChemicalShiftBase chemical_shift
-            size_t i, n
             ModificationBase mod
-            object v
-            tuple mod_count
+            dict modification_dict
+            PyObject *pkey
+            PyObject *pvalue
+            Py_ssize_t ppos = 0
 
-        modifications = PyDict_Items(self.modification_dict)
-        n = PyList_GET_SIZE(modifications)
-        for i in range(n):
-            mod_count = <tuple>PyList_GetItem(modifications, i)
-            mod = <ModificationBase>PyTuple_GetItem(mod_count, 0)
-            v = <object>PyTuple_GetItem(mod_count, 1)
-            self.mass += mod.mass * PyInt_AsLong(v)
+        modification_dict = self.modification_dict
+
+        while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+            mod = <ModificationBase>pkey
+            self.mass += mod.mass * PyInt_AsLong(<object>pvalue)
 
         chemical_shift = self.get_chemical_shift()
         if chemical_shift is not None:
@@ -213,46 +210,50 @@ cdef class PeptideFragment(FragmentBase):
 
     cpdef str get_fragment_name(self):
         cdef:
-            list fragment_name, mod_rule_counts
-            tuple mod_rule_count
+            list fragment_name
             ModificationBase mod_rule
             int count
             str name
             ChemicalShiftBase chemical_shift
+            dict modification_dict
+            PyObject *pkey
+            PyObject *pvalue
+            Py_ssize_t ppos = 0
 
-        fragment_name = []
-        fragment_name.append(self.get_series().name)
-        fragment_name.append(str(self.position))
+        modification_dict = self.modification_dict
+        fragment_name = [self.get_series().name, str(self.position)]
 
-        mod_rule_counts = PyDict_Items(self.modification_dict)
-        n = PyList_GET_SIZE(mod_rule_counts)
-
-        for i in range(n):
-            mod_rule_count = <tuple>PyList_GetItem(mod_rule_counts, i)
-            mod_rule = <ModificationBase>PyTuple_GetItem(mod_rule_count, 0)
+        while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+            mod_rule = <ModificationBase>pkey
             if mod_rule.is_a(ModificationCategory_glycosylation):
-                count = PyInt_AsLong(<object>PyTuple_GetItem(mod_rule_count, 1))
+                count = PyInt_AsLong(<object>pvalue)
                 if count > 1:
                     fragment_name.extend(
                         ['+', str(count), mod_rule.name])
                 elif count == 1:
                     fragment_name.extend(['+', mod_rule.name])
-                else:
-                    pass
 
         chemical_shift = self.get_chemical_shift()
 
         if chemical_shift is not None:
-            fragment_name.append(str(chemical_shift))
+            fragment_name.append(chemical_shift.name)
         name = ''.join(fragment_name)
         return name
 
     @property
     def is_glycosylated(self):
+        cdef:
+            PyObject *pkey
+            PyObject *pvalue
+            Py_ssize_t ppos = 0
+            ModificationBase mod
+            dict modification_dict
         if self.glycosylation:
             return True
         else:
-            for mod in self.modification_dict:
+            modification_dict = self.modification_dict
+            while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+                mod = <ModificationBase>pkey
                 if mod.is_a(ModificationCategory_glycosylation):
                     return True
         return False
