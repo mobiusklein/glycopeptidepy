@@ -1,5 +1,13 @@
 from glypy.composition.ccomposition cimport CComposition
+
+from cpython.list cimport PyList_GetItem
 from cpython.sequence cimport PySequence_GetItem
+
+
+cdef class PeptideSequenceBase(object):
+
+    cdef SequencePosition get(self, ssize_t i):
+        return <SequencePosition>self.sequence[i]
 
 
 cdef class AminoAcidResidueBase(object):
@@ -56,7 +64,13 @@ cdef class SequencePosition(object):
             raise IndexError(i)
 
     def __eq__(self, other):
-        return self.amino_acid == other.amino_acid and self.modifications == other.modifications
+        cdef:
+            SequencePosition other_t
+        if isinstance(other, SequencePosition):
+            other_t = other
+            return self.amino_acid == other_t.amino_acid and self.modifications == other_t.modifications
+        else:
+            return self.amino_acid == other.amino_acid and self.modifications == other.modifications            
 
     def __ne__(self, other):
         return not (self == other)

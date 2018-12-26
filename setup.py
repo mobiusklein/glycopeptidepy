@@ -137,7 +137,9 @@ def run_setup(include_cext=True):
         zip_safe=False,
         package_data={
             'glycopeptidepy': ["*.csv", "*.xml", "*.json", "data/*.csv"],
-            'glycopeptidepy.structure': ["structure/data/*.csv", "structure/data/*.json"]
+            'glycopeptidepy.structure': [
+                "structure/modification/data/*.csv",
+                "structure/modification/data/*.json"]
         },
     )
 

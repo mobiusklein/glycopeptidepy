@@ -33,10 +33,10 @@ def load_from_json(stream):
 
 class ModificationSource(object):
     _table_definition_file = staticmethod(lambda: StringIO(
-        resource_stream(__name__, "../data/ProteinProspectorModifications-for_gly2.csv").read(
+        resource_stream(__name__, "data/ProteinProspectorModifications-for_gly2.csv").read(
         ).decode("utf-8")))
     _unimod_definitions = staticmethod(lambda: StringIO(
-        resource_stream(__name__, "../data/unimod.json").read().decode('utf-8')))
+        resource_stream(__name__, "data/unimod.json").read().decode('utf-8')))
 
     use_protein_prospector = True
 

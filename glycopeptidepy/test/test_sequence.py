@@ -31,6 +31,21 @@ hexnac_mass = MonosaccharideResidue.from_iupac_lite("HexNAc").mass()
 hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
 
+def make_fragment(self, key):
+    if not hasattr(self, '_fragments_map'):
+        self._fragments_map = {}
+    try:
+        return self._fragments_map[key]
+    except KeyError:
+        for group in self.get_fragments(key[0]):
+            for frag in group:
+                self._fragments_map[frag.name] = frag
+        try:
+            return self._fragments_map[key]
+        except KeyError:
+            raise KeyError("Unknown Fragment %r" % (key,))
+
+
 class TestSequenceParser(unittest.TestCase):
     def test_parser(self):
         chunks, mods, glycan, n_term, c_term = sequence.sequence_tokenizer(p1)
@@ -59,10 +74,12 @@ class PeptideSequenceSuiteBase(object):
             "a5": 510.2922 - HYDROGEN,
             "z3": 360.1527 - HYDROGEN,
         }
+
         for fragment, mass in mapping.items():
-            fmass = seq.fragment(fragment).mass
+            fmass = make_fragment(seq, fragment).mass
             self.assertAlmostEqual(mass, fmass, 2, (mass, fmass, fragment))
-            self.assertAlmostEqual(mass, seq.fragment(fragment).total_composition().mass, 2, (mass, fmass, fragment))
+            self.assertAlmostEqual(
+                mass, make_fragment(seq, fragment).total_composition().mass, 2, (mass, fmass, fragment))
 
     def test_stub_ions(self):
         peptide = self.parse_sequence(p3)

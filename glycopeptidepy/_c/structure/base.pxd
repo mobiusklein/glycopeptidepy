@@ -2,6 +2,26 @@ cimport cython
 from glypy.composition.ccomposition cimport CComposition
 
 
+@cython.freelist(1000000)
+cdef class PeptideSequenceBase(object):
+    cdef:
+        public list sequence
+        public double _mass
+        public object _glycosylation_manager
+        public object _n_term
+        public object _c_term
+
+    cdef SequencePosition get(self, ssize_t i)
+
+
+@cython.freelist(100)
+cdef class TerminalGroup(object):
+    cdef:
+        public CComposition base_composition
+        public double _mass
+        public ModificationBase _modification
+
+
 @cython.freelist(100)
 cdef class AminoAcidResidueBase(object):
     cdef:

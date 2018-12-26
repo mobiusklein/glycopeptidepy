@@ -990,6 +990,8 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.chemical_shift_rules = defaultdict(list, chemical_shifts)
         self.max_chemical_shifts = max_chemical_shifts
 
+        self.direction = self.series.direction
+
         # Null Values
         self.running_mass = 0
         self.running_composition = Composition()
@@ -1002,10 +1004,6 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.running_mass += self.series.mass_shift
         self.running_composition += self.series.composition_shift
         self._initialize_start_terminal()
-
-    @property
-    def direction(self):
-        return self.series.direction
 
     def _get_viable_chemical_shift_combinations(self):
         shifts = []

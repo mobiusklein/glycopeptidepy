@@ -274,6 +274,8 @@ def _make_terminal_group(base_composition_formula, modification=None):
 
 
 class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):
+    __slots__ = ()
+
     def __new__(self, parts):
         return super(SequencePosition, self).__new__(self, *parts)
 
@@ -426,8 +428,6 @@ class PeptideSequence(PeptideSequenceBase):
         self._mass = 0.0
         self.sequence = []
         self._fragment_index = None
-        self._glycan = None
-        self._glycan_composition = None
 
         self._glycosylation_manager = GlycosylationManager(self)
 
@@ -714,18 +714,6 @@ class PeptideSequence(PeptideSequenceBase):
             self.mass += mod.mass
             if mod.is_tracked_for(ModificationCategory.glycosylation):
                 self._glycosylation_manager[position] = mod
-
-    def fragment(self, key):
-        try:
-            return self._fragments_map[key]
-        except KeyError:
-            for group in self.get_fragments(key[0]):
-                for frag in group:
-                    self._fragments_map[frag.name] = frag
-            try:
-                return self._fragments_map[key]
-            except KeyError:
-                raise KeyError("Unknown Fragment %r" % (key,))
 
     def _build_fragment_index(self, types=tuple('bycz')):
         self._fragment_index = [[] for i in range(len(self) + 1)]

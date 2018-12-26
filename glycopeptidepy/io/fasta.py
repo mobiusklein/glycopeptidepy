@@ -331,8 +331,11 @@ class RegexDefLineParser(DefLineParserBase):
     pattern : re.pattern
     """
     def __init__(self, pattern):
-        self.pattern = re.compile(pattern)
-        self._is_keyed = "?P<" in pattern
+        if isinstance(pattern, str):
+            self.pattern = re.compile(pattern)
+        else:
+            self.pattern = pattern
+        self._is_keyed = "?P<" in self.pattern.pattern
 
     def parse(self, defline):
         match = self.pattern.search(defline)
