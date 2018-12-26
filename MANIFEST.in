@@ -1,5 +1,7 @@
 recursive-include glycopeptidepy/structure/data *.csv
 recursive-include glycopeptidepy/structure/data *.json
+recursive-include glycopeptidepy/structure/modification/data *.csv
+recursive-include glycopeptidepy/structure/modification/data *.json
 recursive-include glycopeptidepy *.c *.h
 recursive-include glycopeptidepy *.pyx
 recursive-include glycopeptidepy *.pxd
