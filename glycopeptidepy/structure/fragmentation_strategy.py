@@ -989,7 +989,9 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.series = IonSeries(series)
         self.chemical_shift_rules = defaultdict(list, chemical_shifts)
         self.max_chemical_shifts = max_chemical_shifts
+        self._initialize_fields()
 
+    def _initialize_fields(self):
         self.direction = self.series.direction
 
         # Null Values
