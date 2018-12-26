@@ -345,11 +345,15 @@ class ModificationRule(ModificationRuleBase):
         self.names = state['names']
         self.neutral_losses = state['neutral_losses']
         self.title = state['title']
-        self.name = state['name']
+        # defend against outdated pickles here
+        self.name = state.get(
+            'name', state.get(
+                'preferred_name', self._get_preferred_name(
+                    state.get('names', []))))
         self.common_name = state['common_name']
         self.unimod_name = state['unimod_name']
-        self._n_term_targets = state['_n_term_targets']
-        self._c_term_targets = state['_c_term_targets']
+        self._n_term_targets = state.get('_n_term_targets', state.get('_n_term_target', None))
+        self._c_term_targets = state.get('_c_term_targets', state.get('_c_term_target', None))
         self._hash = hash(self.name)
 
     @property
