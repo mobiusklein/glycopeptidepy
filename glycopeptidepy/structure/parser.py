@@ -1,4 +1,5 @@
 import logging
+import sys
 from . import constants as structure_constants
 from . import PeptideSequenceBase
 from .modification import NGlycanCoreGlycosylation
@@ -25,6 +26,8 @@ def sequence_tokenizer(sequence, implicit_n_term=None, implicit_c_term=None, gly
     '''
     if glycan_parser_function is None:
         glycan_parser_function = glycan_parser
+    if sys.version_info[0] > 2 and isinstance(sequence, bytes):
+        sequence = sequence.decode("utf8")
 
     state = "start"  # [start, n_term, aa, mod, c_term]
     n_term = implicit_n_term or structure_constants.N_TERM_DEFAULT

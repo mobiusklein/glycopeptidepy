@@ -15,7 +15,7 @@ cdef class IonSeriesBase(object):
         public bint includes_peptide
         public double mass_shift
         public CComposition composition_shift
-        public long _hash
+        public object _hash
 
 
 cdef class FragmentBase(object):
@@ -37,7 +37,7 @@ cdef class FragmentBase(object):
 
     cdef:
         public str _name
-        public long _hash
+        public object _hash
         public double mass
         public ChemicalShiftBase _chemical_shift
 
