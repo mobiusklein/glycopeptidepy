@@ -37,6 +37,7 @@ symbol_to_residue = {
     'V': 'Val',
     "U": "Sec",
     "O": "Pyl",
+    "X": "Unk"
 }
 
 
@@ -64,6 +65,7 @@ symbol_to_long = {
     "W": "Tryptophan",
     "Y": "Tyrosine",
     "V": "Valine",
+    "X": "Unknown",
 }
 
 
@@ -92,7 +94,8 @@ residue_table = {
     'Tyr': 'C9H9N1O2',
     'Val': 'C5H9N1O1',
     "Sec": "C3H7NO2Se",
-    "Pyl": "C12H21N3O3"
+    "Pyl": "C12H21N3O3",
+    "Unk": "",
 }
 
 residue_chemical_property_group = {
