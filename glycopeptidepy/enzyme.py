@@ -205,13 +205,15 @@ class Protease(object):
 
     @staticmethod
     def nonspecific_digest(sequence, min_length=0, max_length=100):
-        cleaver = Protease(r".")
-        peptides = cleaver.cleave_semispecific(
-            sequence, missed_cleavages=max_length + 1, min_length=min_length,
-            max_length=max_length)
+        if isinstance(sequence, PeptideSequence):
+            sequence = str(sequence)
+        n = len(sequence)
         out = []
-        for seq, start, end, _ in peptides:
-            out.append((seq, start, end, 0))
+        for i in range(n):
+            for j in range(min_length, max_length + 1):
+                if i + j > n:
+                    break
+                out.append((sequence[i:i + j], i, i + j, 0))
         return out
 
 
