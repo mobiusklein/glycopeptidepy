@@ -12,7 +12,7 @@ cache: pip
 # command to install dependencies
 install:
   - pip install -U setuptools
-  - pip install coverage pytest pytest-cov requests
+  - pip install coverage pytest pytest-cov requests -U
   - pip install Cython --install-option="--no-cython-compile"
   - pip install rdflib SPARQLWrapper
   - pip install git+https://github.com/mobiusklein/glypy
