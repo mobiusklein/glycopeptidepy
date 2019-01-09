@@ -158,6 +158,39 @@ class ModifiedResidue(AnnotatedResidue):
         return "{self.__class__.__name__}({self.position}, {self.modification!r})".format(self=self)
 
 
+class SimpleVariant(AnnotatedResidue):
+    feature_type = "simple variant"
+
+    def __init__(self, position, substitution, **kwargs):
+        super(SimpleVariant, self).__init__(position, self.feature_type, (substitution))
+
+    @property
+    def substitution(self):
+        return self.description
+
+    def to_dict(self):
+        d = super(SimpleVariant, self).to_dict()
+        d['substitution'] = d.pop('description')
+        return d
+
+
+class ComplexVariant(AnnotatedInterval):
+    feature_type = 'complex variant'
+
+    def __init__(self, start, end, substitution, **kwargs):
+        super(ComplexVariant, self).__init__(
+            start, end, self.feature_type, (substitution))
+
+    @property
+    def substitution(self):
+        return self.description
+
+    def to_dict(self):
+        d = super(ComplexVariant, self).to_dict()
+        d['substitution'] = d.pop('description')
+        return d
+
+
 class AnnotationCollection(object):
     def __init__(self, items):
         self.items = list(items)
@@ -226,3 +259,7 @@ def from_uniprot(record):
         except KeyError:
             continue
     return AnnotationCollection(annotations)
+
+
+def from_peff(record):
+    pass
