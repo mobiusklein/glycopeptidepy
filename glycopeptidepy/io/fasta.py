@@ -437,7 +437,9 @@ class FastaFileReader(object):
             except (AttributeError, ValueError, TypeError):
                 pos = None
             if isinstance(key, int):
-                start, end = self.index.values()[key]
+                start, end = tuple(self.index.values())[key]
+            elif isinstance(key, slice):
+                return [self[i] for i in range(*key.indices(len(self.index)))]
             else:
                 start, end = self.index[key]
             self.handle.seek(start)
@@ -774,6 +776,10 @@ class FastaIndex(object):
     def __init__(self, mapping):
         self.mapping = mapping
         self._suffix = None
+
+    def __repr__(self):
+        template = "{self.__class__.__name__}({size:d})"
+        return template.format(self=self, size=len(self))
 
     def __getitem__(self, key):
         return self.mapping[key]
