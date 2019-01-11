@@ -189,15 +189,23 @@ def _calculate_mass(sequence):
     return total
 
 
-class TerminalGroup(MoleculeBase):
-    __slots__ = ("base_composition", "mass", "_modification")
+try:
+    from glycopeptidepy._c.structure.base import TerminalGroup as TerminalGroupBase
+except ImportError:
+    TerminalGroupBase = MoleculeBase
+
+
+class TerminalGroup(TerminalGroupBase):
+    if TerminalGroupBase == MoleculeBase:
+        __slots__ = ("base_composition", "mass", "_modification")
+    else:
+        __slots__ = ()
 
     def __init__(self, base_composition, modification=None):
         if not isinstance(base_composition, Composition):
             base_composition = Composition(base_composition)
         self.base_composition = base_composition
         self._modification = None
-        self._mass = None
         if modification is not None:
             self.modification = modification
         self.mass = self._calculate_mass()
@@ -221,7 +229,15 @@ class TerminalGroup(MoleculeBase):
 
     @modification.setter
     def modification(self, value):
-        self._mass = None
+        if value is not None:
+            new_mass = value.mass
+        else:
+            new_mass = 0
+        if self._modification is not None:
+            old_mass = self._modification.mass
+        else:
+            old_mass = 0
+        self.mass += new_mass - old_mass
         self._modification = value
 
     def modify(self, modification):
@@ -459,7 +475,8 @@ class PeptideSequence(PeptideSequenceBase):
         rep = "{n_term}{sequence}{c_term}{glycan}[{_mass}]".format(
             n_term=n_term, c_term=c_term,
             glycan=aggregate,
-            **self.__dict__)
+            sequence=self.sequence,
+            _mass=self._mass)
         return rep
 
     def __len__(self):

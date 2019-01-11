@@ -27,6 +27,6 @@ class ResidueBase(MoleculeBase):
 try:
     from glycopeptidepy._c.structure.base import (
         AminoAcidResidueBase as ResidueBase,
-        ModificationBase)
+        ModificationBase, PeptideSequenceBase)
 except ImportError:
     pass
