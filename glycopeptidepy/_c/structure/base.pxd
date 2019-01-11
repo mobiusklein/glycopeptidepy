@@ -8,8 +8,8 @@ cdef class PeptideSequenceBase(object):
         public list sequence
         public double _mass
         public object _glycosylation_manager
-        public object _n_term
-        public object _c_term
+        public TerminalGroup _n_term
+        public TerminalGroup _c_term
 
     cdef SequencePosition get(self, ssize_t i)
 
@@ -18,7 +18,7 @@ cdef class PeptideSequenceBase(object):
 cdef class TerminalGroup(object):
     cdef:
         public CComposition base_composition
-        public double _mass
+        public double mass
         public ModificationBase _modification
 
 
