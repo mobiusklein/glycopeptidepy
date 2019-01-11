@@ -7,7 +7,11 @@ from cpython.sequence cimport PySequence_GetItem
 cdef class PeptideSequenceBase(object):
 
     cdef SequencePosition get(self, ssize_t i):
-        return <SequencePosition>self.sequence[i]
+        return <SequencePosition>PyList_GetItem(self.sequence, i)
+
+
+cdef class TerminalGroup(object):
+    pass
 
 
 cdef class AminoAcidResidueBase(object):
