@@ -40,6 +40,10 @@ cdef class ModificationBase(object):
     cpdef bint is_a(self, object category):
         return False
 
+    cpdef basestring serialize(self):
+        '''A string representation for inclusion in sequences'''
+        return self.name
+
 
 cdef class SequencePosition(object):
 

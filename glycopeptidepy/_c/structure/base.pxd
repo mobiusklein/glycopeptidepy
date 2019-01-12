@@ -45,6 +45,8 @@ cdef class ModificationBase(object):
 
     cpdef bint is_a(self, object category)
 
+    cpdef basestring serialize(self)
+
 
 @cython.freelist(100000)
 cdef class SequencePosition(object):

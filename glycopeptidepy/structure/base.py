@@ -1,3 +1,6 @@
+from glypy.utils import make_struct
+
+
 class MoleculeBase(object):
     mass = None
 
@@ -17,6 +20,10 @@ class ModificationBase(MoleculeBase):
     A base type for classes describing peptide sequence modifications
     '''
 
+    def serialize(self):
+        '''A string representation for inclusion in sequences'''
+        return self.name
+
 
 class ResidueBase(MoleculeBase):
     '''
@@ -24,9 +31,19 @@ class ResidueBase(MoleculeBase):
     '''
 
 
+class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):
+    __slots__ = ()
+
+    def __new__(self, parts):
+        return super(SequencePosition, self).__new__(self, *parts)
+
+    def __repr__(self):
+        return repr(list(self))
+
+
 try:
     from glycopeptidepy._c.structure.base import (
         AminoAcidResidueBase as ResidueBase,
-        ModificationBase, PeptideSequenceBase)
+        ModificationBase, PeptideSequenceBase, SequencePosition)
 except ImportError:
     pass
