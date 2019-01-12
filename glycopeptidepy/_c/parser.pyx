@@ -2,12 +2,16 @@ from cpython cimport Py_INCREF, PY_MAJOR_VERSION
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values
 
+from glycopeptidepy._c.structure.constants cimport Configuration
 
 from glypy.structure.glycan_composition import FrozenGlycanComposition
 
 cdef object glycan_parser = FrozenGlycanComposition.parse
 
-from glycopeptidepy.structure import constants as structure_constants
+from glycopeptidepy.structure import constants as _structure_constants
+
+
+cdef Configuration structure_constants = _structure_constants
 
 
 ctypedef fused sequence_encoded_t:

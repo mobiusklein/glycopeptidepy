@@ -1,10 +1,6 @@
 from six import string_types as basestring
 
-from collections import namedtuple
-
-from glypy.utils import make_struct
-
-from . import PeptideSequenceBase, MoleculeBase
+from . import PeptideSequenceBase, MoleculeBase, SequencePosition
 from . import constants as structure_constants
 
 from .composition import Composition, formula
@@ -289,22 +285,6 @@ def _make_terminal_group(base_composition_formula, modification=None):
     return TerminalGroup(base_composition_formula, modification)
 
 
-class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):
-    __slots__ = ()
-
-    def __new__(self, parts):
-        return super(SequencePosition, self).__new__(self, *parts)
-
-    def __repr__(self):
-        return repr(list(self))
-
-
-try:
-    from glycopeptidepy._c.structure.base import SequencePosition
-except ImportError:
-    pass
-
-
 class PeptideSequence(PeptideSequenceBase):
     '''
     Represents a peptide that may have post-translational modifications
@@ -360,7 +340,7 @@ class PeptideSequence(PeptideSequenceBase):
                         self._glycosylation_manager[i] = mod
                     mods.append(mod)
                     mass += mod.mass
-            self.sequence[i] = self.position_class([res, mods])
+            self.sequence[i] = SequencePosition([res, mods])
             i += 1
         self.mass = mass
         has_glycan = glycan != "" and glycan is not None
@@ -424,7 +404,7 @@ class PeptideSequence(PeptideSequenceBase):
                 if mod.is_tracked_for(ModificationCategory.glycosylation):
                     self._glycosylation_manager[i] = mod
                 mass += mod.mass
-            self.sequence[i] = self.position_class([res, list(mods)])
+            self.sequence[i] = SequencePosition([res, list(mods)])
             i += 1
         self.mass = mass
         if glycan_composition is not None:
@@ -472,9 +452,9 @@ class PeptideSequence(PeptideSequenceBase):
         if self.c_term is not None:
             c_term = "-({0})".format(self.c_term)
         aggregate = self._glycosylation_manager.aggregate if self._glycosylation_manager.aggregate is not None else ""
-        rep = "{n_term}{sequence}{c_term}{glycan}[{_mass}]".format(
+        rep = "{n_term}{sequence}{c_term}{glycan_aggregate}[{_mass}]".format(
             n_term=n_term, c_term=c_term,
-            glycan=aggregate,
+            glycan_aggregate=aggregate,
             sequence=self.sequence,
             _mass=self._mass)
         return rep
@@ -575,7 +555,7 @@ class PeptideSequence(PeptideSequenceBase):
 
     def subsequence(self, slice_obj):
         sub = self[slice_obj]
-        subseq = Sequence.from_iterable(sub)
+        subseq = self.from_iterable(sub)
         if slice_obj.start == 0:
             subseq.n_term = self.n_term
         if slice_obj.stop == len(self):
@@ -689,10 +669,10 @@ class PeptideSequence(PeptideSequenceBase):
         dropped_index = None
         self._invalidate()
         if position is SequenceLocation.n_term:
-            self.n_term = TerminalGroup(structure_constants.N_TERM_DEFAULT)
+            self.n_term = _make_terminal_group(structure_constants.N_TERM_DEFAULT)
             return
         elif position is SequenceLocation.c_term:
-            self.c_term = TerminalGroup(structure_constants.C_TERM_DEFAULT)
+            self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT)
             return
 
         for i, mod in enumerate(self.sequence[position][1]):
@@ -708,10 +688,8 @@ class PeptideSequence(PeptideSequenceBase):
             raise ValueError("Modification not found! %s @ %s" %
                              (modification_type, position))
 
-    def add_modification(self, position=None, modification_type=None):
+    def add_modification(self, position, modification_type):
         self._invalidate()
-        if position is None and isinstance(modification_type, Modification):
-            position = modification_type.position
         if isinstance(modification_type, Modification):
             mod = modification_type
         else:
@@ -844,7 +822,7 @@ class PeptideSequence(PeptideSequenceBase):
         else:
             next_pos.append([modification])
             self.mass += modification.mass
-        self.sequence.append(self.position_class(next_pos))
+        self.sequence.append(SequencePosition(next_pos))
         self._retrack_sequence()
 
     def extend(self, sequence):

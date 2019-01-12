@@ -14,6 +14,13 @@ class ModificationInstanceBase(ModificationBase):
     def is_a(self, category):
         return self.rule.is_a(category)
 
+    def serialize(self):
+        if self.rule.is_standard:
+            rep = str(self.name)
+        else:
+            rep = self.rule.serialize()
+        return rep
+
 
 try:
     _has_c = True
@@ -64,13 +71,6 @@ class Modification(ModificationInstanceBase):
         except AttributeError:
             self.composition = None
 
-    def serialize(self):
-        if self.rule.is_standard:
-            rep = str(self.name)
-        else:
-            rep = self.rule.serialize()
-        return rep
-
     def valid_site(self, amino_acid=None, position_modifiers=None):
         return self.rule.valid_site(amino_acid, position_modifiers)
 
@@ -80,9 +80,11 @@ class Modification(ModificationInstanceBase):
     def find_valid_sites(self, sequence):
         return self.rule.find_valid_sites(sequence)
 
-    __repr__ = serialize
+    def __repr__(self):
+        return self.serialize()
 
-    __str__ = serialize
+    def __str__(self):
+        return self.serialize()
 
     def __hash__(self):
         return self._hash

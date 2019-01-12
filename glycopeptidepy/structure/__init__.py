@@ -4,7 +4,9 @@ from . import composition
 from .composition import Composition, formula, ChemicalCompositionError
 
 from . import base
-from .base import (MoleculeBase, PeptideSequenceBase, ModificationBase, ResidueBase)
+from .base import (
+    MoleculeBase, PeptideSequenceBase, ModificationBase,
+    ResidueBase, SequencePosition)
 
 from . import parser
 from .parser import (sequence_tokenizer, strip_modifications)
@@ -51,7 +53,7 @@ __all__ = [
 
     "base",
     "MoleculeBase", "PeptideSequenceBase", "ModificationBase",
-    "ResidueBase",
+    "ResidueBase", "SequencePosition",
 
     "parser",
     "sequence_tokenizer", "strip_modifications",
