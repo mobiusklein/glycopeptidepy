@@ -2,7 +2,7 @@ from .structure.sequence import PeptideSequence, ProteinSequence
 from .structure.modification import (
     Modification, ModificationTable, RestrictedModificationTable,
     ModificationRule, ModificationTarget, AnonymousModificationRule,
-    Glycosylation)
+    Glycosylation, SequenceLocation, ModificationCategory)
 from .structure.fragment import (
     IonSeries, PeptideFragment, ChemicalShift,
     SimpleFragment, StubFragment)

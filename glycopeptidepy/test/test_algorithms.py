@@ -1,7 +1,8 @@
 import unittest
 
+from glycopeptidepy.structure.modification import Modification, ModificationTarget
 from glycopeptidepy.structure import sequence
-from glycopeptidepy.algorithm import reverse_preserve_sequon, edit_distance
+from glycopeptidepy.algorithm import reverse_preserve_sequon, edit_distance, PeptidoformGenerator
 
 p2 = "YPVLN(N-Glycosylation)VTMPN(Deamidation)NGKFDK{Hex:9; HexNAc:2}"
 
@@ -49,6 +50,17 @@ class TestEditDistance(unittest.TestCase):
         fwd = sequence.PeptideSequence(heparanase)
         rev = reverse_preserve_sequon(fwd)
         assert edit_distance(fwd, rev) > 0
+
+
+class TestPeptidoformGenerator(unittest.TestCase):
+    def test_generate(self):
+        Deamidation = Modification("Deamidation").rule
+        duplicate = Deamidation.clone()
+        duplicate.targets = {ModificationTarget("N")}
+        generator = PeptidoformGenerator([], [duplicate])
+        seq = sequence.PeptideSequence("PEPQSINIDE")
+        results = list(generator(seq))
+        self.assertEqual(len(results), 2)
 
 
 if __name__ == '__main__':

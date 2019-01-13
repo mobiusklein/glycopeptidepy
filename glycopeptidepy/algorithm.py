@@ -210,6 +210,7 @@ class PeptidoformGenerator(object):
         # the case with unmodified termini
         n_term_modifications.append(None)
         c_term_modifications.append(None)
+        return (n_term_modifications, c_term_modifications)
 
     def apply_fixed_modifications(self, sequence):
         has_fixed_n_term = False

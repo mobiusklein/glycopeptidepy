@@ -163,7 +163,7 @@ class ModificationTarget(object):
         if classification is None:
             classification = []
         self.amino_acid_targets = frozenset(map(AminoAcidResidue, site_targets)) if site_targets is not None else None
-        self.position_modifier = position_modifier
+        self.position_modifier = SequenceLocation[position_modifier]
         self.classification = classification
 
     def valid_site(self, amino_acid=None, position_modifier=SequenceLocation.anywhere):
