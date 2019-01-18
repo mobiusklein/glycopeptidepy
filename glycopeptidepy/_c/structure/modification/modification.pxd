@@ -8,3 +8,5 @@ cdef class ModificationInstanceBase(ModificationBase):
         public object _hash
 
     cpdef _init_from_rule(self, ModificationRuleBase rule)
+
+    cpdef bint is_tracked_for(self, category)

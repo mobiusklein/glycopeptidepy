@@ -13,6 +13,9 @@ cdef class PeptideSequenceBase(object):
     cdef SequencePosition get(self, ssize_t i):
         return <SequencePosition>PyList_GetItem(self.sequence, i)
 
+    cpdef _invalidate(self):
+        pass
+
 
 cdef class TerminalGroup(object):
     def __init__(self, base_composition, modification=None):
@@ -141,6 +144,9 @@ cdef class ModificationBase(object):
     cpdef basestring serialize(self):
         '''A string representation for inclusion in sequences'''
         return self.name
+
+    cpdef bint is_tracked_for(self, object category):
+        return False
 
 
 cdef class SequencePosition(object):

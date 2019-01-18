@@ -13,6 +13,8 @@ cdef class PeptideSequenceBase(object):
 
     cdef SequencePosition get(self, ssize_t i)
 
+    cpdef _invalidate(self)
+
 
 @cython.freelist(100)
 cdef class TerminalGroup(object):
@@ -51,6 +53,8 @@ cdef class ModificationBase(object):
     cpdef bint is_a(self, object category)
 
     cpdef basestring serialize(self)
+
+    cpdef bint is_tracked_for(self, object category)
 
 
 @cython.freelist(100000)

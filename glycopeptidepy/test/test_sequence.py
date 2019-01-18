@@ -51,7 +51,7 @@ class TestSequenceParser(unittest.TestCase):
         chunks, mods, glycan, n_term, c_term = sequence.sequence_tokenizer(p1)
         self.assertEqual(len(mods), 0)
         self.assertEqual(len(chunks), len(p1))
-        self.assertEqual(glycan, "")
+        self.assertEqual(glycan, None)
 
         chunks, mods, glycan, n_term, c_term = sequence.sequence_tokenizer(p2)
         self.assertEqual(GlycanComposition.parse("{Hex:9; HexNAc:2}"), glycan)

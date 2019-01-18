@@ -153,6 +153,8 @@ def sequence_tokenizer(sequence, implicit_n_term=None, implicit_c_term=None, gly
             glycan = glycan_parser_function(glycan)
         except Exception as e:
             logging.exception("Error in parser, %s and %s", glycan, sequence, exc_info=e)
+    else:
+        glycan = None
 
     return chunks, mods, glycan, n_term, c_term
 

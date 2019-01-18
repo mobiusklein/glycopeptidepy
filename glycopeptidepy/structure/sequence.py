@@ -340,7 +340,7 @@ class PeptideSequence(PeptideSequenceBase):
             self.sequence[i] = SequencePosition([res, mods])
             i += 1
         self.mass = mass
-        has_glycan = glycan != "" and glycan is not None
+        has_glycan = glycan is not None
         if has_glycan:
             self._glycosylation_manager.aggregate = glycan.clone()
 
@@ -904,6 +904,7 @@ try:
     from glycopeptidepy._c.structure import sequence_methods
     PeptideSequence._init_from_parsed_string = sequence_methods._init_from_parsed_string
     PeptideSequence._init_from_components = sequence_methods._init_from_components
+    PeptideSequence._init_termini = sequence_methods._init_termini
 except ImportError:
     pass
 

@@ -26,3 +26,6 @@ cdef class ModificationInstanceBase(ModificationBase):
             self.composition = rule.composition
         except AttributeError:
             self.composition = None
+
+    cpdef bint is_tracked_for(self, category):
+        return self.rule.is_tracked_for(category)

@@ -14,6 +14,9 @@ class PeptideSequenceBase(MoleculeBase):
     A base type for classes describing peptide sequences, with or without modifiations
     '''
 
+    def _invalidate(self):
+        pass
+
 
 class ModificationBase(MoleculeBase):
     '''

@@ -176,6 +176,8 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
             glycan = glycan_parser_function(glycan)
         except Exception as e:
             print(e, glycan)
+    else:
+        glycan = None
 
     return chunks, mods, glycan, n_term, c_term
 
