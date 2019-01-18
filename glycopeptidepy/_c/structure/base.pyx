@@ -1,7 +1,11 @@
 from glypy.composition.ccomposition cimport CComposition
+from glypy.composition import formula as _formula
 
 from cpython.list cimport PyList_GetItem
 from cpython.sequence cimport PySequence_GetItem
+
+
+cdef object formula = _formula
 
 
 cdef class PeptideSequenceBase(object):
@@ -11,7 +15,101 @@ cdef class PeptideSequenceBase(object):
 
 
 cdef class TerminalGroup(object):
-    pass
+    def __init__(self, base_composition, modification=None):
+        if not isinstance(base_composition, CComposition):
+            base_composition = CComposition(base_composition)
+        self.base_composition = base_composition
+        self._modification = None
+        if modification is not None:
+            self.modification = modification
+        self.mass = self._calculate_mass()
+
+    def _calculate_mass(self):
+        base_mass = self.base_composition.mass
+        mod = self.modification
+        if mod is not None:
+            base_mass += mod.mass
+        return base_mass
+
+    def clone(self):
+        return self.__class__(self.base_composition, self.modification)
+
+    def __reduce__(self):
+        return self.__class__, (self.base_composition, self.modification)
+
+
+    cdef ModificationBase get_modification(self):
+        return self._modification
+
+    cdef void set_modification(self, ModificationBase value):
+        cdef:
+            double new_mass, old_mass
+        if value is not None:
+            new_mass = value.mass
+        else:
+            new_mass = 0
+        if self._modification is not None:
+            old_mass = self._modification.mass
+        else:
+            old_mass = 0
+        self.mass += new_mass - old_mass
+        self._modification = value
+
+    @property
+    def modification(self):
+        return self.get_modification()
+
+    @modification.setter
+    def modification(self, ModificationBase value):
+        self.set_modification(value)
+
+    def modify(self, modification):
+        return self.__class__(self.base_composition, modification)
+
+    cdef CComposition get_composition(self):
+        cdef ModificationBase modification = self.get_modification()
+        
+        if modification is None:
+            return self.base_composition
+        mod_comp = modification.composition
+        return self.base_composition + mod_comp
+
+    @property
+    def composition(self):
+        return self.get_composition()
+
+    def __repr__(self):
+        template = "{self.__class__.__name__}({self.base_composition}, {self.modification})"
+        return template.format(self=self)
+
+    def __str__(self):
+        if self.modification is not None:
+            return str(self.modification)
+        return formula(self.base_composition)
+
+    def __eq__(self, other):
+        if other is None:
+            return False
+        try:
+            return (self.base_composition == other.base_composition) and (self.modification == other.modification)
+        except AttributeError:
+            if isinstance(other, basestring):
+                from glycopeptidepy.structure.modification import Modification
+                return self.composition == Modification(other).composition
+            else:
+                try:
+                    return self.composition == other.composition
+                except AttributeError:
+                    return NotImplemented
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __hash__(self):
+        return hash(formula(self.get_composition()))
+
+    def serialize(self):
+        return str(self)
 
 
 cdef class AminoAcidResidueBase(object):

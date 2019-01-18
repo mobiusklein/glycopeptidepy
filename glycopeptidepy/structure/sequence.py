@@ -185,17 +185,8 @@ def _calculate_mass(sequence):
     return total
 
 
-try:
-    from glycopeptidepy._c.structure.base import TerminalGroup as TerminalGroupBase
-except ImportError:
-    TerminalGroupBase = MoleculeBase
-
-
-class TerminalGroup(TerminalGroupBase):
-    if TerminalGroupBase == MoleculeBase:
-        __slots__ = ("base_composition", "mass", "_modification")
-    else:
-        __slots__ = ()
+class TerminalGroup(MoleculeBase):
+    __slots__ = ("base_composition", "mass", "_modification")
 
     def __init__(self, base_composition, modification=None):
         if not isinstance(base_composition, Composition):
@@ -278,6 +269,12 @@ class TerminalGroup(TerminalGroupBase):
 
     def serialize(self):
         return str(self)
+
+
+try:
+    from glycopeptidepy._c.structure.base import TerminalGroup
+except ImportError:
+    pass
 
 
 @memoize(100)
@@ -901,6 +898,14 @@ class PeptideSequence(PeptideSequenceBase):
         if self._total_composition is None:
             self._total_composition = _total_composition(self)
         return self._total_composition
+
+
+try:
+    from glycopeptidepy._c.structure import sequence_methods
+    PeptideSequence._init_from_parsed_string = sequence_methods._init_from_parsed_string
+    PeptideSequence._init_from_components = sequence_methods._init_from_components
+except ImportError:
+    pass
 
 
 Sequence = PeptideSequence

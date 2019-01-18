@@ -21,6 +21,11 @@ cdef class TerminalGroup(object):
         public double mass
         public ModificationBase _modification
 
+    cdef ModificationBase get_modification(self)
+    cdef CComposition get_composition(self)
+
+    cdef void set_modification(self, ModificationBase)
+
 
 @cython.freelist(100)
 cdef class AminoAcidResidueBase(object):

@@ -7,3 +7,4 @@ cdef class ModificationInstanceBase(ModificationBase):
         public ModificationRuleBase rule
         public object _hash
 
+    cpdef _init_from_rule(self, ModificationRuleBase rule)

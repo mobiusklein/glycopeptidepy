@@ -21,6 +21,17 @@ class ModificationInstanceBase(ModificationBase):
             rep = self.rule.serialize()
         return rep
 
+    def _init_from_rule(self, rule):
+        self.name = rule.name
+        self.mass = rule.mass
+        self.rule = rule
+        self._hash = self.rule._hash
+
+        try:
+            self.composition = rule.composition
+        except AttributeError:
+            self.composition = None
+
 
 try:
     _has_c = True
@@ -54,31 +65,10 @@ class Modification(ModificationInstanceBase):
         return self._table.resolve(rule_string)
 
     def __init__(self, rule):
-        name = None
         if(isinstance(rule, basestring)):
             rule = self._resolve_name(rule)
-            name = rule.name
-        else:
-            name = rule.name
 
-        self.name = name
-        self.mass = rule.mass
-        self.rule = rule
-        self._hash = self.rule._hash
-
-        try:
-            self.composition = rule.composition
-        except AttributeError:
-            self.composition = None
-
-    def valid_site(self, amino_acid=None, position_modifiers=None):
-        return self.rule.valid_site(amino_acid, position_modifiers)
-
-    def why_valid(self, amino_acid=None, position_modifiers=None):
-        return self.rule.why_valid(amino_acid, position_modifiers)
-
-    def find_valid_sites(self, sequence):
-        return self.rule.find_valid_sites(sequence)
+        self._init_from_rule(rule)
 
     def __repr__(self):
         return self.serialize()
