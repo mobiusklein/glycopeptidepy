@@ -462,6 +462,8 @@ class PeptideSequence(PeptideSequenceBase):
 
     @n_term.setter
     def n_term(self, value):
+        if isinstance(value, Modification):
+            value = self._n_term.modify(value)
         self._invalidate()
         reset_mass = 0
         try:
@@ -482,6 +484,8 @@ class PeptideSequence(PeptideSequenceBase):
 
     @c_term.setter
     def c_term(self, value):
+        if isinstance(value, Modification):
+            value = self._c_term.modify(value)
         self._invalidate()
         reset_mass = 0
         try:
