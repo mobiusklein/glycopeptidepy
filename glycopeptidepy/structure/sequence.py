@@ -456,8 +456,45 @@ class PeptideSequence(PeptideSequenceBase):
             _mass=self._mass)
         return rep
 
-    def __len__(self):
-        return len(self.sequence)
+    @property
+    def n_term(self):
+        return self._n_term
+
+    @n_term.setter
+    def n_term(self, value):
+        self._invalidate()
+        reset_mass = 0
+        try:
+            reset_mass = self._n_term.mass
+        except AttributeError:
+            pass
+        self._n_term = value
+        new_mass = 0
+        try:
+            new_mass = value.mass
+        except AttributeError:
+            pass
+        self.mass += new_mass - reset_mass
+
+    @property
+    def c_term(self):
+        return self._c_term
+
+    @c_term.setter
+    def c_term(self, value):
+        self._invalidate()
+        reset_mass = 0
+        try:
+            reset_mass = self._c_term.mass
+        except AttributeError:
+            pass
+        self._c_term = value
+        new_mass = 0
+        try:
+            new_mass = value.mass
+        except AttributeError:
+            pass
+        self.mass += new_mass - reset_mass
 
     @property
     def mass(self):
@@ -499,45 +536,19 @@ class PeptideSequence(PeptideSequenceBase):
     def total_glycosylation_size(self):
         return self._glycosylation_manager.total_glycosylation_size()
 
-    @property
-    def n_term(self):
-        return self._n_term
-
-    @n_term.setter
-    def n_term(self, value):
+    def deglycosylate(self):
         self._invalidate()
-        reset_mass = 0
-        try:
-            reset_mass = self._n_term.mass
-        except AttributeError:
-            pass
-        self._n_term = value
-        new_mass = 0
-        try:
-            new_mass = value.mass
-        except AttributeError:
-            pass
-        self.mass += new_mass - reset_mass
+        _glycosylation_enum = ModificationCategory.glycosylation
+        for i, pos in enumerate(self):
+            mods = [mod.name for mod in pos[1] if mod.is_a(
+                _glycosylation_enum)]
+            for mod in mods:
+                self.drop_modification(i, mod)
+        self._glycosylation_manager.clear()
+        self.glycan = None
+        return self
 
-    @property
-    def c_term(self):
-        return self._c_term
-
-    @c_term.setter
-    def c_term(self, value):
-        self._invalidate()
-        reset_mass = 0
-        try:
-            reset_mass = self._c_term.mass
-        except AttributeError:
-            pass
-        self._c_term = value
-        new_mass = 0
-        try:
-            new_mass = value.mass
-        except AttributeError:
-            pass
-        self.mass += new_mass - reset_mass
+    # sequence methods
 
     def __iter__(self):
         return iter(self.sequence)
@@ -559,18 +570,13 @@ class PeptideSequence(PeptideSequenceBase):
             subseq.c_term = self.c_term
         return subseq
 
-    def __hash__(self):
-        return hash(str(self))
+    def __len__(self):
+        return len(self.sequence)
+
+    # equality methods
 
     def __eq__(self, other):
         return str(self) == str(other)
-
-    def _retrack_sequence(self):
-        self._glycosylation_manager.clear()
-        for i, position in enumerate(self):
-            for mod in position[1]:
-                if mod.is_tracked_for(ModificationCategory.glycosylation):
-                    self._glycosylation_manager[i] = mod
 
     def base_sequence_equality(self, other):
         if len(self) != len(other):
@@ -598,17 +604,69 @@ class PeptideSequence(PeptideSequenceBase):
     def __ne__(self, other):
         return str(self) != str(other)
 
-    def deglycosylate(self):
-        self._invalidate()
-        _glycosylation_enum = ModificationCategory.glycosylation
-        for i, pos in enumerate(self):
-            mods = [mod.name for mod in pos[1] if mod.is_a(
-                _glycosylation_enum)]
-            for mod in mods:
-                self.drop_modification(i, mod)
-        self._glycosylation_manager.clear()
-        self.glycan = None
-        return self
+    def __hash__(self):
+        return hash(str(self))
+
+    def get_sequence(self, include_glycan=True, include_termini=True, implicit_n_term=None, implicit_c_term=None):
+        """
+        Generate human readable sequence string. Called by :meth:`__str__`
+
+        Parameters
+        ----------
+        include_glycan: bool
+            Whether to include the glycan in the resulting string. Defaults to `True`
+        include_termini: bool
+            Whether to include the N- and C-termini. Make sure this is `True` if you want non-standard
+            termini to be properly propagated.
+
+
+        Returns
+        -------
+        str
+        """
+        if implicit_n_term is None:
+            implicit_n_term = structure_constants.N_TERM_DEFAULT
+        if implicit_c_term is None:
+            implicit_c_term = structure_constants.C_TERM_DEFAULT
+
+        seq_list = []
+        for x, y in self.sequence:
+            mod_str = ''
+            if y:
+                mod_str = '|'.join(mod.serialize() for mod in y)
+                mod_str = ''.join(['(', mod_str, ')'])
+            seq_list.append(''.join([x.symbol, mod_str]))
+        rep = ''.join(seq_list)
+        if include_termini:
+            n_term = ""
+            if self.n_term is not None and self.n_term != implicit_n_term:
+                n_term = "({0})-".format(self.n_term.serialize())
+            c_term = ""
+            if self.c_term is not None and self.c_term != implicit_c_term:
+                c_term = "-({0})".format(self.c_term.serialize())
+            rep = "{0}{1}{2}".format(n_term, rep, c_term)
+        if include_glycan:
+            if self._glycosylation_manager.aggregate is not None:
+                rep += str(self._glycosylation_manager.aggregate)
+        return rep
+
+    def __str__(self):
+        return self.get_sequence()
+
+    def clone(self):
+        inst = self.__class__()
+        if self._glycosylation_manager.aggregate is not None:
+            glycan = self._glycosylation_manager.aggregate.clone()
+            glycan.composition_offset = Composition("H2O")
+        else:
+            glycan = None
+        inst._init_from_components(
+            self.sequence, glycan,
+            self.n_term.modification,
+            self.c_term.modification)
+        return inst
+
+    # fragmentation methods
 
     def break_at(self, idx):
         if self._fragment_index is None:
@@ -649,6 +707,37 @@ class PeptideSequence(PeptideSequenceBase):
             return ([frag] for frag in self.stub_fragments(True))
         else:
             return strategy(self, kind, chemical_shifts=chemical_shifts, **kwargs)
+
+    def stub_fragments(self, extended=False, extended_fucosylation=False, strategy=None, **kwargs):
+        if strategy is None:
+            strategy = StubGlycopeptideStrategy
+        return strategy(
+            self, extended, extended_fucosylation=extended_fucosylation, **kwargs)
+
+    def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,
+                         include_large_glycan_fragments=True, maximum_fragment_size=5,
+                         strategy=None):
+        r'''
+        Generate all oxonium ions for the attached glycan, and
+        if `all_series` is `True`, then include the B/Y glycan
+        ion ladder, with the peptide attached to the Y ion ladder.
+
+        Parameters
+        ----------
+        all_series: bool
+            Generate the B/Y+peptide ion ladder, otherwise just 2-residue
+            pairs for all monosaccharides in :attr:`self.glycan`
+
+        Yields
+        ------
+        SimpleFragment
+        '''
+        if strategy is None:
+            strategy = OxoniumIonStrategy
+        return strategy(
+            self, oxonium=oxonium, all_series=all_series, allow_ambiguous=allow_ambiguous,
+            include_large_glycan_fragments=include_large_glycan_fragments,
+            maximum_fragment_size=maximum_fragment_size)
 
     def drop_modification(self, position, modification_type):
         '''
@@ -725,70 +814,21 @@ class PeptideSequence(PeptideSequenceBase):
                         len(self) - frags[0].position]
                     position.append(frags)
 
-    def get_sequence(self, include_glycan=True, include_termini=True, implicit_n_term=None, implicit_c_term=None):
-        """
-        Generate human readable sequence string. Called by :meth:`__str__`
+    # sequence mutators
 
-        Parameters
-        ----------
-        include_glycan: bool
-            Whether to include the glycan in the resulting string. Defaults to `True`
-        include_termini: bool
-            Whether to include the N- and C-termini. Make sure this is `True` if you want non-standard
-            termini to be properly propagated.
-
-
-        Returns
-        -------
-        str
-        """
-        if implicit_n_term is None:
-            implicit_n_term = structure_constants.N_TERM_DEFAULT
-        if implicit_c_term is None:
-            implicit_c_term = structure_constants.C_TERM_DEFAULT
-
-        seq_list = []
-        for x, y in self.sequence:
-            mod_str = ''
-            if y:
-                mod_str = '|'.join(mod.serialize() for mod in y)
-                mod_str = ''.join(['(', mod_str, ')'])
-            seq_list.append(''.join([x.symbol, mod_str]))
-        rep = ''.join(seq_list)
-        if include_termini:
-            n_term = ""
-            if self.n_term is not None and self.n_term != implicit_n_term:
-                n_term = "({0})-".format(self.n_term.serialize())
-            c_term = ""
-            if self.c_term is not None and self.c_term != implicit_c_term:
-                c_term = "-({0})".format(self.c_term.serialize())
-            rep = "{0}{1}{2}".format(n_term, rep, c_term)
-        if include_glycan:
-            if self._glycosylation_manager.aggregate is not None:
-                rep += str(self._glycosylation_manager.aggregate)
-        return rep
-
-    def __str__(self):
-        return self.get_sequence()
-
-    def clone(self):
-        inst = self.__class__()
-        if self._glycosylation_manager.aggregate is not None:
-            glycan = self._glycosylation_manager.aggregate.clone()
-            glycan.composition_offset = Composition("H2O")
-        else:
-            glycan = None
-        inst._init_from_components(
-            self.sequence, glycan,
-            self.n_term.modification,
-            self.c_term.modification)
-        return inst
+    def _retrack_sequence(self):
+        self._glycosylation_manager.clear()
+        for i, position in enumerate(self):
+            for mod in position[1]:
+                if mod.is_tracked_for(ModificationCategory.glycosylation):
+                    self._glycosylation_manager[i] = mod
 
     def insert(self, position, residue, modifications=None):
         if modifications is None:
             modifications = []
         self._invalidate()
-        self.sequence.insert(position, [residue, modifications])
+        self.sequence.insert(
+            position, SequencePosition([residue, modifications]))
         self.mass += residue.mass
         for mod in modifications:
             self.mass += mod.mass
@@ -803,10 +843,10 @@ class PeptideSequence(PeptideSequenceBase):
         self._retrack_sequence()
 
     def substitute(self, position, residue):
-        old_residue = self.sequence[position][0]
+        old_residue = self.sequence[position].amino_acid
         self.mass -= old_residue.mass
         self.mass += residue.mass
-        self.sequence[position][0] = residue
+        self.sequence[position].amino_acid = residue
         self._invalidate()
         self._retrack_sequence()
 
@@ -853,37 +893,6 @@ class PeptideSequence(PeptideSequenceBase):
     @property
     def glycosylation_sites(self):
         return self.n_glycan_sequon_sites
-
-    def stub_fragments(self, extended=False, extended_fucosylation=False, strategy=None, **kwargs):
-        if strategy is None:
-            strategy = StubGlycopeptideStrategy
-        return strategy(
-            self, extended, extended_fucosylation=extended_fucosylation, **kwargs)
-
-    def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,
-                         include_large_glycan_fragments=True, maximum_fragment_size=5,
-                         strategy=None):
-        r'''
-        Generate all oxonium ions for the attached glycan, and
-        if `all_series` is `True`, then include the B/Y glycan
-        ion ladder, with the peptide attached to the Y ion ladder.
-
-        Parameters
-        ----------
-        all_series: bool
-            Generate the B/Y+peptide ion ladder, otherwise just 2-residue
-            pairs for all monosaccharides in :attr:`self.glycan`
-
-        Yields
-        ------
-        SimpleFragment
-        '''
-        if strategy is None:
-            strategy = OxoniumIonStrategy
-        return strategy(
-            self, oxonium=oxonium, all_series=all_series, allow_ambiguous=allow_ambiguous,
-            include_large_glycan_fragments=include_large_glycan_fragments,
-            maximum_fragment_size=maximum_fragment_size)
 
     def peptide_composition(self):
         if self._peptide_composition is None:

@@ -59,6 +59,8 @@ def _init_from_parsed_string(PeptideSequenceBase self, list seq_list, glycan=Non
         ModificationBase mod
         AminoAcidResidueBase res
         SequencePosition position
+        bint has_glycan
+
     i = 0
     n = PyList_Size(seq_list)
     self.sequence = sequence = PyList_New(n)
