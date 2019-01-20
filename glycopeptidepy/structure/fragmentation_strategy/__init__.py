@@ -1,3 +1,4 @@
+from glycopeptidepy.utils.collectiontools import _AccumulatorBag
 
 from .base import FragmentationStrategyBase
 
@@ -16,6 +17,7 @@ from .peptide import (
 
 __all__ = [
     "FragmentationStrategyBase",
+    "_AccumulatorBag",
 
     "StubGlycopeptideStrategy", "GlycanCompositionFragmentStrategyBase",
     "CADFragmentationStrategy", "_MonosaccharideDefinitionCacher",
