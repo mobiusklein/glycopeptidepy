@@ -14,13 +14,14 @@ from glycopeptidepy._c.structure.constants cimport Configuration
 
 from glycopeptidepy.structure.residue import AminoAcidResidue
 from glycopeptidepy.structure.modification import Modification, ModificationCategory
+from glycopeptidepy.structure.glycan import GlycosylationManager
 from glycopeptidepy.structure import constants as _structure_constants
 
 
 cdef Configuration structure_constants = _structure_constants
 cdef object ModificationImpl = Modification
 cdef object AminoAcidResidueImpl = AminoAcidResidue
-
+cdef object GlycosylationManagerImpl = GlycosylationManager
 
 cdef dict terminal_group_cache = dict()
 
@@ -51,7 +52,8 @@ cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylat
 
 
 @cython.binding
-def _init_from_parsed_string(PeptideSequenceBase self, list seq_list, glycan=None, n_term=None, c_term=None, **kwargs):
+cpdef _init_from_parsed_string(PeptideSequenceBase self, list seq_list, glycan=None, n_term=None,
+                               c_term=None):
     cdef:
         size_t i, j, n, m
         list sequence, item, mods, mod_strs
@@ -109,8 +111,8 @@ def _init_from_parsed_string(PeptideSequenceBase self, list seq_list, glycan=Non
 
 
 @cython.binding
-def _init_from_components(PeptideSequenceBase self, list seq_list, glycan_composition=None,
-                          ModificationBase n_term=None, ModificationBase c_term=None, **kwargs):
+cpdef _init_from_components(PeptideSequenceBase self, list seq_list, glycan_composition=None,
+                            ModificationBase n_term=None, ModificationBase c_term=None):
     """Initialize a :class:`PeptideSequence`'s state from a sequence of (
     :class:`~.AminoAcidResidue`, [:class:`~.Modification`, ]) pairs, with optional extra information
     defining the glycan composition aggregate and the terminal groups
@@ -170,3 +172,21 @@ cpdef _init_termini(PeptideSequenceBase self, TerminalGroup n_term, TerminalGrou
     self._n_term = n_term
     self._c_term = c_term
     self._mass += n_term.mass + c_term.mass
+
+
+@cython.binding
+cpdef _initialize_fields(PeptideSequenceBase self):
+        """Initialize all mutable fields to their default, empty values.
+        """
+        self._mass = 0.0
+        self.sequence = []
+        self._fragment_index = None
+
+        self._glycosylation_manager = GlycosylationManagerImpl(self)
+
+        self._n_term = None
+        self._c_term = None
+
+        self._fragments_map = {}
+        self._total_composition = None
+        self._peptide_composition = None

@@ -304,7 +304,6 @@ class PeptideSequence(PeptideSequenceBase):
         assumes that the glycan's glycosidic bonds have been broken, leaving only
         the amide-bound HexNAc as a modification attached to the amino acid backbone
     '''
-    position_class = SequencePosition
 
     @classmethod
     def from_iterable(cls, iterable, glycan_composition=None, n_term=None, c_term=None, text=None, **kwargs):
@@ -515,6 +514,8 @@ class PeptideSequence(PeptideSequenceBase):
     @property
     def total_mass(self):
         return _calculate_mass(self)
+
+    # glycan related methods
 
     @property
     def glycan(self):
