@@ -9,6 +9,7 @@ try:
 except ImportError:
     from collections import Mapping, Sequence as SequenceABC
 
+from glycopeptidepy.structure.residue import UnknownAminoAcidException, symbol_to_residue
 from glycopeptidepy.structure.sequence import ProteinSequence
 from glycopeptidepy.utils.sequence_tree import SuffixTree
 from glypy.utils.base import opener
@@ -522,11 +523,33 @@ FastaFileParser = FastaFileReader
 
 class ProteinFastaFileReader(FastaFileReader):
 
-    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False):
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False, replace_unknown=None):
         super(ProteinFastaFileReader, self).__init__(path, defline_parser, encoding, index=index)
+        self.replace_unknown = replace_unknown
+        self._replace_amino_acid_pattern = None
+
+    def _make_replace_amino_acid_pattern(self):
+        pattern = re.compile(r"[^%s]" % (
+            ''.join(symbol_to_residue.keys()), ))
+        return pattern
+
+    def _replace_unknown_amino_acids(self, sequence):
+        if self._replace_amino_acid_pattern is None:
+            self._replace_amino_acid_pattern = self._make_replace_amino_acid_pattern()
+        pattern = self._replace_amino_acid_pattern
+        return pattern.sub("X", sequence)
 
     def process_result(self, d):
-        p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
+        try:
+            p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
+        except UnknownAminoAcidException:
+            if self.replace_unknown is None or self.replace_unknown:
+                if self.replace_unknown is None:
+                    warnings.warn("Replacing unknown amino acids in %s" % d['name'])
+                d['sequence'] = self._replace_unknown_amino_acids(d['sequence'])
+                p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
+            else:
+                raise
         return p
 
 

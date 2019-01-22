@@ -1,5 +1,5 @@
 import unittest
-
+import warnings
 from io import BytesIO
 try:
     from StringIO import StringIO
@@ -51,6 +51,20 @@ PROTEIN
         outbuffer.seek(0)
         new_proteins = list(fasta.ProteinFastaFileReader(outbuffer))
         assert proteins == new_proteins
+
+    def test_replaces_unknown(self):
+        reader = fasta.ProteinFastaFileReader(
+            datafile("unknown_amino_acid.fa"), replace_unknown=True)
+        contents = list(reader)
+        assert len(contents) == 1
+        reader = fasta.ProteinFastaFileReader(
+            datafile("unknown_amino_acid.fa"), replace_unknown=False)
+        with warnings.catch_warnings(record=True) as warning_log:
+            warnings.simplefilter("always")
+            should_fail = list(reader)
+            assert len(should_fail) == 0
+            assert len(warning_log) == 1
+            assert "B" in str(warning_log[0].message)
 
 
 class TestHeaderParsing(unittest.TestCase):
