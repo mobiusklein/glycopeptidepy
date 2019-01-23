@@ -15,10 +15,12 @@ from . import residue
 from .residue import (
     AminoAcidResidue, register_degenerate, register_residue)
 
+from .terminal_group import TerminalGroup
+
 from . import sequence
 from .sequence import (
     PeptideSequence, NamedSequence, ProteinSequence,
-    AnnotatedSequence, TerminalGroup,
+    AnnotatedSequence,
     find_glycosaminoglycan_sequons, find_n_glycosylation_sequons,
     find_o_glycosylation_sequons, )
 
