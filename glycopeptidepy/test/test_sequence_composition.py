@@ -7,7 +7,7 @@ class TestSequenceComposition(unittest.TestCase):
     def test_parse(self):
         composition_string = '{N:2; K:1; E:2; Y:1}'
         composition = sequence_composition.SequenceComposition.parse(composition_string)
-        seq = sequence.parse("NEEYNK")
+        seq = sequence.PeptideSequence("NEEYNK")
         self.assertAlmostEqual(seq.mass, composition.mass, 3)
 
     def test_serialize(self):
