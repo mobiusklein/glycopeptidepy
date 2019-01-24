@@ -29,6 +29,6 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     cdef TerminalGroup get_c_term(self)
     cdef void set_c_term(self, _value)
 
-    cpdef str get_sequence(self, bint include_glycan=*, bint include_termini=*, str implicit_n_term=*, str implicit_c_term=*)
+    cpdef basestring get_sequence(self, bint include_glycan=*, bint include_termini=*, str implicit_n_term=*, str implicit_c_term=*)
     cpdef clone(self)
 

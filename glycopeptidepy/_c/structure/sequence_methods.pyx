@@ -216,6 +216,9 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term))
 
     cpdef _init_termini(self, TerminalGroup n_term, TerminalGroup c_term):
+        '''This method assumes that the terminal groups are not yet initialized,
+        and that their mass contributions are not reflected in :attr:`_mass`
+        '''
         self._n_term = n_term
         self._c_term = c_term
         self._mass += n_term.mass + c_term.mass
@@ -426,7 +429,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     def __hash__(self):
         return hash(self.get_sequence())
 
-    cpdef str get_sequence(self, bint include_glycan=True, bint include_termini=True, str implicit_n_term=None, str implicit_c_term=None):
+    cpdef basestring get_sequence(self, bint include_glycan=True, bint include_termini=True, str implicit_n_term=None, str implicit_c_term=None):
         """
         Generate human readable sequence string. Called by :meth:`__str__`
 
@@ -453,7 +456,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             size_t i, j, n, m
             SequencePosition position
             ModificationBase mod
-            str mod_str, n_term, c_term, rep
+            basestring mod_str, n_term, c_term, rep
             bint needs_terminals
 
         seq_list = []
