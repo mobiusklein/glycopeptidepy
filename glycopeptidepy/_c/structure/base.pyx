@@ -66,7 +66,7 @@ cdef class TerminalGroup(object):
     def modification(self, ModificationBase value):
         self.set_modification(value)
 
-    def modify(self, modification):
+    cpdef TerminalGroup  modify(self, ModificationBase modification):
         return self.__class__(self.base_composition, modification)
 
     cdef CComposition get_composition(self):

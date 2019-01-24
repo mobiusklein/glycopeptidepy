@@ -1,3 +1,5 @@
+from six import string_types as basestring
+
 from .. import constants as structure_constants
 from ..base import PeptideSequenceBase, SequencePosition
 from ..composition import Composition
@@ -355,8 +357,6 @@ class _PeptideSequenceCore(PeptideSequenceBase):
 
 try:
     from glycopeptidepy._c.structure import sequence_methods
-    _PeptideSequenceCore._init_from_parsed_string = sequence_methods._init_from_parsed_string
-    _PeptideSequenceCore._init_from_components = sequence_methods._init_from_components
-    _PeptideSequenceCore._init_termini = sequence_methods._init_termini
-except ImportError:
-    pass
+    _PeptideSequenceCore = sequence_methods._PeptideSequenceCore
+except ImportError as err:
+    print(err)

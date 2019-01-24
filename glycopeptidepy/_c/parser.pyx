@@ -14,20 +14,6 @@ from glycopeptidepy.structure import constants as _structure_constants
 cdef Configuration structure_constants = _structure_constants
 
 
-ctypedef fused sequence_encoded_t:
-    str
-    object
-
-
-cdef enum ParserState:
-    start,
-    n_term,
-    aa,
-    mod,
-    c_term,
-
-
-
 cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     '''A simple stateful sequence parser implementing a formally context-free language
     describing components of a polypeptide sequence with N-, C- and internal modifications,
@@ -182,7 +168,7 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
     return chunks, mods, glycan, n_term, c_term
 
 
-def sequence_tokenizer(object sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
+cpdef sequence_tokenizer(object sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     if isinstance(sequence, str):
         return _sequence_tokenizer[str](<str>sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
     if PY_MAJOR_VERSION > 2:

@@ -11,11 +11,24 @@ cdef AminoAcidResidueBase _parse_residue(basestring residue_string)
 cdef TerminalGroup _make_terminal_group(basestring base_composition_formula, ModificationBase modification=*)
 
 
-cpdef _init_from_parsed_string(PeptideSequenceBase self, list seq_list, glycan=*, n_term=*, c_term=*)
+cdef class _PeptideSequenceCore(PeptideSequenceBase):
 
+    cpdef _init_from_parsed_string(self, list seq_list, glycan=*, n_term=*, c_term=*)
 
-cpdef _init_from_components(PeptideSequenceBase self, list seq_list, glycan_composition=*,
-                            ModificationBase n_term=*, ModificationBase c_term=*)
+    cpdef _init_from_string(self, sequence, parser_function)
 
+    cpdef _init_from_components(self, list seq_list, glycan_composition=*, ModificationBase n_term=*, ModificationBase c_term=*)
 
-cpdef _init_termini(PeptideSequenceBase self, TerminalGroup n_term, TerminalGroup c_term)
+    cpdef _init_termini(self, TerminalGroup n_term, TerminalGroup c_term)
+
+    cpdef _initialize_fields(self)
+
+    cdef size_t get_size(self)
+    cdef TerminalGroup get_n_term(self)
+    cdef void set_n_term(self, _value)
+    cdef TerminalGroup get_c_term(self)
+    cdef void set_c_term(self, _value)
+
+    cpdef str get_sequence(self, bint include_glycan=*, bint include_termini=*, str implicit_n_term=*, str implicit_c_term=*)
+    cpdef clone(self)
+

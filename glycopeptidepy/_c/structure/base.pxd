@@ -30,7 +30,7 @@ cdef class TerminalGroup(object):
 
     cdef ModificationBase get_modification(self)
     cdef CComposition get_composition(self)
-
+    cpdef TerminalGroup  modify(self, ModificationBase modification)
     cdef void set_modification(self, ModificationBase)
 
 

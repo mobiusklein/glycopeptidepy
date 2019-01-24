@@ -1,3 +1,5 @@
+from six import string_types as basestring
+
 from ..fragmentation_strategy import HCDFragmentationStrategy
 from ..fragment import IonSeries
 
