@@ -127,7 +127,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         self._mass = mass
         has_glycan = glycan is not None
         if has_glycan:
-            self._glycosylation_manager.aggregate = glycan.clone()
+            self._glycosylation_manager.aggregate = glycan
 
         if isinstance(n_term, basestring):
             if n_term != structure_constants.N_TERM_DEFAULT:
