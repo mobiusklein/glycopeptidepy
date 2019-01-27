@@ -17,6 +17,7 @@ from cpython.int cimport PyInt_AsLong, PyInt_Check, PyInt_FromLong
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.collectiontools cimport descending_combination_counter
+from glycopeptidepy._c.count_table cimport CountTable
 from glycopeptidepy._c.structure.constants cimport Configuration
 from glycopeptidepy._c.structure.fragment cimport IonSeriesBase, PeptideFragment, ChemicalShiftBase
 from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
@@ -152,7 +153,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
     cpdef track_glycosylation(self, index, glycosylation):
         self.glycosylation_manager[self.index] = glycosylation
-        self.modification_index[glycosylation] += 1
+        self.modification_index.increment(glycosylation, 1)
 
     cpdef _update_state(self):
         cdef:
@@ -167,8 +168,8 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             if mod.is_tracked_for(ModificationCategory_glycosylation):
                 self.track_glycosylation(self.index, mod)
             else:
-                self.modification_index[mod] += 1
-        self.amino_acids_counter[position.amino_acid] += 1
+                self.modification_index.increment(mod, 1)
+        self.amino_acids_counter.increment(position.amino_acid, 1)
         composition = self.composition_of(position)
         self.running_mass += position.amino_acid.mass
         self.running_composition.add_from(composition)
@@ -291,7 +292,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             raise ValueError("Cannot determine which core to use for {}".format(
                 glycosylation.rule.glycosylation_type))
         self.glycosylation_manager[self.index] = glycosylation
-        self.modification_index[glycosylation] += 1
+        self.modification_index.increment(glycosylation, 1)
 
     cpdef ModificationConfiguration _get_modifications_of_interest(self, PeptideFragment fragment):
         cdef:
@@ -338,11 +339,11 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             modifications_of_interest[_modification_xylose] += gag_cores
         return modifications_of_interest
 
-    cpdef list _generate_modification_variants(self, interesting_modifications, other_modifications):
+    cpdef list _generate_modification_variants(self, interesting_modifications, dict other_modifications):
         cdef:
             list variants, variant_modification_list
             dict varied_modifications
-            object updated_modifications
+            CountTable updated_modifications
             size_t i, n
             Py_ssize_t pos
             PyObject *key
@@ -355,14 +356,15 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         n = PyList_Size(variant_modification_list)
         for i in range(n):
             varied_modifications = <dict>PyList_GetItem(variant_modification_list, i)
-            updated_modifications = ModificationIndex(other_modifications)
+            updated_modifications = CountTable._create()
+            updated_modifications._update_from_dict(other_modifications)
             extra_composition = CComposition()
             pos = 0
             while PyDict_Next(varied_modifications, &pos, &key, &value):
                 mod = <ModificationBase>key
                 count = PyInt_AsLong(<object>value)
                 if count != 0:
-                    updated_modifications[mod] += <object>value
+                    updated_modifications.increment(mod, PyInt_AsLong(<object>value))
                     extra_composition.add_from(mod.composition * count)
 
             variants.append((updated_modifications, extra_composition))

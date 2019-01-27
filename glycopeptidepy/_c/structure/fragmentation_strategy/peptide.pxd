@@ -2,6 +2,7 @@ cimport cython
 
 from glypy.composition.ccomposition cimport CComposition
 
+from glycopeptidepy._c.count_table cimport CountTable
 from glycopeptidepy._c.structure.fragment cimport IonSeriesBase, PeptideFragment, ChemicalShiftBase
 from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
 from glycopeptidepy._c.structure.base cimport ModificationBase, AminoAcidResidueBase, SequencePosition
@@ -34,9 +35,9 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         public CComposition running_composition
         public long index
         public long size
-        public object modification_index
+        public CountTable modification_index
         public object glycosylation_manager
-        public object amino_acids_counter
+        public CountTable amino_acids_counter
 
     cpdef _initialize_fields(self)
     cpdef _initialize_start_terminal(self)
@@ -55,7 +56,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     cpdef _update_state(self)
 
 
-# @cython.freelist(1000)
+@cython.freelist(1000)
 cdef class ModificationConfiguration(object):
     cdef:
         public object modifications_of_interest
@@ -76,5 +77,5 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
     cpdef _get_core_for(self, ModificationInstanceBase glycosylation)
     cpdef ModificationConfiguration _get_modifications_of_interest(self, PeptideFragment fragment)
     cpdef _replace_cores(self, modifications_of_interest)
-    cpdef list _generate_modification_variants(self, interesting_modifications, other_modifications)
+    cpdef list _generate_modification_variants(self, interesting_modifications, dict other_modifications)
 

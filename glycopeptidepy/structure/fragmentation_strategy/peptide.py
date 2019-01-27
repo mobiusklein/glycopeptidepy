@@ -287,13 +287,13 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
 
 
-# try:
-#     _has_c = True
-#     from glycopeptidepy._c.structure.fragmentation_strategy.peptide import (
-#         PeptideFragmentationStrategyBase,
-#         HCDFragmentationStrategy)
-# except ImportError:
-#     _has_c = False
+try:
+    _has_c = True
+    from glycopeptidepy._c.structure.fragmentation_strategy.peptide import (
+        PeptideFragmentationStrategyBase,
+        HCDFragmentationStrategy)
+except ImportError:
+    _has_c = False
 
 # Cooper, H. J., Hudgins, R. R., Håkansson, K., & Marshall, A. G. (2002).
 # Characterization of amino acid side chain losses in electron capture dissociation.
