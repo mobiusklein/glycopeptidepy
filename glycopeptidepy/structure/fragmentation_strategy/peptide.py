@@ -286,6 +286,15 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         return fragments
 
 
+
+# try:
+#     _has_c = True
+#     from glycopeptidepy._c.structure.fragmentation_strategy.peptide import (
+#         PeptideFragmentationStrategyBase,
+#         HCDFragmentationStrategy)
+# except ImportError:
+#     _has_c = False
+
 # Cooper, H. J., Hudgins, R. R., Håkansson, K., & Marshall, A. G. (2002).
 # Characterization of amino acid side chain losses in electron capture dissociation.
 # Journal of the American Society for Mass Spectrometry, 13(3), 241–249.
@@ -381,6 +390,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
             for position, glycosylation in glycosylations
         ]
         fragment_combinations = product(*fragments)
+        results = []
         for fragment_set in fragment_combinations:
             if fragment_set == ():
                 continue
@@ -398,6 +408,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 bare_fragment.bare_mass,
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
                 composition=bare_fragment.composition + delta_composition)
-            yield extended_fragment
+            results.append(extended_fragment)
         # yield the intact fragment
-        yield fragment
+        results.append(fragment)
+        return results

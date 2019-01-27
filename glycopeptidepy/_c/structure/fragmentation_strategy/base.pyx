@@ -1,3 +1,10 @@
+from glypy.composition.ccomposition cimport CComposition
+
+from glycopeptidepy._c.structure.fragment cimport IonSeriesBase
+from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
+from glycopeptidepy._c.structure.base cimport ModificationBase
+
+
 from glycopeptidepy.structure.modification import (
     Modification,
     NGlycanCoreGlycosylation,
@@ -6,6 +13,7 @@ from glycopeptidepy.structure.modification import (
 
 
 from glycopeptidepy.structure.glycan import (GlycosylationType)
+
 
 _n_glycosylation = NGlycanCoreGlycosylation()
 _o_glycosylation = OGlycanCoreGlycosylation()
@@ -21,7 +29,7 @@ glycosylation_type_to_core = {
 }
 
 
-class FragmentationStrategyBase(object):
+cdef class FragmentationStrategyBase(object):
     def __init__(self, peptide, *args, **kwargs):
         self.peptide = peptide
         super(FragmentationStrategyBase, self).__init__(*args, **kwargs)
@@ -37,15 +45,8 @@ class FragmentationStrategyBase(object):
     def __iter__(self):
         return self
 
-    def peptide_composition(self):
+    cpdef CComposition peptide_composition(self):
         return self.peptide.peptide_composition()
 
-    def total_composition(self):
+    cpdef CComposition total_composition(self):
         return self.peptide.total_composition()
-
-
-try:
-    _has_c = True
-    from glycopeptidepy._c.structure.fragmentation_strategy.base import FragmentationStrategyBase
-except ImportError:
-    _has_c = False

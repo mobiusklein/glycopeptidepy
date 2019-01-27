@@ -364,7 +364,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             total += gc.mass()
         return total
 
-    def peptide_composition(self):
+    cpdef CComposition peptide_composition(self):
         if self._peptide_composition is None:
             if self.glycan is None:
                 glycan_composition = CComposition()
@@ -373,7 +373,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             self._peptide_base_composition = self.total_composition() - glycan_composition
         return self._peptide_base_composition
 
-    def total_composition(self):
+    cpdef CComposition total_composition(self):
         if self._total_composition is None:
             self._total_composition = _total_composition(self)
         return self._total_composition

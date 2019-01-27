@@ -9,10 +9,6 @@ cdef object product
 
 from itertools import product
 
-ctypedef fused mapping_t:
-    object
-    # dict
-
 cpdef list descending_combination_counter(mapping_t counter):
     cdef:
         list keys, values, results

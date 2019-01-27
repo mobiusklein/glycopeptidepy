@@ -1,5 +1,6 @@
 cimport cython
 
+from glypy.composition.ccomposition cimport CComposition
 from glycopeptidepy._c.structure.base cimport (
     PeptideSequenceBase,
     SequencePosition, TerminalGroup, AminoAcidResidueBase,
@@ -32,3 +33,5 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     cpdef basestring get_sequence(self, bint include_glycan=*, bint include_termini=*, str implicit_n_term=*, str implicit_c_term=*)
     cpdef clone(self)
 
+    cpdef CComposition peptide_composition(self)
+    cpdef CComposition total_composition(self)
