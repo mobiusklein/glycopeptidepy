@@ -1,4 +1,4 @@
-# cython: embedsignature=True, profile=True
+# cython: embedsignature=True
 
 from collections import defaultdict
 from itertools import product, combinations
@@ -17,7 +17,7 @@ from cpython.int cimport PyInt_AsLong, PyInt_Check, PyInt_FromLong
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.collectiontools cimport descending_combination_counter
-from glycopeptidepy._c.count_table cimport CountTable
+from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator
 from glycopeptidepy._c.structure.constants cimport Configuration
 from glycopeptidepy._c.structure.fragment cimport IonSeriesBase, PeptideFragment, ChemicalShiftBase
 from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
@@ -179,9 +179,9 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         frag = PeptideFragment(
             self.series,
             self.name_index_of(),
-            dict(self.modification_index),
+            self.modification_index._to_dict(),
             self.running_mass,
-            glycosylation=self.glycosylation_manager.copy(),
+            glycosylation=self.glycosylation_manager.copy() if self.glycosylation_manager else None,
             flanking_amino_acids=self.flanking_residues(),
             composition=self.running_composition)
         shifts = self._get_viable_chemical_shift_combinations()
@@ -224,17 +224,20 @@ hcd_modification_compositions = {
 cdef class ModificationConfiguration(object):
 
     @staticmethod
-    cdef ModificationConfiguration _create(object modifications_of_interest, object other_modifications, CComposition delta_composition):
+    cdef ModificationConfiguration _create(CountTable modifications_of_interest, CountTable other_modifications,
+                                           CComposition delta_composition, dict modification_set):
         cdef ModificationConfiguration inst = ModificationConfiguration.__new__(ModificationConfiguration)
         inst.modifications_of_interest = modifications_of_interest
         inst.other_modifications = other_modifications
         inst.delta_composition = delta_composition
+        inst.modification_set = modification_set
         return inst
 
-    def __init__(self, modifications_of_interest, other_modifications, delta_composition):
+    def __init__(self, modifications_of_interest, other_modifications, delta_composition, modification_set):
         self.modifications_of_interest = modifications_of_interest
         self.other_modifications = other_modifications
         self.delta_composition = delta_composition
+        self.modification_set = modification_set
 
     def __iter__(self):
         yield self.modifications_of_interest
@@ -248,9 +251,9 @@ cdef class ModificationConfiguration(object):
     cdef bint equal_to(self, ModificationConfiguration other):
         if other is None:
             return False
-        if self.modifications_of_interest != other.modifications_of_interest:
+        if not self.modifications_of_interest.equal_to(other.modifications_of_interest):
             return False
-        if self.other_modifications != other.other_modifications:
+        if not self.other_modifications.equal_to(other.other_modifications):
             return False
         return True
 
@@ -298,52 +301,59 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         cdef:
             ModificationConfiguration result
             CComposition delta_composition
-            dict modifications, other_modifications
-            object modifications_of_interest
-            Py_ssize_t pos
+            dict modifications
+            CountTable modifications_of_interest, other_modifications
+            Py_ssize_t pos, j
             PyObject *key
             PyObject *value
             ModificationBase mod
             long count
 
+        if self._last_modification_set is not None:
+            if self._last_modification_set.modification_set == fragment.modification_dict:
+                return self._last_modification_set
 
         modifications = dict(fragment.modification_dict)
-        delta_composition = CComposition()
-        other_modifications = dict()
-        modifications_of_interest = defaultdict(int)
+        delta_composition = CComposition._create(None)
+        other_modifications = CountTable._create()
+        modifications_of_interest = CountTable._create()
         pos = 0
         while PyDict_Next(modifications, &pos, &key, &value):
             mod = <ModificationBase>key
             count = PyInt_AsLong(<object>value)
             if mod.name in hcd_modifications_of_interest:
-                modifications_of_interest[mod] = count
+                modifications_of_interest.setitem(mod, count)
                 delta_composition.add_from(mod.composition * count)
             else:
-                other_modifications[mod] = <object>value
+                other_modifications.setitem(mod, count)
 
         result = ModificationConfiguration._create(
-            modifications_of_interest, other_modifications, delta_composition)
+            modifications_of_interest, other_modifications,
+            delta_composition, modifications)
         return result
 
-    cpdef _replace_cores(self, modifications_of_interest):
-        n_cores = modifications_of_interest.pop(_n_glycosylation, 0)
-        o_cores = modifications_of_interest.pop(_o_glycosylation, 0)
-        gag_cores = modifications_of_interest.pop(_gag_linker_glycosylation, 0)
+    cpdef _replace_cores(self, CountTable modifications_of_interest):
+        cdef:
+            long n_cores, o_cores, gag_cores, hexnac_cores
+        n_cores = modifications_of_interest.pop(_n_glycosylation)
+        o_cores = modifications_of_interest.pop(_o_glycosylation)
+        gag_cores = modifications_of_interest.pop(_gag_linker_glycosylation)
 
         # Convert core glycosylation into the residual monosaccharides remaining
         # after dissociation
         hexnac_cores = n_cores * 2 + o_cores
         if hexnac_cores:
-            modifications_of_interest[_modification_hexnac] += hexnac_cores
+            modifications_of_interest.increment(_modification_hexnac, hexnac_cores)
         if gag_cores:
-            modifications_of_interest[_modification_xylose] += gag_cores
+            modifications_of_interest.increment(_modification_xylose, gag_cores)
         return modifications_of_interest
 
-    cpdef list _generate_modification_variants(self, interesting_modifications, dict other_modifications):
+    cpdef list _generate_modification_variants(self, interesting_modifications, CountTable other_modifications):
         cdef:
             list variants, variant_modification_list
-            dict varied_modifications
+            CountTable varied_modifications
             CountTable updated_modifications
+            CountTableIterator it
             size_t i, n
             Py_ssize_t pos
             PyObject *key
@@ -352,19 +362,22 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             long count
 
         variants = []
-        variant_modification_list = list(descending_combination_counter(interesting_modifications))
+        variant_modification_list = descending_combination_counter(interesting_modifications)
         n = PyList_Size(variant_modification_list)
         for i in range(n):
-            varied_modifications = <dict>PyList_GetItem(variant_modification_list, i)
+            varied_modifications = <CountTable>PyList_GetItem(variant_modification_list, i)
             updated_modifications = CountTable._create()
-            updated_modifications._update_from_dict(other_modifications)
+            updated_modifications._update_from_count_table(other_modifications)
             extra_composition = CComposition()
             pos = 0
-            while PyDict_Next(varied_modifications, &pos, &key, &value):
+            it = CountTableIterator._create(varied_modifications)
+            while it.has_more():
+                pos = it.get_next_value(&key, &count)
+                if pos != 0:
+                    break
                 mod = <ModificationBase>key
-                count = PyInt_AsLong(<object>value)
                 if count != 0:
-                    updated_modifications.increment(mod, PyInt_AsLong(<object>value))
+                    updated_modifications.increment(mod, count)
                     extra_composition.add_from(mod.composition * count)
 
             variants.append((updated_modifications, extra_composition))
@@ -386,7 +399,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
         self._replace_cores(mod_config.modifications_of_interest)
 
-        if mod_config.equal_to(self._last_modification_set):
+        if mod_config is self._last_modification_set:
             variants = self._last_modification_variants
         else:
             self._last_modification_set = mod_config

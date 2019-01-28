@@ -59,12 +59,14 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 @cython.freelist(1000)
 cdef class ModificationConfiguration(object):
     cdef:
-        public object modifications_of_interest
-        public dict other_modifications
+        public CountTable modifications_of_interest
+        public CountTable other_modifications
         public CComposition delta_composition
+        public dict modification_set
 
     @staticmethod
-    cdef ModificationConfiguration _create(object modifications_of_interest, object other_modifications, CComposition delta_composition)
+    cdef ModificationConfiguration _create(CountTable modifications_of_interest, CountTable other_modifications,
+                                           CComposition delta_composition, dict modification_set)
 
     cdef bint equal_to(self, ModificationConfiguration other)
 
@@ -76,6 +78,6 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
     cpdef _get_core_for(self, ModificationInstanceBase glycosylation)
     cpdef ModificationConfiguration _get_modifications_of_interest(self, PeptideFragment fragment)
-    cpdef _replace_cores(self, modifications_of_interest)
-    cpdef list _generate_modification_variants(self, interesting_modifications, dict other_modifications)
+    cpdef _replace_cores(self, CountTable modifications_of_interest)
+    cpdef list _generate_modification_variants(self, interesting_modifications, CountTable other_modifications)
 

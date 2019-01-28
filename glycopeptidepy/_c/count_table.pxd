@@ -46,6 +46,19 @@ cdef count_table* count_table_copy(count_table* table_a)
 cdef bint count_table_equals(count_table* table_a, count_table* table_b)
 
 
+cdef class CountTableIterator(object):
+    cdef :
+        count_table* table
+        size_t bin_index
+        size_t cell_index
+
+    @staticmethod
+    cdef CountTableIterator _create(CountTable table)
+
+    cdef bint has_more(self)
+    cdef int get_next_value(self, PyObject** key, long* value)
+
+
 cdef class CountTable(object):
     cdef:
         count_table* table
@@ -62,6 +75,8 @@ cdef class CountTable(object):
     cdef void _subtract_from_dict(self, dict other)
     cdef void _scale_by(self, long value)
 
+    cdef bint equal_to(self, CountTable other)
+
     cpdef dict _to_dict(self)
 
     cpdef update(self, obj)
@@ -71,9 +86,10 @@ cdef class CountTable(object):
     cpdef list keys(self)
     cpdef clear(self)
     cpdef setdefault(self, key, value)
+    cpdef long pop(self, object key)
+    cpdef get(self, object key, object default=?)
 
     cdef void increment(self, object key, long value)
     cdef void decrement(self, object key, long value)
     cdef long getitem(self, object key)
     cdef void setitem(self, object key, long value)
-    cdef long pop(self, object key)

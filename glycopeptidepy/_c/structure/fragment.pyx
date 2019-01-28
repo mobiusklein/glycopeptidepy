@@ -1,5 +1,8 @@
+# cython: embedsignature=True
 cimport cython
 from cpython cimport PyObject
+from cpython.ref cimport Py_INCREF
+from cpython.object cimport PyObject_Str
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next
 from cpython.int cimport PyInt_AsLong
@@ -222,7 +225,7 @@ cdef class PeptideFragment(FragmentBase):
                 count = PyInt_AsLong(<object>pvalue)
                 if count > 1:
                     fragment_name.extend(
-                        ['+', str(count), mod_rule.name])
+                        ['+', PyObject_Str(<object>pvalue), mod_rule.name])
                 elif count == 1:
                     fragment_name.extend(['+', mod_rule.name])
 
