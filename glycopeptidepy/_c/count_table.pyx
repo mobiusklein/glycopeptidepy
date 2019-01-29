@@ -67,7 +67,7 @@ cdef count_table* make_count_table(size_t table_size, size_t bin_size):
         count_table* table
     table = <count_table*>PyMem_Malloc(sizeof(count_table))
     if table == NULL:
-        raise MemoryError()    
+        raise MemoryError()
     table.bins = <count_table_bin*>PyMem_Malloc(sizeof(count_table_bin) * table_size)
     if table.bins == NULL:
         raise MemoryError()
@@ -278,7 +278,7 @@ cdef void count_table_subtract(count_table* table_a, count_table* table_b):
             if table_b.bins[i].cells[j].key != NULL:
                 count_table_get(table_a, table_b.bins[i].cells[j].key, &temp)
                 count_table_get(table_b, table_b.bins[i].cells[j].key, &value)
-                count_table_put(table_a, table_b.bins[i].cells[j].key, value - temp)
+                count_table_put(table_a, table_b.bins[i].cells[j].key, temp - value)
 
 
 cdef void count_table_scale(count_table* table, long value):
@@ -302,8 +302,16 @@ cdef void count_table_update(count_table* table_a, count_table* table_b):
 
 
 cdef count_table* count_table_copy(count_table* table_a):
-    cdef count_table* dup = make_count_table(table_a.size, 2)
-    count_table_add(dup, table_a)
+    cdef:
+        count_table* dup
+        size_t i, j
+    dup = make_count_table(table_a.size, 2)
+    for i in range(table_a.size):
+        for j in range(table_a.bins[i].used):
+            if table_a.bins[i].cells[j].key != NULL:
+                count_table_bin_append(
+                    &dup.bins[i], table_a.bins[i].cells[j].key,
+                    table_a.bins[i].cells[j].value)
     return dup
 
 
@@ -388,20 +396,29 @@ cdef class CountTable(object):
     cdef CountTable _create():
         cdef CountTable inst
         inst = CountTable.__new__(CountTable)
+        inst._initialize_table()
         return inst
 
-    def __cinit__(self, *args, **kwargs):
-        self.table = make_count_table(6, 2)
-        if self.table == NULL:
-            raise MemoryError()
+    @staticmethod
+    cdef CountTable _create_from(CountTable table):
+        cdef CountTable inst
+        inst = CountTable.__new__(CountTable)
+        inst.table = count_table_copy(table.table)
+        return inst        
 
     def __init__(self, obj=None, **kwargs):
         # print("Creating CountTable", obj, kwargs)
+        self._initialize_table()
         if obj is not None:
             self.update(obj)
         if kwargs:
             self.update(kwargs)
         # print("Init Complete")
+
+    cdef void _initialize_table(self):
+        self.table = make_count_table(6, 2)
+        if self.table == NULL:
+            raise MemoryError()
 
     cpdef update(self, obj):
         if isinstance(obj, CountTable):
@@ -426,8 +443,9 @@ cdef class CountTable(object):
 
     cpdef CountTable copy(self):
         # print("Copying")
-        cdef CountTable inst = CountTable._create()
-        inst._update_from_count_table(self)
+        cdef CountTable inst = CountTable._create_from(self)
+        # cdef CountTable inst = CountTable._create()
+        # inst._add_from(self)
         return inst
 
     def __reduce__(self):
@@ -638,14 +656,14 @@ cdef class CountTable(object):
         # assert status == 0
         Py_DECREF(key)
 
-    cdef void increment(self, object key, long value):        
+    cdef void increment(self, object key, long value):
         cdef PyObject* pkey = <PyObject*>key
         Py_INCREF(key)
         cdef int status = count_table_increment(self.table, pkey, value)
         # assert status == 0
         Py_DECREF(key)
 
-    cdef void decrement(self, object key, long value):        
+    cdef void decrement(self, object key, long value):
         cdef PyObject* pkey = <PyObject*>key
         Py_INCREF(key)
         cdef int status = count_table_decrement(self.table, pkey, value)
