@@ -4,6 +4,7 @@ from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
 from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem
+from cpython.int cimport PyInt_AsLong
 
 from glycopeptidepy._c.structure.base cimport (
     PeptideSequenceBase,
@@ -382,7 +383,12 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         return iter(self.sequence)
 
     def __getitem__(self, index):
-        sub = self.get(index)
+        if isinstance(index, slice):
+            return self.sequence[index]
+        cdef c_index = PyInt_AsLong(index)
+        if c_index < 0:
+            return self.sequence[index]
+        sub = self.get(c_index)
         return sub
 
     def __setitem__(self, index, value):
