@@ -445,7 +445,10 @@ class IonSeries(_IonSeriesBase):
         except AttributeError:
             return self.name != other
 
-    __repr__ = simple_repr
+    def __repr__(self):
+        template = ("{self.__class__.__name__}({self.name}, "
+                    "direction={self.direction}, mass_shift={self.mass_shift})")
+        return template.format(self=self)
 
     def __str__(self):
         return str(self.name)
