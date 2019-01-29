@@ -38,8 +38,14 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
         glycan_parser_function = glycan_parser
 
     state = ParserState.start  # [start, n_term, aa, mod, c_term]
-    n_term = implicit_n_term or structure_constants.N_TERM_DEFAULT
-    c_term = implicit_c_term or structure_constants.C_TERM_DEFAULT
+    if implicit_n_term is None:
+        n_term = structure_constants.N_TERM_DEFAULT
+    else:
+        n_term = implicit_n_term
+    if implicit_c_term is None:
+        c_term = structure_constants.C_TERM_DEFAULT
+    else:
+        c_term = c_term
     mods = []
     chunks = []
     glycan = ""
