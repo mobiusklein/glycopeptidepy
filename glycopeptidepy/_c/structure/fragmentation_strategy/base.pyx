@@ -1,3 +1,4 @@
+cimport cython
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.fragment cimport IonSeriesBase
@@ -29,6 +30,7 @@ glycosylation_type_to_core = {
 }
 
 
+@cython.freelist(1000)
 cdef class FragmentationStrategyBase(object):
     def __init__(self, peptide, *args, **kwargs):
         self.peptide = peptide
