@@ -37,8 +37,8 @@ class ResidueBase(MoleculeBase):
 class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):
     __slots__ = ()
 
-    def __new__(self, parts):
-        return super(SequencePosition, self).__new__(self, *parts)
+    def __init__(self, parts):
+        return super(SequencePosition, self).__init__(*parts)
 
     def __repr__(self):
         return repr(list(self))
@@ -47,6 +47,7 @@ class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modificat
 try:
     from glycopeptidepy._c.structure.base import (
         AminoAcidResidueBase as ResidueBase,
-        ModificationBase, PeptideSequenceBase, SequencePosition)
+        ModificationBase, PeptideSequenceBase,
+        SequencePosition)
 except ImportError:
     pass
