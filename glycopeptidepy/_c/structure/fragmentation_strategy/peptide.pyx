@@ -313,7 +313,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             if self._last_modification_set.modification_set == fragment.modification_dict:
                 return self._last_modification_set
 
-        modifications = dict(fragment.modification_dict)
+        modifications = (fragment.modification_dict)
         delta_composition = CComposition._create(None)
         other_modifications = CountTable._create()
         modifications_of_interest = CountTable._create()
@@ -390,6 +390,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             list variants, fragments
             IonSeriesBase series
             tuple variant_pair
+            CountTable updated_modifications
             size_t i, n
 
         mod_config = self._get_modifications_of_interest(fragment)
@@ -412,11 +413,11 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         n = PyList_Size(variants)
         for i in range(n):
             variant_pair = <tuple>PyList_GetItem(variants, i)
-            updated_modifications = <object>PyTuple_GetItem(variant_pair, 0)
+            updated_modifications = <CountTable>PyTuple_GetItem(variant_pair, 0)
             extra_composition = <CComposition>PyTuple_GetItem(variant_pair, 1)
             fragments.append(
                 PeptideFragment(
-                    series, fragment.position, dict(updated_modifications), fragment.bare_mass,
+                    series, fragment.position, (updated_modifications._to_dict()), fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
                     composition=base_composition + extra_composition))
         return fragments

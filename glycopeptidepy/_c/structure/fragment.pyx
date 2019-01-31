@@ -1,4 +1,8 @@
 # cython: embedsignature=True
+
+from libc.stdlib cimport malloc
+from libc.string cimport strcpy, memcpy
+
 cimport cython
 from cpython cimport PyObject
 from cpython.ref cimport Py_INCREF
@@ -8,11 +12,13 @@ from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Ite
 from cpython.int cimport PyInt_AsLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
-
+from cpython.string cimport PyString_AsStringAndSize, PyString_FromStringAndSize
 
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.base cimport ModificationBase
+
+from glycopeptidepy._c.compat cimport PyStr_AsUTF8AndSize, PyStr_FromStringAndSize
 
 from glycopeptidepy.structure.modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
@@ -23,6 +29,28 @@ cdef ModificationBase _o_glycosylation = OGlycanCoreGlycosylation()
 cdef ModificationBase _gag_linker_glycosylation = GlycosaminoglycanLinkerGlycosylation()
 cdef ModificationBase _modification_hexnac = Modification("HexNAc").rule
 cdef ModificationBase _modification_xylose = Modification("Xyl").rule
+
+
+cdef struct string_cell:
+    char* string
+    size_t size
+
+DEF ARRAY_SIZE = 2 ** 12
+
+
+cdef string_cell[ARRAY_SIZE] str_ints
+cdef int i, z
+cdef bytes pa
+cdef char* a
+
+for i in range(ARRAY_SIZE):
+    pa = bytes(i)
+    z = len(pa)
+    a = <char*>malloc(sizeof(char) * z)
+    strcpy(a, pa)
+    a[z] = "\0"
+    str_ints[i].string = a
+    str_ints[i].size = z
 
 
 @cython.freelist(100)
@@ -206,35 +234,57 @@ cdef class PeptideFragment(FragmentBase):
 
     cpdef str get_fragment_name(self):
         cdef:
-            list fragment_name
             ModificationBase mod_rule
             int count
-            str name
             ChemicalShiftBase chemical_shift
             dict modification_dict
             PyObject *pkey
             PyObject *pvalue
+            Py_ssize_t index, size_ref
             Py_ssize_t ppos = 0
 
-        modification_dict = self.modification_dict
-        fragment_name = [self.get_series().name, str(self.position)]
+            string_cell int_conv
 
+            char* tmp_buffer
+            char[200] name_buffer
+
+        PyString_AsStringAndSize(self.get_series().name, &tmp_buffer, &size_ref)
+        index = 0
+        memcpy(&name_buffer[index], tmp_buffer, size_ref)
+        index += size_ref
+
+        int_conv = str_ints[self.position]
+        memcpy(&name_buffer[index], int_conv.string, int_conv.size)
+        index += int_conv.size
+
+        modification_dict = self.modification_dict
         while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
             mod_rule = <ModificationBase>pkey
             if mod_rule.is_a(ModificationCategory_glycosylation):
                 count = PyInt_AsLong(<object>pvalue)
                 if count > 1:
-                    fragment_name.extend(
-                        ['+', PyObject_Str(<object>pvalue), mod_rule.name])
+                    name_buffer[index] = "+"
+                    index += 1
+                    int_conv = str_ints[count]
+                    memcpy(&name_buffer[index], int_conv.string, int_conv.size)
+                    index += int_conv.size
+                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    memcpy(&name_buffer[index], tmp_buffer, size_ref)
+                    index += size_ref
                 elif count == 1:
-                    fragment_name.extend(['+', mod_rule.name])
+                    name_buffer[index] = "+"
+                    index += 1
+                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    memcpy(&name_buffer[index], tmp_buffer, size_ref)
+                    index += size_ref
+
 
         chemical_shift = self.get_chemical_shift()
-
         if chemical_shift is not None:
-            fragment_name.append(chemical_shift.name)
-        name = ''.join(fragment_name)
-        return name
+            tmp_buffer = PyStr_AsUTF8AndSize(chemical_shift.name, &size_ref)   
+            memcpy(&name_buffer[index], tmp_buffer, size_ref)
+            index += size_ref        
+        return PyStr_FromStringAndSize(&name_buffer[0], index)
 
     @property
     def is_glycosylated(self):

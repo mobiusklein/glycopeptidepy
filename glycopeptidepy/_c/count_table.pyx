@@ -2,7 +2,7 @@ import sys
 from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF, Py_XDECREF, Py_XINCREF
 from cpython.int cimport PyInt_AsLong, PyInt_FromLong
-from cpython.dict cimport PyDict_Next
+from cpython.dict cimport PyDict_Next, PyDict_SetItem
 
 try:
     from collections import Mapping
@@ -315,6 +315,20 @@ cdef count_table* count_table_copy(count_table* table_a):
     return dup
 
 
+cdef dict count_table_to_dict(count_table* table_a):
+    cdef:
+        dict dup
+        size_t i, j
+    dup = dict()
+    for i in range(table_a.size):
+        for j in range(table_a.bins[i].used):
+            if table_a.bins[i].cells[j].key != NULL:
+                PyDict_SetItem(
+                    dup, <object>table_a.bins[i].cells[j].key,
+                    PyInt_FromLong(table_a.bins[i].cells[j].value))
+    return dup
+
+
 cdef bint count_table_equals(count_table* table_a, count_table* table_b):
     cdef:
         size_t i, j
@@ -602,7 +616,7 @@ cdef class CountTable(object):
         count_table_scale(self.table, value)
 
     cpdef dict _to_dict(self):
-        return dict(self.items())
+        return count_table_to_dict(self.table)
 
     def __repr__(self):
         return "{self.__class__.__name__}({content})".format(
