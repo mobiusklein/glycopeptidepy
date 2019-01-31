@@ -10,7 +10,7 @@ from glypy.structure.glycan_composition import FrozenGlycanComposition
 cdef object glycan_parser = FrozenGlycanComposition.parse
 
 from glycopeptidepy.structure import constants as _structure_constants
-from glycopeptidepy._c.compat cimport PyStr_AsString, PyStr_FromStringAndSize, IS_PY3
+from glycopeptidepy._c.compat cimport PyStr_AsString, PyStr_FromStringAndSize
 
 cdef Configuration structure_constants = _structure_constants
 
@@ -352,9 +352,9 @@ cpdef sequence_tokenizer(object sequence, object implicit_n_term=None, object im
     if PY_MAJOR_VERSION > 2:
         if isinstance(sequence, bytes):
             return _sequence_tokenizer[str](
-                sequence.decode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
+                (<bytes>sequence).decode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
     else:
         if isinstance(sequence, unicode):
             return _sequence_tokenizer[str](
-                sequence.encode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
+                (<unicode>sequence).encode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
     return _sequence_tokenizer[object](sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
