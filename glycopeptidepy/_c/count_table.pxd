@@ -59,6 +59,7 @@ cdef class CountTableIterator(object):
 
     cdef void advance(self)
     cdef bint has_more(self)
+    cdef int _locate_next_value(self, PyObject** key, long* value)
     cdef int get_next_value(self, PyObject** key, long* value)
 
 

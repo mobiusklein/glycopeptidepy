@@ -347,7 +347,7 @@ cdef class CountTableIterator(object):
     cdef bint has_more(self):
         return self.next_key != NULL
 
-    cdef int get_next_value(self, PyObject** key, long* value):
+    cdef int _locate_next_value(self, PyObject** key, long* value):
         if not self.bin_index < self.table.size:
             key[0] = NULL
             return 1
@@ -373,14 +373,31 @@ cdef class CountTableIterator(object):
         key[0] = NULL
         return 1
 
+    cdef int get_next_value(self, PyObject** key, long* value):
+        cdef:
+            PyObject* next_key
+            long next_value
+            int status
+        if self.next_key == NULL:
+            key[0] = NULL
+            value[0] = 0
+            return 1
+        else:
+            key[0] = self.next_key
+            value[0] = self.next_value
+            status = self._locate_next_value(&next_key, &next_value)
+            self.next_key = next_key
+            self.next_value = next_value
+        return 0
+
     cdef void advance(self):
         cdef:
             PyObject* next_key
             long next_value
             int status
-        status = self.get_next_value(&next_key, &next_value)
+        status = self._locate_next_value(&next_key, &next_value)
         self.next_key = next_key
-        self.next_value = next_value        
+        self.next_value = next_value
 
     def __iter__(self):
         return self
@@ -396,10 +413,28 @@ cdef class CountTableIterator(object):
         else:
             key = self.next_key
             value = self.next_value
-            status = self.get_next_value(&next_key, &next_value)
+            status = self._locate_next_value(&next_key, &next_value)
             self.next_key = next_key
             self.next_value = next_value
         return (<object>key, value)
+
+    def _test(self):
+        cdef:
+            PyObject* key
+            long count
+            int pos, j
+            list result
+        pos = 0
+        j = 0
+        result = []
+        while self.has_more():
+            pos = self.get_next_value(&key, &count)
+            if pos != 0:
+                break
+            result.append((<object>key, count))
+            j += 1
+        return result
+
 
 
 cdef class CountTable(object):

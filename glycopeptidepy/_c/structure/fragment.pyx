@@ -57,7 +57,7 @@ for i in range(ARRAY_SIZE):
 @cython.freelist(100)
 cdef class ChemicalShiftBase(object):
 
-    def clone(self):
+    cpdef ChemicalShiftBase clone(self):
         return self.__class__(self.name, self.composition.clone())
 
     def __str__(self):
@@ -159,6 +159,30 @@ cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylat
 
 cdef class PeptideFragment(FragmentBase):
 
+    @staticmethod
+    cdef PeptideFragment _create(IonSeriesBase kind, int position, dict modification_dict, double mass,
+                                 list flanking_amino_acids=None, object glycosylation=None,
+                                 ChemicalShiftBase chemical_shift=None, CComposition composition=None):
+        cdef PeptideFragment self = PeptideFragment.__new__(PeptideFragment)
+        self.kind = kind
+        self.position = position
+
+        self.bare_mass = mass
+        self.mass = mass
+        self.modification_dict = modification_dict
+        self.composition = composition
+        self._chemical_shift = None
+        
+        self.flanking_amino_acids = flanking_amino_acids
+        self.glycosylation = glycosylation
+        self.set_chemical_shift(chemical_shift)
+
+        self._update_mass_with_modifications()
+
+        self._name = self.get_fragment_name()
+        self._hash = hash(self._name)
+        return self
+
     def __init__(self, kind, position, modification_dict, mass, flanking_amino_acids=None,
                  glycosylation=None, chemical_shift=None, composition=None):
         self.kind = kind
@@ -205,10 +229,9 @@ cdef class PeptideFragment(FragmentBase):
         return self.kind
 
     cpdef clone(self):
-        return self.__class__(
+        return PeptideFragment._create(
             self.series, self.position, dict(self.modification_dict),
-            self.bare_mass, list(
-                self.flanking_amino_acids),
+            self.bare_mass, list(self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,
             self.composition.clone())

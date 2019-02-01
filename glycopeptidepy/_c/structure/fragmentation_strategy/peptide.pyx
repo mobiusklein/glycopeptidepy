@@ -189,14 +189,16 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
     cpdef list _build_fragments(self):
         fragments_from_site = []
-        frag = PeptideFragment(
+        frag = PeptideFragment._create(
             self.series,
             self.name_index_of(),
             self.modification_index._to_dict(),
             self.running_mass,
-            glycosylation=self.glycosylation_manager.copy() if self.glycosylation_manager else None,
             flanking_amino_acids=self.flanking_residues(),
-            composition=self.running_composition)
+            glycosylation=self.glycosylation_manager.copy() if self.glycosylation_manager else None,
+            chemical_shift=None,
+            composition=self.running_composition
+            )
         shifts = self._get_viable_chemical_shift_combinations()
         for fragment in self.partial_loss(frag):
             fragments_from_site.append(fragment)
@@ -321,11 +323,9 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             PyObject *value
             ModificationBase mod
             long count
-
         if self._last_modification_set is not None:
             if self._last_modification_set.modification_set == fragment.modification_dict:
                 return self._last_modification_set
-
         modifications = (fragment.modification_dict)
         delta_composition = CComposition._create(None)
         other_modifications = CountTable._create()
@@ -339,7 +339,6 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 delta_composition.add_from(mod.composition * count)
             else:
                 other_modifications.setitem(mod, count)
-
         result = ModificationConfiguration._create(
             modifications_of_interest, other_modifications,
             delta_composition, modifications)
@@ -367,13 +366,12 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             CountTable varied_modifications
             CountTable updated_modifications
             CountTableIterator it
-            size_t i, n
+            size_t i, n, j
             Py_ssize_t pos
             PyObject *key
             PyObject *value
             ModificationBase mod
             long count
-
         variants = []
         variant_modification_list = descending_combination_counter(interesting_modifications)
         n = PyList_Size(variant_modification_list)
@@ -382,39 +380,37 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             updated_modifications = CountTable._create_from(other_modifications)
             extra_composition = CComposition._create(None)
             pos = 0
+            j = 0
             it = CountTableIterator._create(varied_modifications)
             while it.has_more():
                 pos = it.get_next_value(&key, &count)
                 if pos != 0:
                     break
+                j += 1
                 mod = <ModificationBase>key
                 if count != 0:
                     updated_modifications.increment(mod, count)
                     extra_composition.add_from(mod.composition * count)
-
             variants.append((updated_modifications, extra_composition))
         return variants
 
     cpdef list partial_loss(self, PeptideFragment fragment):
         cdef:
-            CComposition base_composition, delta_composition
+            CComposition base_composition, delta_composition, new_composition
             ModificationConfiguration mod_config
             list variants, fragments
             IonSeriesBase series
             tuple variant_pair
             CountTable updated_modifications
             size_t i, n
-
         mod_config = self._get_modifications_of_interest(fragment)
-
         base_composition = fragment.composition.clone()
         base_composition.subtract_from(mod_config.delta_composition)
-
-        self._replace_cores(mod_config.modifications_of_interest)
 
         if mod_config is self._last_modification_set:
             variants = self._last_modification_variants
         else:
+            self._replace_cores(mod_config.modifications_of_interest)
             self._last_modification_set = mod_config
             variants = self._last_modification_variants = self._generate_modification_variants(
                 mod_config.modifications_of_interest,
@@ -427,9 +423,13 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             variant_pair = <tuple>PyList_GetItem(variants, i)
             updated_modifications = <CountTable>PyTuple_GetItem(variant_pair, 0)
             extra_composition = <CComposition>PyTuple_GetItem(variant_pair, 1)
+            new_composition = base_composition.clone()
+            new_composition.add_from(extra_composition)
             fragments.append(
-                PeptideFragment(
+                PeptideFragment._create(
                     series, fragment.position, (updated_modifications._to_dict()), fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
-                    composition=base_composition + extra_composition))
+                    glycosylation=None,
+                    chemical_shift=None,
+                    composition=new_composition))
         return fragments

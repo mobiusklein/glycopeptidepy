@@ -7,6 +7,8 @@ cdef class ChemicalShiftBase(object):
         public CComposition composition
         public double mass
 
+    cpdef ChemicalShiftBase clone(self)
+
 
 cdef class IonSeriesBase(object):
     cdef:
@@ -37,7 +39,7 @@ cdef class FragmentBase(object):
 
     cdef:
         public str _name
-        public object _hash
+        public Py_hash_t _hash
         public double mass
         public ChemicalShiftBase _chemical_shift
 
@@ -59,6 +61,11 @@ cdef class PeptideFragment(FragmentBase):
         public list flanking_amino_acids
         public object glycosylation
         public CComposition composition
+
+    @staticmethod
+    cdef PeptideFragment _create(IonSeriesBase kind, int position, dict modification_dict, double mass,
+                                 list flanking_amino_acids=*, object glycosylation=*,
+                                 ChemicalShiftBase chemical_shift=*, CComposition composition=?)
 
     cpdef clone(self)
 
