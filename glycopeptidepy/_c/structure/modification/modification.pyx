@@ -29,3 +29,6 @@ cdef class ModificationInstanceBase(ModificationBase):
 
     cpdef bint is_tracked_for(self, category):
         return self.rule.is_tracked_for(category)
+
+    def __hash__(self):
+        return self._hash

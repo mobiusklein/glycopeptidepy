@@ -46,7 +46,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     cpdef CComposition composition_of(self, SequencePosition position)
     cpdef long name_index_of(self)
     cpdef list flanking_residues(self)
-    cpdef track_glycosylation(self, index, glycosylation)
+    cpdef track_glycosylation(self, long index, glycosylation)
 
     cpdef bint has_more(self)
     cpdef list _build_fragments(self)
@@ -79,5 +79,5 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
     cpdef _get_core_for(self, ModificationInstanceBase glycosylation)
     cpdef ModificationConfiguration _get_modifications_of_interest(self, PeptideFragment fragment)
     cpdef _replace_cores(self, CountTable modifications_of_interest)
-    cpdef list _generate_modification_variants(self, interesting_modifications, CountTable other_modifications)
+    cpdef list _generate_modification_variants(self, CountTable interesting_modifications, CountTable other_modifications)
 

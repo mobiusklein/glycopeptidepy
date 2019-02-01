@@ -41,6 +41,9 @@ except ImportError:
         def is_a(self, category):
             return category in self.categories
 
+        def __hash__(self):
+            return self._hash
+
 
 def _ModificationRule_reconstructor(tp):
     return tp.__new__(tp)
@@ -375,9 +378,6 @@ class ModificationRule(ModificationRuleBase):
                     solutions.append(target)
             self._c_term_targets = solutions
         return self._c_term_targets
-
-    def __hash__(self):
-        return self._hash
 
     def __eq__(self, other):
         if self is other:

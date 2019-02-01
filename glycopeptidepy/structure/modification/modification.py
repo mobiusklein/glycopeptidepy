@@ -32,6 +32,9 @@ class ModificationInstanceBase(ModificationBase):
         except AttributeError:
             self.composition = None
 
+    def __hash__(self):
+        return self._hash
+
 
 try:
     _has_c = True
@@ -75,9 +78,6 @@ class Modification(ModificationInstanceBase):
 
     def __str__(self):
         return self.serialize()
-
-    def __hash__(self):
-        return self._hash
 
     def __eq__(self, other):
         try:

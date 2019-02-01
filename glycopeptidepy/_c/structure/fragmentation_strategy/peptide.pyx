@@ -133,10 +133,23 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             return self.index > 1
 
     cpdef list flanking_residues(self):
-        residues = [self.peptide[self.index][0],
-                    self.peptide[self.index + self.direction][0]]
+        cdef:
+            list residues
+            SequencePosition pos_a, pos_b
+
+        residues = PyList_New(2)
+        pos_a = self.peptide.get(self.index)
+        pos_b = self.peptide.get(self.index + self.direction)
         if self.direction < 0:
-            residues = residues[::-1]
+            Py_INCREF(pos_b.amino_acid)
+            PyList_SetItem(residues, 0, pos_b.amino_acid)
+            Py_INCREF(pos_a.amino_acid)
+            PyList_SetItem(residues, 1, pos_a.amino_acid)
+        else:
+            Py_INCREF(pos_a.amino_acid)
+            PyList_SetItem(residues, 0, pos_a.amino_acid)
+            Py_INCREF(pos_b.amino_acid)
+            PyList_SetItem(residues, 1, pos_b.amino_acid)
         return residues
 
     cpdef long name_index_of(self):
@@ -151,7 +164,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         else:
             raise StopIteration()
 
-    cpdef track_glycosylation(self, index, glycosylation):
+    cpdef track_glycosylation(self, long index, glycosylation):
         self.glycosylation_manager[self.index] = glycosylation
         self.modification_index.increment(glycosylation, 1)
 
@@ -287,7 +300,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             composition.add_from(mod.composition)
         return composition
 
-    cpdef track_glycosylation(self, index, glycosylation):
+    cpdef track_glycosylation(self, long index, glycosylation):
         # HCD strategy does not track intact topologies
         try:
             glycosylation = self._get_core_for(glycosylation)
@@ -335,9 +348,9 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
     cpdef _replace_cores(self, CountTable modifications_of_interest):
         cdef:
             long n_cores, o_cores, gag_cores, hexnac_cores
-        n_cores = modifications_of_interest.pop(_n_glycosylation)
-        o_cores = modifications_of_interest.pop(_o_glycosylation)
-        gag_cores = modifications_of_interest.pop(_gag_linker_glycosylation)
+        n_cores = modifications_of_interest.delitem(_n_glycosylation)
+        o_cores = modifications_of_interest.delitem(_o_glycosylation)
+        gag_cores = modifications_of_interest.delitem(_gag_linker_glycosylation)
 
         # Convert core glycosylation into the residual monosaccharides remaining
         # after dissociation
@@ -348,7 +361,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             modifications_of_interest.increment(_modification_xylose, gag_cores)
         return modifications_of_interest
 
-    cpdef list _generate_modification_variants(self, interesting_modifications, CountTable other_modifications):
+    cpdef list _generate_modification_variants(self, CountTable interesting_modifications, CountTable other_modifications):
         cdef:
             list variants, variant_modification_list
             CountTable varied_modifications
@@ -366,9 +379,8 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         n = PyList_Size(variant_modification_list)
         for i in range(n):
             varied_modifications = <CountTable>PyList_GetItem(variant_modification_list, i)
-            updated_modifications = CountTable._create()
-            updated_modifications._update_from_count_table(other_modifications)
-            extra_composition = CComposition()
+            updated_modifications = CountTable._create_from(other_modifications)
+            extra_composition = CComposition._create(None)
             pos = 0
             it = CountTableIterator._create(varied_modifications)
             while it.has_more():

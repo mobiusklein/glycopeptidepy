@@ -132,6 +132,9 @@ cdef class AminoAcidResidueBase(object):
         inst.composition = composition
         return inst
 
+    def __hash__(self):
+        return self._hash
+
 
 cdef class ModificationBase(object):
     

@@ -1,6 +1,6 @@
 # cython: embedsignature=True
 
-from libc.stdlib cimport malloc
+from libc.stdlib cimport malloc, free, realloc
 from libc.string cimport strcpy, memcpy
 
 cimport cython
@@ -36,7 +36,7 @@ cdef struct string_cell:
     size_t size
 
 DEF ARRAY_SIZE = 2 ** 12
-
+DEF DEFAULT_FRAGMENT_NAME_BUFFER_SIZE = 128
 
 cdef string_cell[ARRAY_SIZE] str_ints
 cdef int i, z
@@ -238,16 +238,23 @@ cdef class PeptideFragment(FragmentBase):
             int count
             ChemicalShiftBase chemical_shift
             dict modification_dict
+            str name
             PyObject *pkey
             PyObject *pvalue
-            Py_ssize_t index, size_ref
+            Py_ssize_t index, size_ref, buffer_size
             Py_ssize_t ppos = 0
 
             string_cell int_conv
 
             char* tmp_buffer
-            char[200] name_buffer
+            char[DEFAULT_FRAGMENT_NAME_BUFFER_SIZE] default_name_buffer
+            char* name_buffer
+            char* oversized_buffer
+            bint needs_free
 
+        name_buffer = <char*>default_name_buffer
+        buffer_size = DEFAULT_FRAGMENT_NAME_BUFFER_SIZE
+        needs_free = False
         PyString_AsStringAndSize(self.get_series().name, &tmp_buffer, &size_ref)
         index = 0
         memcpy(&name_buffer[index], tmp_buffer, size_ref)
@@ -260,6 +267,16 @@ cdef class PeptideFragment(FragmentBase):
         modification_dict = self.modification_dict
         while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
             mod_rule = <ModificationBase>pkey
+            if buffer_size - index < 30:
+                if needs_free:
+                    name_buffer = <char*>realloc(name_buffer, sizeof(char) * buffer_size * 2)
+                    buffer_size *= 2
+                else:
+                    oversized_buffer = <char*>malloc(sizeof(char) * buffer_size * 2)
+                    memcpy(oversized_buffer, name_buffer, index)
+                    name_buffer = oversized_buffer
+                    needs_free = True
+                    buffer_size *= 2
             if mod_rule.is_a(ModificationCategory_glycosylation):
                 count = PyInt_AsLong(<object>pvalue)
                 if count > 1:
@@ -269,22 +286,54 @@ cdef class PeptideFragment(FragmentBase):
                     memcpy(&name_buffer[index], int_conv.string, int_conv.size)
                     index += int_conv.size
                     tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    if size_ref + index > buffer_size:
+                        if needs_free:
+                            name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref) * 2)
+                            buffer_size = (buffer_size + size_ref) * 2
+                        else:
+                            oversized_buffer = <char*>malloc(sizeof(char) * (buffer_size + size_ref) * 2)
+                            memcpy(oversized_buffer, name_buffer, index)
+                            name_buffer = oversized_buffer
+                            needs_free = True
+                            buffer_size = (buffer_size + size_ref) * 2
                     memcpy(&name_buffer[index], tmp_buffer, size_ref)
                     index += size_ref
                 elif count == 1:
                     name_buffer[index] = "+"
                     index += 1
                     tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    if size_ref + index > buffer_size:
+                        if needs_free:
+                            name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref) * 2)
+                            buffer_size = (buffer_size + size_ref) * 2
+                        else:
+                            oversized_buffer = <char*>malloc(sizeof(char) * (buffer_size + size_ref) * 2)
+                            memcpy(oversized_buffer, name_buffer, index)
+                            name_buffer = oversized_buffer
+                            needs_free = True
+                            buffer_size = (buffer_size + size_ref) * 2
                     memcpy(&name_buffer[index], tmp_buffer, size_ref)
                     index += size_ref
 
-
         chemical_shift = self.get_chemical_shift()
         if chemical_shift is not None:
-            tmp_buffer = PyStr_AsUTF8AndSize(chemical_shift.name, &size_ref)   
+            tmp_buffer = PyStr_AsUTF8AndSize(chemical_shift.name, &size_ref)
+            if size_ref + index > buffer_size:
+                if needs_free:
+                    name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref))
+                    buffer_size = (buffer_size + size_ref)
+                else:
+                    oversized_buffer = <char*>malloc(sizeof(char) * (buffer_size + size_ref))
+                    memcpy(oversized_buffer, name_buffer, index)
+                    name_buffer = oversized_buffer
+                    needs_free = True
+                    buffer_size = (buffer_size + size_ref) 
             memcpy(&name_buffer[index], tmp_buffer, size_ref)
             index += size_ref        
-        return PyStr_FromStringAndSize(&name_buffer[0], index)
+        name = PyStr_FromStringAndSize(&name_buffer[0], index)
+        if needs_free:
+            free(name_buffer)
+        return name
 
     @property
     def is_glycosylated(self):

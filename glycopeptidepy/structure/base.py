@@ -2,6 +2,7 @@ from glypy.utils import make_struct
 
 
 class MoleculeBase(object):
+    __slots__ = ()
     mass = None
 
     def __copy__(self):
@@ -22,6 +23,7 @@ class ModificationBase(MoleculeBase):
     '''
     A base type for classes describing peptide sequence modifications
     '''
+    __slots__ = ()
 
     def serialize(self):
         '''A string representation for inclusion in sequences'''
@@ -32,6 +34,7 @@ class ResidueBase(MoleculeBase):
     '''
     A base type for classes describing amino acid residues
     '''
+    __slots__ = ()
 
 
 class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):

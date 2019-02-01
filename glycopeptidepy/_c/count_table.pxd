@@ -51,10 +51,13 @@ cdef class CountTableIterator(object):
         count_table* table
         size_t bin_index
         size_t cell_index
+        PyObject* next_key
+        long next_value
 
     @staticmethod
     cdef CountTableIterator _create(CountTable table)
 
+    cdef void advance(self)
     cdef bint has_more(self)
     cdef int get_next_value(self, PyObject** key, long* value)
 
@@ -90,10 +93,11 @@ cdef class CountTable(object):
     cpdef list keys(self)
     cpdef clear(self)
     cpdef setdefault(self, key, value)
-    cpdef long pop(self, object key)
+    cpdef long pop(self, object key, object default=?)
     cpdef get(self, object key, object default=?)
 
     cdef void increment(self, object key, long value)
     cdef void decrement(self, object key, long value)
     cdef long getitem(self, object key)
     cdef void setitem(self, object key, long value)
+    cdef long delitem(self, object key)
