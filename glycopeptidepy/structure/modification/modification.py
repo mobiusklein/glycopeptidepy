@@ -35,6 +35,15 @@ class ModificationInstanceBase(ModificationBase):
     def __hash__(self):
         return self._hash
 
+    def __eq__(self, other):
+        try:
+            return other.name in self.rule.names
+        except AttributeError:
+            return other in self.rule.names
+
+    def __ne__(self, other):
+        return not self == other
+
 
 try:
     _has_c = True
@@ -78,15 +87,6 @@ class Modification(ModificationInstanceBase):
 
     def __str__(self):
         return self.serialize()
-
-    def __eq__(self, other):
-        try:
-            return other.name in self.rule.names
-        except AttributeError:
-            return other in self.rule.names
-
-    def __ne__(self, other):
-        return not self == other
 
     def __reduce__(self):
         return _Modifcation_reconstructor, (), self.__getstate__()

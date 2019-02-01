@@ -135,6 +135,22 @@ cdef class AminoAcidResidueBase(object):
     def __hash__(self):
         return self._hash
 
+    def __eq__(self, other):
+        if self is other:
+            return True
+        try:
+            return self.name == other.name or self.symbol == other.symbol
+        except AttributeError:
+            return self.name == other or self.symbol == other
+
+    def __ne__(self, other):
+        if self is other:
+            return False
+        try:
+            return self.name != other.name and self.symbol != other.symbol
+        except AttributeError:
+            return self.name != other and self.symbol != other
+
 
 cdef class ModificationBase(object):
     

@@ -12,7 +12,6 @@ from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Ite
 from cpython.int cimport PyInt_AsLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
-from cpython.string cimport PyString_AsStringAndSize, PyString_FromStringAndSize
 
 from glypy.composition.ccomposition cimport CComposition
 
@@ -39,15 +38,17 @@ DEF ARRAY_SIZE = 2 ** 12
 DEF DEFAULT_FRAGMENT_NAME_BUFFER_SIZE = 128
 
 cdef string_cell[ARRAY_SIZE] str_ints
-cdef int i, z
-cdef bytes pa
+cdef int i
+cdef Py_ssize_t z
+cdef str pa
 cdef char* a
+cdef char* atemp
 
 for i in range(ARRAY_SIZE):
-    pa = bytes(i)
-    z = len(pa)
+    pa = str(i)
     a = <char*>malloc(sizeof(char) * z)
-    strcpy(a, pa)
+    atemp = PyStr_AsUTF8AndSize(pa, &z)
+    strcpy(a, atemp)
     a[z] = "\0"
     str_ints[i].string = a
     str_ints[i].size = z
@@ -255,8 +256,8 @@ cdef class PeptideFragment(FragmentBase):
         name_buffer = <char*>default_name_buffer
         buffer_size = DEFAULT_FRAGMENT_NAME_BUFFER_SIZE
         needs_free = False
-        PyString_AsStringAndSize(self.get_series().name, &tmp_buffer, &size_ref)
         index = 0
+        tmp_buffer = PyStr_AsUTF8AndSize(self.get_series().name, &size_ref)
         memcpy(&name_buffer[index], tmp_buffer, size_ref)
         index += size_ref
 
