@@ -145,7 +145,7 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         frag = PeptideFragment(
             self.series,
             self.name_index_of(),
-            dict(self.modification_index),
+            self.modification_index.copy(),
             self.running_mass,
             glycosylation=self.glycosylation_manager.copy(),
             flanking_amino_acids=self.flanking_residues(),
@@ -217,10 +217,10 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         self.modification_index[glycosylation] += 1
 
     def _get_modifications_of_interest(self, fragment):
-        modifications = dict(fragment.modification_dict)
+        modifications = fragment.modification_dict
         delta_composition = Composition()
-        other_modifications = dict()
-        modifications_of_interest = defaultdict(int)
+        other_modifications = ModificationIndex()
+        modifications_of_interest = ModificationIndex()
 
         for k, v in modifications.items():
             if k.name in self.modifications_of_interest:
@@ -280,7 +280,7 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         for updated_modifications, extra_composition in variants:
             fragments.append(
                 PeptideFragment(
-                    series, fragment.position, dict(updated_modifications), fragment.bare_mass,
+                    series, fragment.position, updated_modifications, fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
                     composition=base_composition + extra_composition))
         return fragments
@@ -380,7 +380,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
         for position, glycosylation in glycosylations:
             base_composition -= glycosylation.composition
         bare_fragment = PeptideFragment(
-            fragment.series, fragment.position, dict(stripped_modifications),
+            fragment.series, fragment.position, ModificationIndex(stripped_modifications),
             fragment.bare_mass,
             flanking_amino_acids=fragment.flanking_amino_acids,
             composition=base_composition.clone())
@@ -404,7 +404,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 delta_composition += subfragment.composition
 
             extended_fragment = PeptideFragment(
-                bare_fragment.series, bare_fragment.position, dict(new_modifications),
+                bare_fragment.series, bare_fragment.position, new_modifications,
                 bare_fragment.bare_mass,
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
                 composition=bare_fragment.composition + delta_composition)

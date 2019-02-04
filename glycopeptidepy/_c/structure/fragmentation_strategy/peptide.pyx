@@ -188,24 +188,40 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.running_composition.add_from(composition)
 
     cpdef list _build_fragments(self):
-        fragments_from_site = []
+        cdef:
+            list fragments_from_site
+            list partial_loss_fragments
+            PeptideFragment fragment, f
+            size_t i, n, j, m, k
+
         frag = PeptideFragment._create(
             self.series,
             self.name_index_of(),
-            self.modification_index._to_dict(),
+            self.modification_index.copy(),
             self.running_mass,
             flanking_amino_acids=self.flanking_residues(),
             glycosylation=self.glycosylation_manager.copy() if self.glycosylation_manager else None,
             chemical_shift=None,
-            composition=self.running_composition
-            )
+            composition=self.running_composition)
         shifts = self._get_viable_chemical_shift_combinations()
-        for fragment in self.partial_loss(frag):
-            fragments_from_site.append(fragment)
-            for shift in shifts:
+        partial_loss_fragments = self.partial_loss(frag)
+
+        n = PyList_Size(partial_loss_fragments)
+        m = PyList_Size(shifts)
+        fragments_from_site = PyList_New(n * (m + 1))
+        k = 0
+        for i in range(n):
+            fragment = <PeptideFragment>PyList_GetItem(partial_loss_fragments, i)
+            Py_INCREF(fragment)
+            PyList_SetItem(fragments_from_site, k, fragment)
+            k += 1
+            for j in range(m):
+                shift = <ChemicalShiftBase>PyList_GetItem(shifts, j)
                 f = fragment.clone()
                 f.chemical_shift = shift
-                fragments_from_site.append(f)
+                Py_INCREF(f)
+                PyList_SetItem(fragments_from_site, k, f)
+                k += 1
         return fragments_from_site
 
     cpdef list partial_loss(self, PeptideFragment fragment):
@@ -240,7 +256,7 @@ cdef class ModificationConfiguration(object):
 
     @staticmethod
     cdef ModificationConfiguration _create(CountTable modifications_of_interest, CountTable other_modifications,
-                                           CComposition delta_composition, dict modification_set):
+                                           CComposition delta_composition, CountTable modification_set):
         cdef ModificationConfiguration inst = ModificationConfiguration.__new__(ModificationConfiguration)
         inst.modifications_of_interest = modifications_of_interest
         inst.other_modifications = other_modifications
@@ -316,7 +332,8 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         cdef:
             ModificationConfiguration result
             CComposition delta_composition
-            dict modifications
+            CountTable modifications
+            CountTableIterator modification_iterator
             CountTable modifications_of_interest, other_modifications
             Py_ssize_t pos, j
             PyObject *key
@@ -331,9 +348,10 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         other_modifications = CountTable._create()
         modifications_of_interest = CountTable._create()
         pos = 0
-        while PyDict_Next(modifications, &pos, &key, &value):
+        modification_iterator = CountTableIterator._create(modifications)
+        while modification_iterator.has_more():
+            pos = modification_iterator.get_next_value(&key, &count)
             mod = <ModificationBase>key
-            count = PyInt_AsLong(<object>value)
             if mod.name in hcd_modifications_of_interest:
                 modifications_of_interest.setitem(mod, count)
                 delta_composition.add_from(mod.composition * count)
@@ -427,7 +445,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             new_composition.add_from(extra_composition)
             fragments.append(
                 PeptideFragment._create(
-                    series, fragment.position, (updated_modifications._to_dict()), fragment.bare_mass,
+                    series, fragment.position, updated_modifications.copy(), fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
                     glycosylation=None,
                     chemical_shift=None,

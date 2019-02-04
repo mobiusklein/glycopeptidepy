@@ -19,6 +19,8 @@ from glycopeptidepy._c.structure.base cimport ModificationBase
 
 from glycopeptidepy._c.compat cimport PyStr_AsUTF8AndSize, PyStr_FromStringAndSize
 
+from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator
+
 from glycopeptidepy.structure.modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
@@ -160,7 +162,7 @@ cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylat
 cdef class PeptideFragment(FragmentBase):
 
     @staticmethod
-    cdef PeptideFragment _create(IonSeriesBase kind, int position, dict modification_dict, double mass,
+    cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
                                  list flanking_amino_acids=None, object glycosylation=None,
                                  ChemicalShiftBase chemical_shift=None, CComposition composition=None):
         cdef PeptideFragment self = PeptideFragment.__new__(PeptideFragment)
@@ -210,16 +212,21 @@ cdef class PeptideFragment(FragmentBase):
         cdef:
             ChemicalShiftBase chemical_shift
             ModificationBase mod
-            dict modification_dict
+            CountTable modification_dict
+            CountTableIterator modification_iterator
             PyObject *pkey
-            PyObject *pvalue
+            long count
             Py_ssize_t ppos = 0
 
         modification_dict = self.modification_dict
+        modification_iterator = CountTableIterator._create(modification_dict)
 
-        while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+        while modification_iterator.has_more():
+            ppos = modification_iterator.get_next_value(&pkey, &count)
+            if ppos != 0:
+                break
             mod = <ModificationBase>pkey
-            self.mass += mod.mass * PyInt_AsLong(<object>pvalue)
+            self.mass += mod.mass * count
 
         chemical_shift = self.get_chemical_shift()
         if chemical_shift is not None:
@@ -230,7 +237,7 @@ cdef class PeptideFragment(FragmentBase):
 
     cpdef clone(self):
         return PeptideFragment._create(
-            self.series, self.position, dict(self.modification_dict),
+            self.series, self.position, self.modification_dict.copy(),
             self.bare_mass, list(self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,
@@ -259,9 +266,10 @@ cdef class PeptideFragment(FragmentBase):
     cpdef str get_fragment_name(self):
         cdef:
             ModificationBase mod_rule
-            int count
+            long count
             ChemicalShiftBase chemical_shift
-            dict modification_dict
+            CountTable modification_dict
+            CountTableIterator modification_iterator
             str name
             PyObject *pkey
             PyObject *pvalue
@@ -289,7 +297,11 @@ cdef class PeptideFragment(FragmentBase):
         index += int_conv.size
 
         modification_dict = self.modification_dict
-        while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+        modification_iterator = CountTableIterator._create(modification_dict)
+        while modification_iterator.has_more():
+            ppos = modification_iterator.get_next_value(&pkey, &count)
+            if ppos != 0:
+                break
             mod_rule = <ModificationBase>pkey
             if buffer_size - index < 30:
                 if needs_free:
@@ -302,7 +314,6 @@ cdef class PeptideFragment(FragmentBase):
                     needs_free = True
                     buffer_size *= 2
             if mod_rule.is_a(ModificationCategory_glycosylation):
-                count = PyInt_AsLong(<object>pvalue)
                 if count > 1:
                     name_buffer[index] = "+"
                     index += 1
@@ -363,15 +374,20 @@ cdef class PeptideFragment(FragmentBase):
     def is_glycosylated(self):
         cdef:
             PyObject *pkey
-            PyObject *pvalue
+            long value
             Py_ssize_t ppos = 0
             ModificationBase mod
-            dict modification_dict
+            CountTable modification_dict
+            CountTableIterator modification_iterator
         if self.glycosylation:
             return True
         else:
             modification_dict = self.modification_dict
-            while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+            modification_iterator = CountTableIterator._create(modification_dict)
+            while modification_iterator.has_more():
+                ppos = modification_iterator.get_next_value(&pkey, &value)
+                if ppos != 0:
+                    break
                 mod = <ModificationBase>pkey
                 if mod.is_a(ModificationCategory_glycosylation):
                     return True

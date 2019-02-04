@@ -11,14 +11,14 @@ cdef class ModificationRuleBase(ModificationBase):
             return True
         if not isinstance(self, ModificationRuleBase):
             temp = self
-            self = other
+            self = <ModificationRuleBase>other
             other = temp
         idents = (<ModificationRuleBase>self).names
         if isinstance(other, ModificationRuleBase):
             other_idents = (<ModificationRuleBase>other).names
         else:
             other_idents = {other}
-        return len(idents & other_idents) > 0
+        return bool(idents & other_idents)
 
     def __ne__(self, other):
         return not self == other

@@ -1,4 +1,5 @@
 from glypy.composition.ccomposition cimport CComposition
+from glycopeptidepy._c.count_table cimport CountTable
 
 
 cdef class ChemicalShiftBase(object):
@@ -56,14 +57,14 @@ cdef class PeptideFragment(FragmentBase):
     cdef:
         public IonSeriesBase kind
         public int position
-        public dict modification_dict
+        public CountTable modification_dict
         public double bare_mass
         public list flanking_amino_acids
         public object glycosylation
         public CComposition composition
 
     @staticmethod
-    cdef PeptideFragment _create(IonSeriesBase kind, int position, dict modification_dict, double mass,
+    cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
                                  list flanking_amino_acids=*, object glycosylation=*,
                                  ChemicalShiftBase chemical_shift=*, CComposition composition=?)
 

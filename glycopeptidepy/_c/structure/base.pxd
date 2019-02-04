@@ -42,7 +42,7 @@ cdef class AminoAcidResidueBase(object):
         public double mass
         public CComposition composition
         public object neutral_loss
-        public object _hash
+        public Py_hash_t _hash
 
     @staticmethod
     cdef AminoAcidResidueBase _create(str name, str symbol, double mass, CComposition composition)

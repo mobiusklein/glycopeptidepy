@@ -62,11 +62,11 @@ cdef class ModificationConfiguration(object):
         public CountTable modifications_of_interest
         public CountTable other_modifications
         public CComposition delta_composition
-        public dict modification_set
+        public CountTable modification_set
 
     @staticmethod
     cdef ModificationConfiguration _create(CountTable modifications_of_interest, CountTable other_modifications,
-                                           CComposition delta_composition, dict modification_set)
+                                           CComposition delta_composition, CountTable modification_set)
 
     cdef bint equal_to(self, ModificationConfiguration other)
 
