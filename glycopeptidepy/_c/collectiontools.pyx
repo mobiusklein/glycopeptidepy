@@ -40,7 +40,7 @@ cpdef list descending_combination_counter(mapping_t counter):
     k = PyList_GET_SIZE(combos)
     results = PyList_New(k)
     for i in range(k):
-        result = CountTable()
+        result = CountTable._create()
         combo = <tuple>PyList_GET_ITEM(combos, i)
         for j in range(n):
             result.setitem(
