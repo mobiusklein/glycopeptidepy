@@ -30,7 +30,7 @@ fragment_shift_composition = {
     'x': Composition("CO2") - Composition("H"),
     'y': Composition('H'),
     'z': (-Composition("NH")),
-    'z1': (-Composition("NH2")),
+    'zp': (-Composition("NH2")),
 }
 
 fragment_shift = {
@@ -45,7 +45,7 @@ fragment_direction = {
     "x": -1,
     "y": -1,
     "z": -1,
-    "z1": -1,
+    "zp": -1,
 }
 
 generic_chemical_shifts_composition = {
@@ -489,6 +489,7 @@ IonSeries.b = IonSeries("b")
 IonSeries.y = IonSeries("y")
 IonSeries.c = IonSeries("c")
 IonSeries.z = IonSeries("z")
-IonSeries.z1 = IonSeries("z1")
+IonSeries.zp = IonSeries("zp")
+IonSeries.z1 = IonSeries.zp
 IonSeries.oxonium_ion = IonSeries("oxonium_ion", includes_peptide=False)
 IonSeries.stub_glycopeptide = IonSeries("stub_glycopeptide")
