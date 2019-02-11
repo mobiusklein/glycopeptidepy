@@ -29,7 +29,8 @@ fragment_shift_composition = {
     'c': Composition("NH2"),
     'x': Composition("CO2") - Composition("H"),
     'y': Composition('H'),
-    'z': (-Composition("NH"))
+    'z': (-Composition("NH")),
+    'z1': (-Composition("NH2")),
 }
 
 fragment_shift = {
@@ -44,6 +45,7 @@ fragment_direction = {
     "x": -1,
     "y": -1,
     "z": -1,
+    "z1": -1,
 }
 
 generic_chemical_shifts_composition = {
@@ -410,7 +412,8 @@ class IonSeries(_IonSeriesBase):
     def get(cls, name):
         return cls(name)
 
-    def __init__(self, name, direction=None, includes_peptide=True, mass_shift=None, regex=None):
+    def __init__(self, name, direction=None, includes_peptide=True, mass_shift=None, regex=None,
+                 composition_shift=None):
         if direction is None:
             if name in fragment_direction:
                 direction = fragment_direction[name]
@@ -426,8 +429,10 @@ class IonSeries(_IonSeriesBase):
         self.includes_peptide = includes_peptide
         self.mass_shift = mass_shift
         self.regex = re.compile(regex) if regex is not None else regex
-        self.composition_shift = fragment_shift_composition.get(
-            self.name, Composition())
+        if composition_shift is None:
+            self.composition_shift = fragment_shift_composition.get(self.name, Composition())
+        else:
+            self.composition_shift = composition_shift
         self._hash = hash(self.name)
 
     def __hash__(self):
@@ -484,5 +489,6 @@ IonSeries.b = IonSeries("b")
 IonSeries.y = IonSeries("y")
 IonSeries.c = IonSeries("c")
 IonSeries.z = IonSeries("z")
+IonSeries.z1 = IonSeries("z1")
 IonSeries.oxonium_ion = IonSeries("oxonium_ion", includes_peptide=False)
 IonSeries.stub_glycopeptide = IonSeries("stub_glycopeptide")
