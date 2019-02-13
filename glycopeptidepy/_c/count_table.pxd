@@ -23,10 +23,10 @@ cdef int count_table_bin_find(count_table_bin* bin, PyObject* query, Py_ssize_t*
 
 cdef count_table* make_count_table(size_t table_size, size_t bin_size)
 cdef void free_count_table(count_table* table)
-cdef int count_table_find_bin(count_table* table, PyObject* query, Py_ssize_t* bin_index)
-cdef int count_table_put(count_table* table, PyObject* key, long value)
-cdef int count_table_del(count_table* table, PyObject* key, long* value)
-cdef int count_table_get(count_table* table, PyObject* key, long* value)
+cdef int count_table_find_bin(count_table* table, PyObject* query, Py_ssize_t* bin_index) except 1
+cdef int count_table_put(count_table* table, PyObject* key, long value) except 1
+cdef int count_table_del(count_table* table, PyObject* key, long* value) except 1
+cdef int count_table_get(count_table* table, PyObject* key, long* value) except 1
 cdef int count_table_increment(count_table* table, PyObject* key, long value)
 cdef int count_table_decrement(count_table* table, PyObject* key, long value)
 
@@ -94,11 +94,11 @@ cdef class CountTable(object):
     cpdef list keys(self)
     cpdef clear(self)
     cpdef setdefault(self, key, value)
-    cpdef long pop(self, object key, object default=?)
+    cpdef long pop(self, object key, object default=?) except *
     cpdef get(self, object key, object default=?)
 
     cdef void increment(self, object key, long value)
     cdef void decrement(self, object key, long value)
-    cdef long getitem(self, object key)
-    cdef void setitem(self, object key, long value)
-    cdef long delitem(self, object key)
+    cdef long getitem(self, object key) except *
+    cdef int setitem(self, object key, long value) except 1
+    cdef long delitem(self, object key) except *
