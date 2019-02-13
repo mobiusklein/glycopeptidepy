@@ -694,7 +694,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         if xyl_in_aggregate == 0:
             xyl_in_aggregate = glycan.query("Xyl", exact=False)
         core_shifts = []
-        for xyl_count in range(min(0, xyl_in_aggregate) + 1):
+        for xyl_count in range(max(0, xyl_in_aggregate) + 1):
             if xyl_count == 0:
                 shift = {
                     "mass": 0,
@@ -744,7 +744,6 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                             "is_extended": False
                         }
                         core_shifts.append(shift)
-
         return core_shifts
 
     def stub_fragments(self):

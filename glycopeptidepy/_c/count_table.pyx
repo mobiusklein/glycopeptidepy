@@ -5,9 +5,9 @@ from cpython.int cimport PyInt_AsLong, PyInt_FromLong
 from cpython.dict cimport PyDict_Next, PyDict_SetItem
 
 try:
-    from collections import Mapping
+    from collections import Mapping, MutableMapping
 except ImportError:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, MutableMapping
 
 
 cdef int initialize_count_table_bin(count_table_bin* bin, size_t size):
@@ -235,13 +235,12 @@ cdef list count_table_items(count_table* table):
 cdef void count_table_add(count_table* table_a, count_table* table_b):
     cdef:
         size_t i, j
-        long value, temp
+        long value
     for i in range(table_b.size):
         for j in range(table_b.bins[i].used):
             if table_b.bins[i].cells[j].key != NULL:
-                count_table_get(table_a, table_b.bins[i].cells[j].key, &temp)
                 count_table_get(table_b, table_b.bins[i].cells[j].key, &value)
-                count_table_put(table_a, table_b.bins[i].cells[j].key, value + temp)
+                count_table_increment(table_a, table_b.bins[i].cells[j].key, value)
 
 
 cdef void count_table_subtract(count_table* table_a, count_table* table_b):
@@ -251,9 +250,8 @@ cdef void count_table_subtract(count_table* table_a, count_table* table_b):
     for i in range(table_b.size):
         for j in range(table_b.bins[i].used):
             if table_b.bins[i].cells[j].key != NULL:
-                count_table_get(table_a, table_b.bins[i].cells[j].key, &temp)
                 count_table_get(table_b, table_b.bins[i].cells[j].key, &value)
-                count_table_put(table_a, table_b.bins[i].cells[j].key, temp - value)
+                count_table_decrement(table_a, table_b.bins[i].cells[j].key, value)
 
 
 cdef void count_table_scale(count_table* table, long value):
@@ -727,6 +725,7 @@ cdef class CountTable(object):
 
 
 Mapping.register(CountTable)
+MutableMapping.register(CountTable)
 
 
 def main():

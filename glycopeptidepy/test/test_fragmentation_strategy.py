@@ -32,6 +32,11 @@ class StubGlycopeptideStrategyTest(unittest.TestCase):
                 fucosylated.append(frag)
         assert fucosylated
 
+    def test_gag_linker_stubs(self):
+        gp = sequence.PeptideSequence("ISAS(GAG-Linker)GVEDISR{Xyl:1; a,en-Hex:1; Hex:2; a-Hex:1; HexNAc(S):1}")
+        frags = list(gp.stub_fragments())
+        assert len(frags) == 5
+
     def test_fucosylation_mechanism_limited(self):
         gp = sequence.PeptideSequence("VLGFKPKPPKN(N-Glycosylation)ESLETYPLMMK{Fuc:2; Hex:8; HexNAc:6; Neu5Ac:4}")
         strategy = fragmentation_strategy.StubGlycopeptideStrategy(gp, extended=True)
