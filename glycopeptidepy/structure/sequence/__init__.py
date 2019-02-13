@@ -12,11 +12,13 @@ from .implementation import (
     ProteinSequence,
     list_to_sequence,)
 
+from .base import PeptideSequenceBase
 
 parse = PeptideSequence
 
 
 __all__ = [
+    "PeptideSequenceBase",
     "PeptideSequence", "NamedSequence", "ProteinSequence",
     "AnnotatedSequence", "find_glycosaminoglycan_sequons",
     "find_o_glycosylation_sequons", "find_n_glycosylation_sequons",
