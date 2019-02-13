@@ -10,3 +10,5 @@ cdef class ModificationRuleBase(ModificationBase):
         public basestring title
         public basestring common_name
         public basestring unimod_name
+
+        public Py_hash_t _hash

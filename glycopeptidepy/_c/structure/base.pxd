@@ -30,7 +30,7 @@ cdef class TerminalGroup(object):
 
     cdef ModificationBase get_modification(self)
     cdef CComposition get_composition(self)
-
+    cpdef TerminalGroup  modify(self, ModificationBase modification)
     cdef void set_modification(self, ModificationBase)
 
 
@@ -42,6 +42,7 @@ cdef class AminoAcidResidueBase(object):
         public double mass
         public CComposition composition
         public object neutral_loss
+        public Py_hash_t _hash
 
     @staticmethod
     cdef AminoAcidResidueBase _create(str name, str symbol, double mass, CComposition composition)

@@ -5,13 +5,11 @@ from cpython.int cimport PyInt_AsLong
 from cpython.tuple cimport PyTuple_GetItem
 from cpython.mapping cimport PyMapping_Keys, PyMapping_Values
 
+from glycopeptidepy._c.count_table cimport CountTable
+
 cdef object product
 
 from itertools import product
-
-ctypedef fused mapping_t:
-    object
-    # dict
 
 cpdef list descending_combination_counter(mapping_t counter):
     cdef:
@@ -19,11 +17,14 @@ cpdef list descending_combination_counter(mapping_t counter):
         object interval, v
         list count_ranges, combos
         int i, j, n, k
-        dict result
+        CountTable result
         tuple combo
     if mapping_t is dict:
         keys = list(PyDict_Keys(counter))
         values = list(PyDict_Values(counter))
+    elif mapping_t is CountTable:
+        keys = counter.keys()
+        values = counter.values()
     else:
         keys = list(PyMapping_Keys(counter))
         values = list(PyMapping_Values(counter))
@@ -39,10 +40,12 @@ cpdef list descending_combination_counter(mapping_t counter):
     k = PyList_GET_SIZE(combos)
     results = PyList_New(k)
     for i in range(k):
-        result = dict()
+        result = CountTable._create()
         combo = <tuple>PyList_GET_ITEM(combos, i)
         for j in range(n):
-            PyDict_SetItem(result, <object>PyList_GET_ITEM(keys, j), <object>PyTuple_GetItem(combo, j))
+            result.setitem(
+                <object>PyList_GET_ITEM(keys, j),
+                PyInt_AsLong(<object>PyTuple_GetItem(combo, j)))
         Py_INCREF(result)
         PyList_SetItem(results, i, result)
     return results

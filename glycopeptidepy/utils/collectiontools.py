@@ -84,3 +84,18 @@ try:
     from glycopeptidepy._c.collectiontools import descending_combination_counter
 except ImportError:
     has_c = False
+
+try:
+    from glycopeptidepy._c.count_table import CountTable
+
+    del _AccumulatorBag
+
+    class _AccumulatorBag(CountTable):
+        pass
+except ImportError:
+    has_c = False
+
+
+__all__ = [
+    "descending_combination_counter", "_AccumulatorBag"
+]

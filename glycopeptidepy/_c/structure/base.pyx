@@ -66,7 +66,7 @@ cdef class TerminalGroup(object):
     def modification(self, ModificationBase value):
         self.set_modification(value)
 
-    def modify(self, modification):
+    cpdef TerminalGroup  modify(self, ModificationBase modification):
         return self.__class__(self.base_composition, modification)
 
     cdef CComposition get_composition(self):
@@ -131,6 +131,25 @@ cdef class AminoAcidResidueBase(object):
         inst.mass = mass
         inst.composition = composition
         return inst
+
+    def __hash__(self):
+        return self._hash
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        try:
+            return self.name == other.name or self.symbol == other.symbol
+        except AttributeError:
+            return self.name == other or self.symbol == other
+
+    def __ne__(self, other):
+        if self is other:
+            return False
+        try:
+            return self.name != other.name and self.symbol != other.symbol
+        except AttributeError:
+            return self.name != other and self.symbol != other
 
 
 cdef class ModificationBase(object):

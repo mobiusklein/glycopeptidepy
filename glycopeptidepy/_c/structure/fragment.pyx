@@ -1,15 +1,25 @@
+# cython: embedsignature=True
+
+from libc.stdlib cimport malloc, free, realloc
+from libc.string cimport strcpy, memcpy
+
 cimport cython
 from cpython cimport PyObject
+from cpython.ref cimport Py_INCREF
+from cpython.object cimport PyObject_Str
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next
 from cpython.int cimport PyInt_AsLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
 
-
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.base cimport ModificationBase
+
+from glycopeptidepy._c.compat cimport PyStr_AsUTF8AndSize, PyStr_FromStringAndSize
+
+from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator
 
 from glycopeptidepy.structure.modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
@@ -22,10 +32,34 @@ cdef ModificationBase _modification_hexnac = Modification("HexNAc").rule
 cdef ModificationBase _modification_xylose = Modification("Xyl").rule
 
 
+cdef struct string_cell:
+    char* string
+    size_t size
+
+DEF ARRAY_SIZE = 2 ** 12
+DEF DEFAULT_FRAGMENT_NAME_BUFFER_SIZE = 128
+
+cdef string_cell[ARRAY_SIZE] str_ints
+cdef int i
+cdef Py_ssize_t z
+cdef str pa
+cdef char* a
+cdef char* atemp
+
+for i in range(ARRAY_SIZE):
+    pa = str(i)
+    a = <char*>malloc(sizeof(char) * z)
+    atemp = PyStr_AsUTF8AndSize(pa, &z)
+    strcpy(a, atemp)
+    a[z] = "\0"
+    str_ints[i].string = a
+    str_ints[i].size = z
+
+
 @cython.freelist(100)
 cdef class ChemicalShiftBase(object):
 
-    def clone(self):
+    cpdef ChemicalShiftBase clone(self):
         return self.__class__(self.name, self.composition.clone())
 
     def __str__(self):
@@ -127,6 +161,30 @@ cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylat
 
 cdef class PeptideFragment(FragmentBase):
 
+    @staticmethod
+    cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
+                                 list flanking_amino_acids=None, object glycosylation=None,
+                                 ChemicalShiftBase chemical_shift=None, CComposition composition=None):
+        cdef PeptideFragment self = PeptideFragment.__new__(PeptideFragment)
+        self.kind = kind
+        self.position = position
+
+        self.bare_mass = mass
+        self.mass = mass
+        self.modification_dict = modification_dict
+        self.composition = composition
+        self._chemical_shift = None
+        
+        self.flanking_amino_acids = flanking_amino_acids
+        self.glycosylation = glycosylation
+        self.set_chemical_shift(chemical_shift)
+
+        self._update_mass_with_modifications()
+
+        self._name = self.get_fragment_name()
+        self._hash = hash(self._name)
+        return self
+
     def __init__(self, kind, position, modification_dict, mass, flanking_amino_acids=None,
                  glycosylation=None, chemical_shift=None, composition=None):
         self.kind = kind
@@ -154,16 +212,21 @@ cdef class PeptideFragment(FragmentBase):
         cdef:
             ChemicalShiftBase chemical_shift
             ModificationBase mod
-            dict modification_dict
+            CountTable modification_dict
+            CountTableIterator modification_iterator
             PyObject *pkey
-            PyObject *pvalue
+            long count
             Py_ssize_t ppos = 0
 
         modification_dict = self.modification_dict
+        modification_iterator = CountTableIterator._create(modification_dict)
 
-        while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+        while modification_iterator.has_more():
+            ppos = modification_iterator.get_next_value(&pkey, &count)
+            if ppos != 0:
+                break
             mod = <ModificationBase>pkey
-            self.mass += mod.mass * PyInt_AsLong(<object>pvalue)
+            self.mass += mod.mass * count
 
         chemical_shift = self.get_chemical_shift()
         if chemical_shift is not None:
@@ -173,10 +236,9 @@ cdef class PeptideFragment(FragmentBase):
         return self.kind
 
     cpdef clone(self):
-        return self.__class__(
-            self.series, self.position, dict(self.modification_dict),
-            self.bare_mass, list(
-                self.flanking_amino_acids),
+        return PeptideFragment._create(
+            self.series, self.position, self.modification_dict.copy(),
+            self.bare_mass, list(self.flanking_amino_acids),
             self.glycosylation.clone() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,
             self.composition.clone())
@@ -203,49 +265,129 @@ cdef class PeptideFragment(FragmentBase):
 
     cpdef str get_fragment_name(self):
         cdef:
-            list fragment_name
             ModificationBase mod_rule
-            int count
-            str name
+            long count
             ChemicalShiftBase chemical_shift
-            dict modification_dict
+            CountTable modification_dict
+            CountTableIterator modification_iterator
+            str name
             PyObject *pkey
             PyObject *pvalue
+            Py_ssize_t index, size_ref, buffer_size
             Py_ssize_t ppos = 0
 
-        modification_dict = self.modification_dict
-        fragment_name = [self.get_series().name, str(self.position)]
+            string_cell int_conv
 
-        while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+            char* tmp_buffer
+            char[DEFAULT_FRAGMENT_NAME_BUFFER_SIZE] default_name_buffer
+            char* name_buffer
+            char* oversized_buffer
+            bint needs_free
+
+        name_buffer = <char*>default_name_buffer
+        buffer_size = DEFAULT_FRAGMENT_NAME_BUFFER_SIZE
+        needs_free = False
+        index = 0
+        tmp_buffer = PyStr_AsUTF8AndSize(self.get_series().name, &size_ref)
+        memcpy(&name_buffer[index], tmp_buffer, size_ref)
+        index += size_ref
+
+        int_conv = str_ints[self.position]
+        memcpy(&name_buffer[index], int_conv.string, int_conv.size)
+        index += int_conv.size
+
+        modification_dict = self.modification_dict
+        modification_iterator = CountTableIterator._create(modification_dict)
+        while modification_iterator.has_more():
+            ppos = modification_iterator.get_next_value(&pkey, &count)
+            if ppos != 0:
+                break
             mod_rule = <ModificationBase>pkey
+            if buffer_size - index < 30:
+                if needs_free:
+                    name_buffer = <char*>realloc(name_buffer, sizeof(char) * buffer_size * 2)
+                    buffer_size *= 2
+                else:
+                    oversized_buffer = <char*>malloc(sizeof(char) * buffer_size * 2)
+                    memcpy(oversized_buffer, name_buffer, index)
+                    name_buffer = oversized_buffer
+                    needs_free = True
+                    buffer_size *= 2
             if mod_rule.is_a(ModificationCategory_glycosylation):
-                count = PyInt_AsLong(<object>pvalue)
                 if count > 1:
-                    fragment_name.extend(
-                        ['+', str(count), mod_rule.name])
+                    name_buffer[index] = "+"
+                    index += 1
+                    int_conv = str_ints[count]
+                    memcpy(&name_buffer[index], int_conv.string, int_conv.size)
+                    index += int_conv.size
+                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    if size_ref + index > buffer_size:
+                        if needs_free:
+                            name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref) * 2)
+                            buffer_size = (buffer_size + size_ref) * 2
+                        else:
+                            oversized_buffer = <char*>malloc(sizeof(char) * (buffer_size + size_ref) * 2)
+                            memcpy(oversized_buffer, name_buffer, index)
+                            name_buffer = oversized_buffer
+                            needs_free = True
+                            buffer_size = (buffer_size + size_ref) * 2
+                    memcpy(&name_buffer[index], tmp_buffer, size_ref)
+                    index += size_ref
                 elif count == 1:
-                    fragment_name.extend(['+', mod_rule.name])
+                    name_buffer[index] = "+"
+                    index += 1
+                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    if size_ref + index > buffer_size:
+                        if needs_free:
+                            name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref) * 2)
+                            buffer_size = (buffer_size + size_ref) * 2
+                        else:
+                            oversized_buffer = <char*>malloc(sizeof(char) * (buffer_size + size_ref) * 2)
+                            memcpy(oversized_buffer, name_buffer, index)
+                            name_buffer = oversized_buffer
+                            needs_free = True
+                            buffer_size = (buffer_size + size_ref) * 2
+                    memcpy(&name_buffer[index], tmp_buffer, size_ref)
+                    index += size_ref
 
         chemical_shift = self.get_chemical_shift()
-
         if chemical_shift is not None:
-            fragment_name.append(chemical_shift.name)
-        name = ''.join(fragment_name)
+            tmp_buffer = PyStr_AsUTF8AndSize(chemical_shift.name, &size_ref)
+            if size_ref + index > buffer_size:
+                if needs_free:
+                    name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref))
+                    buffer_size = (buffer_size + size_ref)
+                else:
+                    oversized_buffer = <char*>malloc(sizeof(char) * (buffer_size + size_ref))
+                    memcpy(oversized_buffer, name_buffer, index)
+                    name_buffer = oversized_buffer
+                    needs_free = True
+                    buffer_size = (buffer_size + size_ref) 
+            memcpy(&name_buffer[index], tmp_buffer, size_ref)
+            index += size_ref        
+        name = PyStr_FromStringAndSize(&name_buffer[0], index)
+        if needs_free:
+            free(name_buffer)
         return name
 
     @property
     def is_glycosylated(self):
         cdef:
             PyObject *pkey
-            PyObject *pvalue
+            long value
             Py_ssize_t ppos = 0
             ModificationBase mod
-            dict modification_dict
+            CountTable modification_dict
+            CountTableIterator modification_iterator
         if self.glycosylation:
             return True
         else:
             modification_dict = self.modification_dict
-            while PyDict_Next(modification_dict, &ppos, &pkey, &pvalue):
+            modification_iterator = CountTableIterator._create(modification_dict)
+            while modification_iterator.has_more():
+                ppos = modification_iterator.get_next_value(&pkey, &value)
+                if ppos != 0:
+                    break
                 mod = <ModificationBase>pkey
                 if mod.is_a(ModificationCategory_glycosylation):
                     return True

@@ -42,6 +42,7 @@ def make_extensions():
             cython_directives['linetrace'] = True
         extensions = cythonize([
             Extension("glycopeptidepy._c.collectiontools", sources=['glycopeptidepy/_c/collectiontools.pyx']),
+            Extension("glycopeptidepy._c.count_table", sources=['glycopeptidepy/_c/count_table.pyx']),
             Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.pyx']),
             Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.pyx']),
             Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.pyx']),
@@ -52,10 +53,15 @@ def make_extensions():
                       sources=['glycopeptidepy/_c/structure/modification/rule.pyx']),
             Extension("glycopeptidepy._c.structure.modification.modification",
                       sources=['glycopeptidepy/_c/structure/modification/modification.pyx']),
+            Extension("glycopeptidepy._c.structure.fragmentation_strategy.base",
+                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/base.pyx"]),
+            Extension("glycopeptidepy._c.structure.fragmentation_strategy.peptide",
+                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/peptide.pyx"]),
         ], compiler_directives=cython_directives, force=force_cythonize)
     except ImportError:
         extensions = [
             Extension("glycopeptidepy._c.collectiontools", sources=['glycopeptidepy/_c/collectiontools.c']),
+            Extension("glycopeptidepy._c.count_table", sources=['glycopeptidepy/_c/count_table.c']),
             Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.c']),
             Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.c']),
             Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.c']),
@@ -66,6 +72,10 @@ def make_extensions():
                       sources=['glycopeptidepy/_c/structure/modification/rule.c']),
             Extension("glycopeptidepy._c.structure.modification.modification",
                       sources=['glycopeptidepy/_c/structure/modification/modification.c']),
+            Extension("glycopeptidepy._c.structure.fragmentation_strategy.base",
+                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/base.c"]),
+            Extension("glycopeptidepy._c.structure.fragmentation_strategy.peptide",
+                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/peptide.c"]),
         ]
     return extensions
 

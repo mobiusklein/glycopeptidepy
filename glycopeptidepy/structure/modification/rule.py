@@ -41,6 +41,22 @@ except ImportError:
         def is_a(self, category):
             return category in self.categories
 
+        def __hash__(self):
+            return self._hash
+
+        def __eq__(self, other):
+            if self is other:
+                return True
+            idents = self.names
+            try:
+                other_idents = other.names
+            except AttributeError:
+                other_idents = {other}
+            return len(idents & other_idents) > 0
+
+        def __ne__(self, other):
+            return not self == other
+
 
 def _ModificationRule_reconstructor(tp):
     return tp.__new__(tp)
@@ -375,22 +391,6 @@ class ModificationRule(ModificationRuleBase):
                     solutions.append(target)
             self._c_term_targets = solutions
         return self._c_term_targets
-
-    def __hash__(self):
-        return self._hash
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-        idents = self.names
-        try:
-            other_idents = other.names
-        except AttributeError:
-            other_idents = {other}
-        return len(idents & other_idents) > 0
-
-    def __ne__(self, other):
-        return not self == other
 
     def as_spec_strings(self):
         for target in self.targets:

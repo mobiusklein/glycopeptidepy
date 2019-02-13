@@ -231,7 +231,7 @@ class AminoAcidResidue(ResidueBase):
     if _has_c:
         __slots__ = ["neutral_loss", ]
     else:
-        __slots__ = ["name", "symbol", "mass", "composition", "neutral_loss"]
+        __slots__ = ["name", "symbol", "mass", "composition", "_hash", "neutral_loss"]
 
     @staticmethod
     @memoize()
@@ -252,6 +252,7 @@ class AminoAcidResidue(ResidueBase):
         except KeyError:
             raise UnknownAminoAcidException(
                 "No definition for Amino Acid %s" % (symbol if symbol is not None else name))
+        self._hash = hash(self.name)
         self.neutral_loss = residue_to_neutral_loss[self.name]
 
     def _by_name(self, name):
@@ -285,24 +286,25 @@ class AminoAcidResidue(ResidueBase):
     def __repr__(self):
         return self.name
 
-    def __hash__(self):
-        return hash(self.name)
+    if not _has_c:
+        def __hash__(self):
+            return self._hash
 
-    def __eq__(self, other):
-        if self is other:
-            return True
-        try:
-            return self.name == other.name or self.symbol == other.symbol
-        except AttributeError:
-            return self.name == other or self.symbol == other
+        def __eq__(self, other):
+            if self is other:
+                return True
+            try:
+                return self.name == other.name or self.symbol == other.symbol
+            except AttributeError:
+                return self.name == other or self.symbol == other
 
-    def __ne__(self, other):
-        if self is other:
-            return False
-        try:
-            return self.name != other.name and self.symbol != other.symbol
-        except AttributeError:
-            return self.name != other and self.symbol != other
+        def __ne__(self, other):
+            if self is other:
+                return False
+            try:
+                return self.name != other.name and self.symbol != other.symbol
+            except AttributeError:
+                return self.name != other and self.symbol != other
 
     def __reduce__(self):
         return _AminoAcidResidue_reconstructor, (), self.__getstate__()
@@ -317,6 +319,7 @@ class AminoAcidResidue(ResidueBase):
         self.composition = state[3]
         if len(state) > 4:
             self.neutral_loss = state[4]
+        self._hash = hash(self.name)
 
     @property
     def chemical_class(self):
