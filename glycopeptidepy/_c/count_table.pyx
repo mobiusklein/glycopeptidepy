@@ -1,4 +1,5 @@
 import sys
+from cpython cimport PyErr_SetString
 from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF, Py_XDECREF, Py_XINCREF
 from cpython.int cimport PyInt_AsLong, PyInt_FromLong
@@ -81,22 +82,28 @@ cdef void free_count_table(count_table* table):
     PyMem_Free(table)
 
 
-cdef int count_table_find_bin(count_table* table, PyObject* query, Py_ssize_t* bin_index):
+cdef int count_table_find_bin(count_table* table, PyObject* query, Py_ssize_t* bin_index) except 1:
     cdef object query_obj = <object>query
     Py_INCREF(query_obj)
-    bin_index[0] = hash(query_obj) % table.size
+    try:
+        bin_index[0] = hash(query_obj) % table.size
+    except TypeError:
+        PyErr_SetString(TypeError, "%r is not hashable" % (query_obj, ))
+        return 1
     Py_DECREF(query_obj)
     return 0
 
 
-cdef int count_table_put(count_table* table, PyObject* key, long value):
+cdef int count_table_put(count_table* table, PyObject* key, long value) except 1:
     cdef:
         Py_ssize_t bin_index, cell_index
         int status
     if key == NULL:
-        return -1
+        return 1
     Py_XINCREF(key)
     status = count_table_find_bin(table, key, &bin_index)
+    if status != 0:
+        return 1
     status = count_table_bin_find(&table.bins[bin_index], key, &cell_index)
     if cell_index == -1:
         status = count_table_bin_append(&table.bins[bin_index], key, value)
@@ -109,12 +116,15 @@ cdef int count_table_put(count_table* table, PyObject* key, long value):
     return 0
 
 
-cdef int count_table_del(count_table* table, PyObject* key, long* value):
+cdef int count_table_del(count_table* table, PyObject* key, long* value) except 1:
     cdef:
         Py_ssize_t bin_index, cell_index
         int status
     Py_XINCREF(key)
+    value[0] = 0
     status = count_table_find_bin(table, key, &bin_index)
+    if status != 0:
+        return 1
     status = count_table_bin_find(&table.bins[bin_index], key, &cell_index)
     if cell_index == -1:
         value[0] = 0
@@ -129,12 +139,15 @@ cdef int count_table_del(count_table* table, PyObject* key, long* value):
         return 0
 
 
-cdef int count_table_get(count_table* table, PyObject* key, long* value):
+cdef int count_table_get(count_table* table, PyObject* key, long* value) except 1:
     cdef:
         Py_ssize_t bin_index, cell_index
         int status
+    value[0] = 0
     Py_XINCREF(key)
     status = count_table_find_bin(table, key, &bin_index)
+    if status != 0:
+        return 1
     status = count_table_bin_find(&table.bins[bin_index], key, &cell_index)
     Py_XDECREF(key)
     if cell_index == -1:
@@ -610,30 +623,44 @@ cdef class CountTable(object):
     cdef void _add_from(self, CountTable other):
         count_table_add(self.table, other.table)
 
-    cdef void _add_from_dict(self, dict other):
+    cdef int _add_from_dict(self, dict other) except 1:
         cdef:
             PyObject *key
             PyObject *value
             Py_ssize_t pos
+            long v
         pos = 0
-        while PyDict_Next(other, &pos, &key, &value):
-            self.setitem(
-                <object>key,
-                PyInt_AsLong(<object>value) + self.getitem(<object>key))
+        try:
+            while PyDict_Next(other, &pos, &key, &value):
+                v = PyInt_AsLong(int(<object>value))
+                self.setitem(
+                    <object>key,
+                    v + self.getitem(<object>key))
+        except TypeError:
+            PyErr_SetString(TypeError, "%r must be a number" % (<object>value, ))
+            return 1
+        return 0
 
     cdef void _subtract_from(self, CountTable other):
         count_table_subtract(self.table, other.table)
 
-    cdef void _subtract_from_dict(self, dict other):
+    cdef int _subtract_from_dict(self, dict other) except 1:
         cdef:
             PyObject *key
             PyObject *value
             Py_ssize_t pos
+            long v
         pos = 0
-        while PyDict_Next(other, &pos, &key, &value):
-            self.setitem(
-                <object>key,
-                PyInt_AsLong(<object>value) - self.getitem(<object>key))
+        try:
+            while PyDict_Next(other, &pos, &key, &value):
+                v = PyInt_AsLong(<object>value)
+                self.setitem(
+                    <object>key,
+                    v - self.getitem(<object>key))
+        except TypeError:
+            PyErr_SetString(TypeError, "%r must be a number" % (<object>value, ))
+            return 1
+        return 0
 
     cdef void _scale_by(self, long value):
         count_table_scale(self.table, value)
@@ -677,26 +704,34 @@ cdef class CountTable(object):
         if self.getitem(key) == 0:
             self.setitem(key, value)
 
-    cdef long getitem(self, object key):
+    cdef long getitem(self, object key) except *:
         cdef long value
+        cdef int status 
         cdef PyObject* pkey = <PyObject*>key
         Py_INCREF(key)
-        count_table_get(self.table, pkey, &value)
+        status = count_table_get(self.table, pkey, &value)
         Py_DECREF(key)
+        if status != 0:
+            return 0
         return value        
 
-    cdef void setitem(self, object key, long value):
+    cdef int setitem(self, object key, long value) except 1:
         cdef PyObject* pkey = <PyObject*>key
         Py_INCREF(key)
         cdef int status = count_table_put(self.table, pkey, value)
         Py_DECREF(key)
+        if status != 0:
+            return 1
+        return 0
 
-    cdef long delitem(self, object key):
+    cdef long delitem(self, object key) except *:
         cdef PyObject* pkey = <PyObject*>key
         cdef long value
         Py_INCREF(key)
-        count_table_del(self.table, pkey, &value)
+        cdef int status = count_table_del(self.table, pkey, &value)
         Py_DECREF(key)
+        if status != 0:
+            return 0
         return value
 
     cdef void increment(self, object key, long value):
@@ -711,7 +746,7 @@ cdef class CountTable(object):
         cdef int status = count_table_decrement(self.table, pkey, value)
         Py_DECREF(key)
 
-    cpdef long pop(self, object key, object default=None):
+    cpdef long pop(self, object key, object default=None) except *:
         cdef long value = self.delitem(key)
         if value == 0:
             return default
