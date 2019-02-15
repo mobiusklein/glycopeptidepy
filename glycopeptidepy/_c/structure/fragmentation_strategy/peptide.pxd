@@ -31,6 +31,8 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         public int max_chemical_shifts
         public int direction
 
+        public bint include_neutral_losses
+
         public double running_mass
         public CComposition running_composition
         public long index

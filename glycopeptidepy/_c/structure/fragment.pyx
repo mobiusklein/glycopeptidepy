@@ -131,10 +131,11 @@ cdef class FragmentBase(object):
 
     cpdef set_chemical_shift(self, ChemicalShiftBase chemical_shift):
         if self._chemical_shift is not None:
-            self.mass += self._chemical_shift.mass
+            self.mass -= self._chemical_shift.mass
         self._chemical_shift = chemical_shift
         if chemical_shift is not None:
-            self.mass -= chemical_shift.mass
+            self.mass += chemical_shift.mass
+        self._name = self.get_fragment_name()
 
     chemical_shift = property(get_chemical_shift, set_chemical_shift)
 

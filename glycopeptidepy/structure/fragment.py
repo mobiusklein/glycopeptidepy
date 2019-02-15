@@ -141,10 +141,10 @@ class FragmentBase(object):
 
     def set_chemical_shift(self, chemical_shift):
         if self._chemical_shift is not None:
-            self.mass += self._chemical_shift.mass
+            self.mass -= self._chemical_shift.mass
         self._chemical_shift = chemical_shift
         if chemical_shift is not None:
-            self.mass -= chemical_shift.mass
+            self.mass += chemical_shift.mass
 
     def get_fragment_name(self):
         parts = [self._name]
@@ -491,5 +491,6 @@ IonSeries.c = IonSeries("c")
 IonSeries.z = IonSeries("z")
 IonSeries.zp = IonSeries("zp")
 IonSeries.z1 = IonSeries.zp
+IonSeries.precursor = IonSeries("precursor")
 IonSeries.oxonium_ion = IonSeries("oxonium_ion", includes_peptide=False)
 IonSeries.stub_glycopeptide = IonSeries("stub_glycopeptide")
