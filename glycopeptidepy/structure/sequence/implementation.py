@@ -62,7 +62,7 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
                         len(self) - frags[0].position]
                     position.append(frags)
 
-    def get_fragments(self, kind, chemical_shifts=None, strategy=None, **kwargs):
+    def get_fragments(self, kind, chemical_shifts=None, strategy=None, include_neutral_losses=False, **kwargs):
         """Generate fragments from this structure according to the strategy specified
         by ``strategy``, returning an iterator over the sequence of theoretical fragments.
 
@@ -79,6 +79,8 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
             to the produced fragments containing that :class:`~.AminoAcidResidue`, to be applied combinatorially.
         strategy : :class:`~.FragmentationStrategyBase` type, optional
             The strategy type to employ when producing fragments. Defaults to :class:`~.HCDFragmentationStrategy`.
+        include_neutral_losses: :class:`bool`
+            Whether to include generic neutral losses (-NH3 and -H2O) on all fragments
         **kwargs
             Passed to ``strategy``
 
@@ -89,13 +91,15 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         """
         if strategy is None:
             strategy = HCDFragmentationStrategy
-        losses = kwargs.pop('neutral_losses', [])
+        losses = kwargs.pop('neutral_losses', {})
         if losses and not chemical_shifts:
             chemical_shifts = losses
         if kind == stub_glycopeptide_series:
             return ([frag] for frag in self.stub_fragments(True))
         else:
-            return strategy(self, kind, chemical_shifts=chemical_shifts, **kwargs)
+            return strategy(
+                self, kind, chemical_shifts=chemical_shifts,
+                include_neutral_losses=include_neutral_losses, **kwargs)
 
 
 def list_to_sequence(seq_list, wrap=True):

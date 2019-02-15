@@ -56,16 +56,20 @@ from glycopeptidepy.structure.glycan import (GlycosylationType)
 cdef Configuration structure_constants = _structure_constants
 cdef ModificationCategory_glycosylation = ModificationCategory.glycosylation
 
+cdef ChemicalShiftBase ammonia_loss = ChemicalShift("-NH3", -CComposition({"N": 1, "H": 3}))
+cdef ChemicalShiftBase water_loss = ChemicalShift("-H2O", -CComposition({"O": 1, "H": 2}))
+
 
 cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
-    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1):
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, include_neutral_losses=False):
         if chemical_shifts is None:
             chemical_shifts = dict()
         super(PeptideFragmentationStrategyBase, self).__init__(peptide)
         self.series = IonSeries(series)
         self.chemical_shift_rules = defaultdict(list, chemical_shifts)
         self.max_chemical_shifts = max_chemical_shifts
+        self.include_neutral_losses = include_neutral_losses
         self._initialize_fields()
 
     cpdef _initialize_fields(self):
@@ -86,9 +90,17 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self._initialize_start_terminal()
 
     cpdef list _get_viable_chemical_shift_combinations(self):
+        cdef:
+            bint has_neutral_loss_rules
+            list shifts
+
         shifts = []
+        if self.include_neutral_losses:
+            shifts.append(ammonia_loss)
+            shifts.append(water_loss)
         if not self.chemical_shift_rules:
             return shifts
+
         for residue, count in self.amino_acids_counter.items():
             loss_composition = self.chemical_shift_rules[residue]
             if loss_composition:
@@ -290,8 +302,9 @@ cdef class ModificationConfiguration(object):
 
 
 cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
-    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1):
-        super(HCDFragmentationStrategy, self).__init__(peptide, series, chemical_shifts, max_chemical_shifts)
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, include_neutral_losses=False):
+        super(HCDFragmentationStrategy, self).__init__(
+            peptide, series, chemical_shifts, max_chemical_shifts, include_neutral_losses)
         self._last_modification_set = None
         self._last_modification_variants = None
 
