@@ -8,3 +8,6 @@ htmlcov/
 .coverage
 *sublime*
 /.cache
+.vscode
+.pytest_cache
+.ipynb_checkpoints

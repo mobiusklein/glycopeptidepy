@@ -9,12 +9,12 @@ try:
 except ImportError:
     from collections import Mapping, Sequence as SequenceABC
 
+from six import text_type
+
 from glycopeptidepy.structure.residue import UnknownAminoAcidException, symbol_to_residue
 from glycopeptidepy.structure.sequence import ProteinSequence
 from glycopeptidepy.utils.sequence_tree import SuffixTree
 from glypy.utils.base import opener
-
-from six import text_type
 
 from .cv.peff import peff_cv_term
 
@@ -215,7 +215,8 @@ class PEFFDeflineParser(DefLineParserBase):
                 storage[key] = self.coerce_types(key, value)
             else:
                 # multi-value
-                storage[key] = [self.coerce_types(key, v) for v in self.extract_parenthesis_list(value)]
+                storage[key] = [
+                    self.coerce_types(key, v) for v in self.extract_parenthesis_list(value)]
         return storage
 
 
@@ -256,7 +257,7 @@ class PEFFFastaHeader(FastaHeader):
         self._init_feature_id_map()
 
     def _init_feature_id_map(self):
-        for key, values in self.items():
+        for _, values in self.items():
             if isinstance(values, list):
                 for feature in values:
                     if hasattr(feature, 'id'):
@@ -382,13 +383,13 @@ class DispatchingDefLineParser(DefLineParserBase):
                 return parts
             except UnparsableDeflineError:
                 continue
+    
+        if self.graceful:
+            return FastaHeader({}, defline)
         else:
-            if self.graceful:
-                return FastaHeader({}, defline)
-            else:
-                raise UnparsableDeflineError(
-                    "Failed to parse {:r} using {:r}".format(
-                        defline, self))
+            raise UnparsableDeflineError(
+                "Failed to parse {:r} using {:r}".format(
+                    defline, self))
 
 
 uniprot_regex = r"(?P<db>[a-z^\|]+)\|(?P<accession>[a-zA-Z0-9\-]+)\|(?P<name>\S*)(?:\s(?P<description>.+))?"
@@ -399,15 +400,21 @@ partial_uniprot_parser = RegexDefLineParser(partial_uniprot_regex)
 
 peff_parser = PEFFDeflineParser()
 
-default_parser = DispatchingDefLineParser([uniprot_parser, partial_uniprot_parser, peff_parser, space_delim_parser])
+default_parser = DispatchingDefLineParser(
+    [uniprot_parser, partial_uniprot_parser, peff_parser, space_delim_parser])
 
 
 class FastaFileReader(object):
-    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False):
+    '''A base class for parsing amino acid Fasta Files. Supports
+    sequential access through iteration, and random access if :attr:`index`
+    is :const:`True`.
+    '''
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False, case_sensitive=False):
         self.state = "defline"
         self.handle = opener(path, 'rb')
         self.defline_parser = defline_parser
         self.encoding = encoding
+        self.case_sensitive = case_sensitive
         self._generator = None
         self._index = None
         if index:
@@ -492,13 +499,15 @@ class FastaFileReader(object):
                 else:
                     if defline is not None:
                         try:
+                            value = ''.join(sequence_chunks).replace(" ", "")
+                            if not self.case_sensitive:
+                                value = value.upper()
                             yield self.process_result({
                                 "name": self.defline_parser(defline),
-                                "sequence": ''.join(sequence_chunks).replace(" ", "")
+                                "sequence": value
                             })
                         except KeyError as e:
                             warnings.warn(str(e))
-                            pass
                     sequence_chunks = []
                     defline = None
                     state = 'defline'
@@ -506,25 +515,41 @@ class FastaFileReader(object):
                         defline = re.sub(r"[\n\r]", "", line[1:])
                         state = "sequence"
 
-        if len(sequence_chunks) > 0:
+        if sequence_chunks:
             try:
+                value = ''.join(sequence_chunks).replace(" ", "")
+                if not self.case_sensitive:
+                    value = value.upper()
                 yield self.process_result(
                     {
                         "name": self.defline_parser(defline),
-                        "sequence": ''.join(sequence_chunks).replace(" ", "")
+                        "sequence": value
                     })
             except KeyError as e:
                 warnings.warn(str(e))
-                pass
 
 
 FastaFileParser = FastaFileReader
 
 
 class ProteinFastaFileReader(FastaFileReader):
+    '''Parses Fasta Files into :class:`~.ProteinSequence` instances. Supports
+    sequential access, as well as random access when :attr:`index` is :const:`True`.
 
-    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False, replace_unknown=None):
-        super(ProteinFastaFileReader, self).__init__(path, defline_parser, encoding, index=index)
+    Attributes
+    ----------
+    replace_unknown: :class:`bool`
+        Whether to replace amino acids which are not recognized with an 'X'
+        instead of throwing an error. If not set, the parser will replace
+        the amino acids and emit a warning instead.
+    case_sensitive: :class:`bool`
+        Whether to convert all characters in the amino acid sequence to upper case
+        prior to parsing.
+    '''
+    def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False,
+                 replace_unknown=None, case_sensitive=False):
+        super(ProteinFastaFileReader, self).__init__(
+            path, defline_parser, encoding, index=index, case_sensitive=case_sensitive)
         self.replace_unknown = replace_unknown
         self._replace_amino_acid_pattern = None
 
@@ -650,10 +675,12 @@ class PEFFHeaderBlock(Mapping):
 
 class PEFFReader(ProteinFastaFileReader):
     def __init__(self, path, defline_parser=PEFFDeflineParser(False), index=False):
-        super(PEFFReader, self).__init__(opener(path, 'rb'), defline_parser, encoding='ascii', index=index)
+        super(PEFFReader, self).__init__(
+            opener(path, 'rb'), defline_parser, encoding='ascii', index=index)
         try:
             if 'b' not in self.handle.mode:
-                raise ValueError("PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
+                raise ValueError(
+                    "PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
         except (AttributeError, TypeError):
             pass
         self.version = (0, 0)
@@ -721,6 +748,9 @@ class PEFFWriter(ProteinFastaFileWriter):
 
 
 class FastaIndexer(object):
+    '''Encapsulates the process of building an index of byte-level offsets
+    and entry-level metadata for a Fasta file.
+    '''
     def __init__(self, read_size=1000000, encoding='utf8', defline_parser=default_parser):
         self.read_size = int(read_size)
         self.encoding = encoding
@@ -750,7 +780,7 @@ class FastaIndexer(object):
         running = True
         while running:
             buff = f.read(read_size)
-            if len(buff) == 0:
+            if not buff:
                 running = False
                 buff = tail
             else:
@@ -782,6 +812,17 @@ class FastaIndexer(object):
         return defline
 
     def build_index(self, stream):
+        '''Build an random access and metadata index over the stream
+        of Fasta File entries.
+        
+        Parameters
+        ----------
+        stream: file-like
+        
+        Returns
+        -------
+        :class:`FastaIndex`
+        '''
         index = OrderedDict()
         g = self._generate_offsets(stream)
         last_offset = 0
@@ -796,9 +837,13 @@ class FastaIndexer(object):
 
 
 class FastaIndex(object):
+    '''A :class:`~.Mapping`-like object which stores the byte offsets
+    and entry metadata for a Fasta file.
+    '''
     def __init__(self, mapping):
         self.mapping = mapping
         self._suffix = None
+        self._index_map = dict()
 
     def __repr__(self):
         template = "{self.__class__.__name__}({size:d})"
@@ -832,20 +877,92 @@ class FastaIndex(object):
         return sfx_tree
 
     def suffix(self, key):
+        '''Search for headers where ``key`` is a suffix of
+        the header.
+
+        This method builds a suffix tree which may be very
+        expensive in memory
+
+        Parameters
+        ----------
+        key: :class:`str`
+            The suffix to search for
+
+        Returns
+        -------
+        :class:`list`
+        '''
         if self._suffix is None:
             self._suffix = self._build_suffix_tree()
         return self._suffix.subsequences_of(key)
 
-    def query(self, **kwargs):
-        queries = kwargs.items()
-        matches = []
-        for key in self.keys():
+    def _build_index_for_key(self, key):
+        index = defaultdict(set)
+        for header in self.keys():
+            try:
+                value = header[key]
+                index[value].add(header)
+            except KeyError:
+                continue
+        self._index_map[key] = index
+
+    def index_by(self, key):
+        '''Build an extra index over the values of ``key``
+        '''
+        self._build_index_for_key(key)
+
+    def clear_indices(self):
+        '''Discard all the extra indices.
+        '''
+        self._index_map.clear()
+        self._suffix = None
+
+    def query(self, queries=None, **kwargs):
+        '''Query the index for headers whose keys match the values passed
+        through ``kwargs``
+
+        Parameters
+        ----------
+        queries: :class:`dict`, optional
+            A mapping of :class:`FastaHeader` keys to values to match for
+            inclusion in the result set. All pairs must match for a header
+            to be included in the results.
+        **kwargs:
+            Additional key-value pairs to search for
+        
+        Results
+        -------
+        :class:`list`:
+            The :class:`FastaHeader` instances that matched all of the constraints
+            the query.
+        '''
+        if not queries:
+            queries = dict()
+        else:
+            queries = dict(queries)
+        queries.update(kwargs)
+        queries = queries.items()
+        # The indices fully cover this query, so make it fast.
+        if set(kwargs) <= set(self._index_map):
+            index_matches = []
             for k, v in queries:
                 try:
-                    if key[k] != v:
-                        break
+                    index_matches.append(self._index_map[k][v])
                 except KeyError:
-                    break
-            else:
-                matches.append(key)
+                    continue
+            if not index_matches:
+                return []
+            return list(index_matches[0].intersection(*index_matches[1:]))
+        else:
+            matches = []
+            # No helpful index, so iterate over all headers.
+            for header in self.keys():
+                for k, v in queries:
+                    try:
+                        if header[k] != v:
+                            break
+                    except KeyError:
+                        break
+                else:
+                    matches.append(header)
         return matches
