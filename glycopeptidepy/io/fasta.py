@@ -188,24 +188,24 @@ class PEFFDeflineParser(DefLineParserBase):
             pass
         return str(value)
 
-    def parse(self, line):
+    def parse(self, defline):
         if self.validate:
-            match = self.detect_pattern.match(line)
+            match = self.detect_pattern.match(defline)
             if not match:
                 raise UnparsableDeflineError(
                     "Failed to parse {!r} using {!r}".format(
-                        line, self))
+                        defline, self))
         storage = OrderedDict()
         prefix = None
         db_uid = None
-        if line.startswith(">"):
-            line = line[1:]
-        prefix, line = line.split(":", 1)
-        db_uid, line = line.split(" ", 1)
+        if defline.startswith(">"):
+            defline = defline[1:]
+        prefix, defline = defline.split(":", 1)
+        db_uid, defline = defline.split(" ", 1)
         storage['Prefix'] = prefix
         storage['Tag'] = db_uid
         kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
-        for key, value in kv_pattern.findall(line):
+        for key, value in kv_pattern.findall(defline):
             if self.validate:
                 try:
                     peff_cv_term(key, strict=True)
@@ -611,7 +611,7 @@ class ProteinFastaFileWriter(FastaFileWriter):
         super(ProteinFastaFileWriter, self).__init__(handle, encoding)
         self.line_length = line_length
 
-    def write(self, protein):
+    def write(self, protein): # pylint: disable=arguments-differ
         defline = str(protein.name)
         seq = '\n'.join(textwrap.wrap(protein.get_sequence(), self.line_length))
         super(ProteinFastaFileWriter, self).write(defline, seq)
