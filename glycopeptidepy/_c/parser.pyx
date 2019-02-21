@@ -207,11 +207,11 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
         list mods, chunks, current_mods
         int paren_level, i, n
 
-    if sequence_encoded_t is str:
-        return _cstring_sequence_tokenizer(sequence, implicit_n_term, implicit_c_term, glycan_parser)
-
     if glycan_parser_function is None:
         glycan_parser_function = glycan_parser
+
+    if sequence_encoded_t is str:
+        return _cstring_sequence_tokenizer(sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
 
     state = ParserState.start  # [start, n_term, aa, mod, c_term]
     if implicit_n_term is None:

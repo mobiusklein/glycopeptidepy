@@ -11,6 +11,7 @@ class TerminalGroup(MoleculeBase):
     def __init__(self, base_composition, modification=None):
         if not isinstance(base_composition, Composition):
             base_composition = Composition(base_composition)
+        self.mass = 0
         self.base_composition = base_composition
         self._modification = None
         if modification is not None:

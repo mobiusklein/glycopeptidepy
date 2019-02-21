@@ -50,6 +50,7 @@ cdef class FragmentBase(object):
 
     cpdef set_chemical_shift(self, ChemicalShiftBase chemical_shift)
 
+    cpdef str base_name(self)
     cpdef str get_fragment_name(self)
 
 

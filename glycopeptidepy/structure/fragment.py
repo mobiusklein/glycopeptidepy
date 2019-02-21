@@ -153,6 +153,9 @@ class FragmentBase(object):
             parts.append(str(chemical_shift))
         return ''.join(parts)
 
+    def base_name(self):
+        return self._name
+
     @property
     def name(self):
         if self._name is None:

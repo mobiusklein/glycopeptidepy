@@ -146,6 +146,10 @@ cdef class FragmentBase(object):
             parts.append(chemical_shift.name)
         return ''.join(parts)
 
+    cpdef str base_name(self):
+        """Simply return string like b2, y3 with no modification information."""
+        return self._name
+
     @property
     def name(self):
         if self._name is None:
@@ -257,7 +261,7 @@ cdef class PeptideFragment(FragmentBase):
             self.flanking_amino_acids, self.glycosylation,
             self.chemical_shift, self.composition)
 
-    def base_name(self):
+    cpdef str base_name(self):
         """Simply return string like b2, y3 with no modification information."""
         fragment_name = []
         fragment_name.append(self.get_series().name)
