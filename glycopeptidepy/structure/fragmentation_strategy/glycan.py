@@ -220,6 +220,22 @@ class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
 
 
+_HEX = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
+_HEXNAC = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
+_FUC = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
+_DHEX = FrozenMonosaccharideResidue.from_iupac_lite("dHex")
+_XYL = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
+
+
+def _prepare_glycan_composition_from_mapping(mapping):
+    # modify the hashable glycan composition before calculating
+    # its hash value
+    gc = HashableGlycanComposition()
+    for key, value in mapping.items():
+        gc._setitem_fast(FrozenMonosaccharideResidue.from_iupac_lite(key), value)
+    return gc
+
+
 class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
 
     """A fragmentation strategy that generates intact peptide + glycan Y fragments from
@@ -305,7 +321,8 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             if invalid:
                 continue
             name = StubFragment.build_name_from_composition(aggregate_glycosylation)
-            glycosylation = HashableGlycanComposition(aggregate_glycosylation)
+            glycosylation = _prepare_glycan_composition_from_mapping(
+                aggregate_glycosylation)
             yield StubFragment(
                 name=name,
                 mass=mass,
@@ -344,10 +361,10 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             hexnac_in_aggregate = glycan.query('HexNAc')
             hexose_in_aggregate = glycan.query('Hex')
         else:
-            fucose_count = glycan['Fuc'] + glycan['dHex']
-            xylose_count = glycan['Xyl']
-            hexnac_in_aggregate = glycan['HexNAc']
-            hexose_in_aggregate = glycan["Hex"]
+            fucose_count = glycan[_FUC] + glycan[_DHEX]
+            xylose_count = glycan[_XYL]
+            hexnac_in_aggregate = glycan[_HEXNAC]
+            hexose_in_aggregate = glycan[_HEX]
 
         core_shifts = []
         base_hexnac = min(hexnac_in_aggregate + 1, 3)
@@ -531,7 +548,8 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             if name in seen:
                 continue
             seen.add(name)
-            glycosylation = HashableGlycanComposition(aggregate_glycosylation)
+            glycosylation = _prepare_glycan_composition_from_mapping(
+                aggregate_glycosylation)
             yield StubFragment(
                 name=name,
                 mass=mass,
@@ -549,9 +567,9 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             hexnac_in_aggregate = glycan.query('HexNAc')
             hexose_in_aggregate = glycan.query('Hex')
         else:
-            fucose_count = glycan['Fuc'] + glycan['dHex']
-            hexnac_in_aggregate = glycan['HexNAc']
-            hexose_in_aggregate = glycan["Hex"]
+            fucose_count = glycan[_FUC] + glycan[_DHEX]
+            hexnac_in_aggregate = glycan[_HEXNAC]
+            hexose_in_aggregate = glycan[_HEX]
         core_shifts = []
         for hexnac_count in range(3):
             if hexnac_in_aggregate < hexnac_count:
@@ -676,7 +694,8 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             if name in seen:
                 continue
             seen.add(name)
-            glycosylation = HashableGlycanComposition(aggregate_glycosylation)
+            glycosylation = _prepare_glycan_composition_from_mapping(
+                aggregate_glycosylation)
             yield StubFragment(
                 name=name,
                 mass=mass,

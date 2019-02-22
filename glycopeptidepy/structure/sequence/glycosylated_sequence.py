@@ -185,7 +185,6 @@ class GlycosylatedSequenceMixin(object):
             include_large_glycan_fragments=include_large_glycan_fragments,
             maximum_fragment_size=maximum_fragment_size)
 
-
     def stub_fragments(self, extended=False, extended_fucosylation=False, strategy=None, **kwargs):
         if strategy is None:
             strategy = StubGlycopeptideStrategy
