@@ -42,7 +42,7 @@ class UniProtFeatureMeta(type):
     def handle_tag(self, tag):
         feature_type = tag.attrib['type']
         try:
-            feature_type_t = self.feature_type(feature_type)
+            feature_type_t = self.feature_type(feature_type)  # pylint: disable=no-value-for-parameter
             return feature_type_t.fromxml(tag)
         except KeyError:
             return None
@@ -53,6 +53,7 @@ class UniProtFeatureBase(object):
     __repr__ = simple_repr
 
     known = True
+    _name = None
 
     @property
     def is_defined(self):
