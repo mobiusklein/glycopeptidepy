@@ -405,7 +405,21 @@ class MemoizedIonSeriesMetaclass(type):
 try:
     from glycopeptidepy._c.structure.fragment import IonSeriesBase as _IonSeriesBase
 except ImportError:
-    _IonSeriesBase = object
+    class _IonSeriesBase(object):
+        __slots__ = ('name', 'direction', 'includes_peptide', 'mass_shift', 'regex', 'composition_shift',
+                     '_hash')
+
+        def __eq__(self, other):
+            try:
+                return self.name == other.name
+            except AttributeError:
+                return self.name == other
+
+        def __ne__(self, other):
+            try:
+                return self.name != other.name
+            except AttributeError:
+                return self.name != other
 
 
 @add_metaclass(MemoizedIonSeriesMetaclass)
@@ -440,18 +454,6 @@ class IonSeries(_IonSeriesBase):
 
     def __hash__(self):
         return self._hash
-
-    def __eq__(self, other):
-        try:
-            return self.name == other.name
-        except AttributeError:
-            return self.name == other
-
-    def __ne__(self, other):
-        try:
-            return self.name != other.name
-        except AttributeError:
-            return self.name != other
 
     def __repr__(self):
         template = ("{self.__class__.__name__}({self.name}, "
