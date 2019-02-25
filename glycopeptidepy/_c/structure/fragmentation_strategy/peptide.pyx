@@ -372,8 +372,6 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             long count
         if self._last_modification_set is not None:
             if self._last_modification_set.modification_set == fragment.modification_dict:
-                print("Modification Set Did Not Change",
-                      self._last_modification_set)
                 return self._last_modification_set
         modifications = (fragment.modification_dict)
         delta_composition = CComposition._create(None)
@@ -393,7 +391,6 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         result = ModificationConfiguration._create(
             modifications_of_interest, other_modifications,
             delta_composition, modifications)
-        print("Modification Set Changed", result)
         return result
 
     cpdef _replace_cores(self, CountTable modifications_of_interest):
@@ -458,6 +455,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             size_t i, n
         mod_config = self._get_modifications_of_interest(fragment)
         base_composition = fragment.composition.clone()
+        # remove the composition shift associated with the interesting modifications
         base_composition.subtract_from(mod_config.delta_composition)
 
         # If the modification configuration hasn't changed, reuse the existing variants.
@@ -482,7 +480,11 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             if ptemp == NULL:
                 variants = self._last_modification_variants = self._generate_modification_variants(
                     mod_config.modifications_of_interest,
-                    mod_config.other_modifications)
+                    # do not include extra modifications here so that caching of 
+                    # interesting modificatoin variants does not need to be recalculated
+                    # when uninteresting modifications change
+                    CountTable._create()
+                )
                 PyDict_SetItem(
                     hcd_modifications_of_interest_to_variants_cache,
                     self._last_modification_set.modifications_of_interest,
@@ -496,13 +498,16 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         n = PyList_Size(variants)
         for i in range(n):
             variant_pair = <tuple>PyList_GetItem(variants, i)
-            updated_modifications = <CountTable>PyTuple_GetItem(variant_pair, 0)
+            updated_modifications = CountTable._create_from(<CountTable>PyTuple_GetItem(variant_pair, 0))
+            # add the current fragment's uninteresting modifications back on top of the
+            # varied modifications here.
+            updated_modifications._add_from(mod_config.other_modifications)
             extra_composition = <CComposition>PyTuple_GetItem(variant_pair, 1)
             new_composition = base_composition.clone()
             new_composition.add_from(extra_composition)
             fragments.append(
                 PeptideFragment._create(
-                    series, fragment.position, updated_modifications.copy(), fragment.bare_mass,
+                    series, fragment.position, updated_modifications, fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
                     glycosylation=None,
                     chemical_shift=None,
