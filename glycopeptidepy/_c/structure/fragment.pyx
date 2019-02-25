@@ -436,7 +436,7 @@ cdef class PeptideFragment(FragmentBase):
         return ("PeptideFragment(%(type)s %(position)s %(mass)s "
                 "%(modification_dict)s %(flanking_amino_acids)s %(chemical_shift)r)") % {
             "type": self.series, "position": self.position, "mass": self.mass,
-            "modification_dict": self.modification_dict, "flanking_amino_acids": self.flanking_amino_acids,
+            "modification_dict": dict(self.modification_dict), "flanking_amino_acids": self.flanking_amino_acids,
             "chemical_shift": self.chemical_shift
         }
 

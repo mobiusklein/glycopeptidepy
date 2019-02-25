@@ -372,6 +372,8 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             long count
         if self._last_modification_set is not None:
             if self._last_modification_set.modification_set == fragment.modification_dict:
+                print("Modification Set Did Not Change",
+                      self._last_modification_set)
                 return self._last_modification_set
         modifications = (fragment.modification_dict)
         delta_composition = CComposition._create(None)
@@ -391,6 +393,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         result = ModificationConfiguration._create(
             modifications_of_interest, other_modifications,
             delta_composition, modifications)
+        print("Modification Set Changed", result)
         return result
 
     cpdef _replace_cores(self, CountTable modifications_of_interest):

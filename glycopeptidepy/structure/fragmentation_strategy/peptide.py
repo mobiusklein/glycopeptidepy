@@ -366,7 +366,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                     key = frag_spec['key']
                     if not key:
                         continue
-                    name = ''.join("%s%d" % kv for kv in sorted(key.items()))
+                    name = ''.join("%s%d" % kv for kv in sorted(key.items(), key=lambda x: x[0].mass()))
                     mass = frag_spec['mass']
                     composition = frag_spec['composition']
                     fragments.append(SimpleFragment(name, mass, IonSeries.other, composition))
