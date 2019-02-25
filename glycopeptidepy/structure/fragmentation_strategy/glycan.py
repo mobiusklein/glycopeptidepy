@@ -277,10 +277,14 @@ class _CompositionTree(object):
             node.name = HashableGlycanComposition()
             for k, v in pair_sequence:
                 node.name._setitem_fast(k, v)
+            # Force the population of the _mass and _str caches
+            node.name.mass()
+            str(node.name)
         return node.name
 
 
 _composition_tree_root = _CompositionTree()
+_composition_name_cache = dict()
 
 
 def _prepare_glycan_composition_from_mapping(mapping):
@@ -373,12 +377,17 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                             break
                 if invalid:
                     continue
-            name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            glycosylation = _prepare_glycan_composition_from_mapping(
+                aggregate_glycosylation)
+            name_key = str(glycosylation)
+            try:
+                name = _composition_name_cache[name_key]
+            except KeyError:
+                _composition_name_cache[name_key] = name = StubFragment.build_name_from_composition(
+                    aggregate_glycosylation)
             if name in seen:
                 continue
             seen.add(name)
-            glycosylation = _prepare_glycan_composition_from_mapping(
-                aggregate_glycosylation)
             yield StubFragment(
                 name=name,
                 mass=mass,

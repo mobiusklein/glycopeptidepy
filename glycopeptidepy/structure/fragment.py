@@ -412,7 +412,7 @@ class StubFragment(SimpleFragment):
         if extended_key is None:
             parts.sort(key=lambda x: x[0].mass())
             node.name = extended_key = ''.join("%s%d" % kv for kv in parts)
-        if len(extended_key) > 0:
+        if extended_key:
             name = "%s+%s" % (name, extended_key)
         return name
 
