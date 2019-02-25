@@ -369,7 +369,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                     name = ''.join("%s%d" % kv for kv in sorted(key.items()))
                     mass = frag_spec['mass']
                     composition = frag_spec['composition']
-                    fragments.append(SimpleFragment(name, mass, 'Y', composition))
+                    fragments.append(SimpleFragment(name, mass, IonSeries.other, composition))
                 return fragments
             else:
                 fragments = sorted(glycosylation.rule.get_fragments(

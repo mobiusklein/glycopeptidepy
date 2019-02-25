@@ -1,3 +1,4 @@
+cimport cython
 from glypy.composition.ccomposition cimport CComposition
 from glycopeptidepy._c.count_table cimport CountTable
 
@@ -18,7 +19,7 @@ cdef class IonSeriesBase(object):
         public bint includes_peptide
         public double mass_shift
         public CComposition composition_shift
-        public object _hash
+        public Py_hash_t _hash
 
 
 cdef class FragmentBase(object):
@@ -54,6 +55,17 @@ cdef class FragmentBase(object):
     cpdef str get_fragment_name(self)
 
 
+
+cdef class SimpleFragment(FragmentBase):
+    cdef:
+        public IonSeriesBase kind
+        public bint is_glycosylated
+        public CComposition composition
+
+    cpdef clone(self)
+
+
+
 cdef class PeptideFragment(FragmentBase):
     cdef:
         public IonSeriesBase kind
@@ -61,14 +73,28 @@ cdef class PeptideFragment(FragmentBase):
         public CountTable modification_dict
         public double bare_mass
         public list flanking_amino_acids
-        public object glycosylation
+        public dict glycosylation
         public CComposition composition
 
     @staticmethod
     cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
-                                 list flanking_amino_acids=*, object glycosylation=*,
+                                 list flanking_amino_acids=*, dict glycosylation=*,
                                  ChemicalShiftBase chemical_shift=*, CComposition composition=?)
 
     cpdef clone(self)
 
     cdef void _update_mass_with_modifications(self)
+    cdef bint _is_glycosylated(self)
+
+
+@cython.final
+cdef class _NameTree(object):
+    cdef:
+        public object name
+        public dict children
+
+    @staticmethod
+    cdef _NameTree _create()
+
+    cpdef _NameTree get(self, key)
+    cpdef traverse(self, list parts)

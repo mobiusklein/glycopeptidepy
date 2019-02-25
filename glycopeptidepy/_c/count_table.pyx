@@ -689,6 +689,21 @@ cdef class CountTable(object):
     def __ne__(self, other):
         return not (self == other)
 
+    def __hash__(self):
+        cdef:
+            Py_hash_t hash_value
+            size_t i, j
+
+        hash_value = 0
+        for i in range(self.table.size):
+            for j in range(self.table.bins[i].used):
+                if self.table.bins[i].cells[j].key != NULL:
+                    hash_value ^= hash(<object>self.table.bins[i].cells[j].key)
+                    hash_value ^= self.table.bins[i].cells[j].value
+        hash_value ^= (hash_value >> 11) ^ (hash_value >> 25)
+        hash_value = hash_value * 69069 + 907133923
+        return hash_value
+
     cpdef list keys(self):
         return count_table_keys(self.table)
 

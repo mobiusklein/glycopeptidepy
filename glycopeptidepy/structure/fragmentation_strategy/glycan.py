@@ -17,10 +17,14 @@ from glycopeptidepy.structure.glycan import (
 from glycopeptidepy.structure.fragment import (
     IonSeries,
     SimpleFragment,
-    StubFragment)
+    StubFragment,
+    _NameTree)
 
 
 from .base import FragmentationStrategyBase
+
+
+from six.moves import range
 
 
 oxonium_ion_series = IonSeries.oxonium_ion
@@ -191,6 +195,11 @@ class _MonosaccharideDefinitionCacher(object):
         return self._hexa
 
 
+_Hex2NAc = FrozenMonosaccharideResidue.from_iupac_lite("Hex2NAc")
+_Glc2NAc = FrozenMonosaccharideResidue.from_iupac_lite("Glc2NAc")
+_Gal2NAc = FrozenMonosaccharideResidue.from_iupac_lite("Gal2NAc")
+
+
 class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
     def __init__(self, peptide, use_query=False, *args, **kwargs):
         super(GlycanCompositionFragmentStrategyBase, self).__init__(peptide, *args, **kwargs)
@@ -212,8 +221,9 @@ class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
     def _guess_query_mode(self, glycan_composition):
         # these guesses will work for N-glycans and common types of mucin-type O-glycans
         # and GAG linkers
-        flag = ("Hex2NAc" in glycan_composition) or ("Glc2NAc" in glycan_composition
-                                                     ) or ("Gal2NAc" in glycan_composition)
+        flag = glycan_composition._getitem_fast(_Hex2NAc) +\
+            glycan_composition._getitem_fast(_Glc2NAc) +\
+            glycan_composition._getitem_fast(_Gal2NAc)
         return flag or self._use_query
 
     def count_glycosylation_type(self, glycotype):
@@ -225,15 +235,57 @@ _HEXNAC = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
 _FUC = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
 _DHEX = FrozenMonosaccharideResidue.from_iupac_lite("dHex")
 _XYL = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
+_AHEX = FrozenMonosaccharideResidue.from_iupac_lite("aHex")
+
+
+class GlycanCompositionFragment(object):
+    __slots__ = ("mass", "composition", "key", "is_extended")
+
+    def __init__(self, mass, composition, key, is_extended=False):
+        self.mass = mass
+        self.composition = composition
+        self.key = key
+        self.is_extended = is_extended
+
+    def __getitem__(self, key):
+        if key == "mass":
+            return self.mass
+        elif key == "composition":
+            return self.composition
+        elif key == "key":
+            return self.key
+        elif key == 'is_extended':
+            return self.is_extended
+        else:
+            raise KeyError(key)
+
+
+class _CompositionTree(object):
+    def __init__(self, root=None):
+        if root is None:
+            root = _NameTree()
+        self.root = root
+
+    def __getitem__(self, key):
+        return self.root[key]
+
+    def build(self, pair_sequence):
+        node = self.root.traverse(pair_sequence)
+        if node.name is None:
+            # modify the hashable glycan composition before calculating
+            # its hash value
+            node.name = HashableGlycanComposition()
+            for k, v in pair_sequence:
+                node.name._setitem_fast(k, v)
+        return node.name
+
+
+_composition_tree_root = _CompositionTree()
 
 
 def _prepare_glycan_composition_from_mapping(mapping):
-    # modify the hashable glycan composition before calculating
-    # its hash value
-    gc = HashableGlycanComposition()
-    for key, value in mapping.items():
-        gc._setitem_fast(FrozenMonosaccharideResidue.from_iupac_lite(key), value)
-    return gc
+    pair_sequence = mapping.items()
+    return _composition_tree_root.build(pair_sequence)
 
 
 class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
@@ -261,7 +313,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         fucosylated['mass'] += self.fucose.mass()
         fucosylated['composition'] = fucosylated[
             'composition'] + self.fucose.total_composition()
-        fucosylated['key']["Fuc"] = 1
+        fucosylated['key'][_FUC] = 1
         return fucosylated
 
     def xylosylate_increment(self, shift):
@@ -270,7 +322,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         xylosylated['mass'] += self.xylose.mass()
         xylosylated['composition'] = xylosylated[
             'composition'] + self.xylose.total_composition()
-        xylosylated['key']["Xyl"] = 1
+        xylosylated['key'][_XYL] = 1
         return xylosylated
 
     def fucosylate_extended(self, shift, fucose_count):
@@ -281,7 +333,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             fucosylated['mass'] += self.fucose.mass()
             fucosylated['composition'] = fucosylated[
                 'composition'] + self.fucose.total_composition() * i
-            fucosylated['key']["Fuc"] = i
+            fucosylated['key'][_FUC] = i
             result[i - 1] = fucosylated
         return result
 
@@ -292,7 +344,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         per_site_shifts = []
         base_composition = self.peptide_composition()
         base_mass = base_composition.mass
-
+        seen = set()
         for i in range(core_count):
             core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
@@ -306,21 +358,25 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                 aggregate_glycosylation += (site['key'])
                 composition += site['composition']
                 is_extended |= site['is_extended']
-            is_glycosylated = (composition != base_composition)
-            invalid = False
-            if self._use_query:
-                for key, value in aggregate_glycosylation.items():
-                    if glycan.query(key) < value:
-                        invalid = True
-                        break
-            else:
-                for key, value in aggregate_glycosylation.items():
-                    if glycan[key] < value:
-                        invalid = True
-                        break
-            if invalid:
-                continue
+            is_glycosylated = (mass != base_mass)
+            if len(positions) > 1:
+                invalid = False
+                if self._use_query:
+                    for key, value in aggregate_glycosylation.items():
+                        if glycan.query(key) < value:
+                            invalid = True
+                            break
+                else:
+                    for key, value in aggregate_glycosylation.items():
+                        if glycan[key] < value:
+                            invalid = True
+                            break
+                if invalid:
+                    continue
             name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            if name in seen:
+                continue
+            seen.add(name)
             glycosylation = _prepare_glycan_composition_from_mapping(
                 aggregate_glycosylation)
             yield StubFragment(
@@ -381,7 +437,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                 shift = {
                     "mass": (hexnac_count * hexnac.mass()),
                     "composition": hexnac_count * hexnac.total_composition(),
-                    "key": {"HexNAc": hexnac_count},
+                    "key": {_HEXNAC: hexnac_count},
                     'is_extended': False,
                 }
                 core_shifts.append(shift)
@@ -392,7 +448,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                 shift = {
                     "mass": (hexnac_count * hexnac.mass()),
                     "composition": hexnac_count * hexnac.total_composition(),
-                    "key": {"HexNAc": hexnac_count},
+                    "key": {_HEXNAC: hexnac_count},
                     'is_extended': False,
                 }
                 core_shifts.append(shift)
@@ -419,7 +475,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                         "mass": (hexnac_count * hexnac.mass()) + (hexose_count * hexose.mass()),
                         "composition": (hexnac_count * hexnac.total_composition()) + (
                             hexose_count * hexose.total_composition()),
-                        "key": {"HexNAc": hexnac_count, "Hex": hexose_count},
+                        "key": {_HEXNAC: hexnac_count, _HEX: hexose_count},
                         'is_extended': False,
                     }
                     core_shifts.append(shift)
@@ -456,7 +512,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                                     "composition": (
                                         (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
                                         hexose_count * hexose.total_composition()),
-                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": hexose_count},
+                                    "key": {_HEXNAC: hexnac_count + extra_hexnac_count, _HEX: hexose_count},
                                     'is_extended': True
                                 }
                                 core_shifts.append(shift)
@@ -485,7 +541,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                                     "composition": (
                                         (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
                                         (hexose_count + extra_hexose_count) * hexose.total_composition()),
-                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                    "key": {_HEXNAC: hexnac_count + extra_hexnac_count, _HEX: (
                                         hexose_count + extra_hexose_count)},
                                     'is_extended': True
                                 }
@@ -586,7 +642,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                 shift = {
                     "mass": (hexnac_count * hexnac.mass()),
                     "composition": hexnac_count * hexnac.total_composition(),
-                    "key": {"HexNAc": hexnac_count},
+                    "key": {_HEXNAC: hexnac_count},
                     "is_extended": False
                 }
                 core_shifts.append(shift)
@@ -604,7 +660,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                             "composition": (
                                 (hexnac_count) * hexnac.total_composition()) + (
                                 (hexose_count) * hexose.total_composition()),
-                            "key": {"HexNAc": hexnac_count, "Hex": (
+                            "key": {_HEXNAC: hexnac_count, _HEX: (
                                 hexose_count)},
                             "is_extended": False
                         }
@@ -625,7 +681,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                                     "composition": (
                                         (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
                                         (hexose_count) * hexose.total_composition()),
-                                    "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                    "key": {_HEXNAC: hexnac_count + extra_hexnac_count, _HEX: (
                                         hexose_count)},
                                     'is_extended': True,
                                 }
@@ -643,7 +699,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                                             "composition": (
                                                 (hexnac_count + extra_hexnac_count) * hexnac.total_composition()) + (
                                                 (hexose_count + extra_hexose_count) * hexose.total_composition()),
-                                            "key": {"HexNAc": hexnac_count + extra_hexnac_count, "Hex": (
+                                            "key": {_HEXNAC: hexnac_count + extra_hexnac_count, _HEX: (
                                                 hexose_count + extra_hexose_count)},
                                             "is_extended": True
                                         }
@@ -727,7 +783,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                     "mass": xyl.mass() * xyl_count,
                     "composition": xyl.total_composition() * xyl_count,
                     "key": {
-                        "Xyl": xyl_count
+                        _XYL: xyl_count
                     },
                     "is_extended": False
                 }
@@ -742,8 +798,8 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                             (xyl.total_composition() * xyl_count) + (
                                 hexose.total_composition() * hexose_count)),
                         "key": {
-                            "Xyl": xyl_count,
-                            "Hex": hexose_count
+                            _XYL: xyl_count,
+                            _HEX: hexose_count
                         },
                         "is_extended": False
                     }
@@ -756,9 +812,9 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                                 (xyl.total_composition() * xyl_count) + (
                                     hexose.total_composition() * hexose_count) + hexa.total_composition()),
                             "key": {
-                                "Xyl": xyl_count,
-                                "Hex": hexose_count,
-                                "aHex": 1
+                                _XYL: xyl_count,
+                                _HEX: hexose_count,
+                                _AHEX: 1
                             },
                             "is_extended": False
                         }

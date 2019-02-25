@@ -22,6 +22,7 @@ from glycopeptidepy.structure.glycan import (GlycosylationType)
 cdef:
     dict hcd_modifications_of_interest
     dict hcd_modification_compositions
+    dict hcd_modifications_of_interest_to_variants_cache
 
 
 cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
@@ -38,7 +39,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         public long index
         public long size
         public CountTable modification_index
-        public object glycosylation_manager
+        public dict glycosylation_manager
         public CountTable amino_acids_counter
 
     cpdef _initialize_fields(self)

@@ -218,6 +218,9 @@ class GlycanCompositionProxy(Mapping):
     def __getitem__(self, key):
         return self.obj[key]
 
+    def _getitem_fast(self, key):
+        return self.obj._getitem_fast(key)
+
     def __contains__(self, key):
         return key in self.obj
 

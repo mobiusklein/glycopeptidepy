@@ -82,7 +82,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.size = self.peptide.get_size()
 
         self.modification_index = ModificationIndex()
-        self.glycosylation_manager = GlycosylationManager(self.peptide)
+        self.glycosylation_manager = dict()
         self.amino_acids_counter = _AccumulatorBag()
 
         self.running_mass += self.series.mass_shift
@@ -264,6 +264,9 @@ hcd_modification_compositions = {
 }
 
 
+hcd_modifications_of_interest_to_variants_cache = dict()
+
+
 cdef class ModificationConfiguration(object):
 
     @staticmethod
@@ -291,6 +294,12 @@ cdef class ModificationConfiguration(object):
         return "{self.__class__.__name__}({self.modifications_of_interest}, {self.other_modifications})".format(
             self=self)
 
+    def __eq__(self, other):
+        if not isinstance(other, ModificationConfiguration):
+            return NotImplemented
+        else:
+            return self.equal_to(<ModificationConfiguration>other)
+
     cdef bint equal_to(self, ModificationConfiguration other):
         if other is None:
             return False
@@ -316,6 +325,15 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         except KeyError:
             raise ValueError("Cannot determine which core to use for {}".format(
                 glycosylation.rule.glycosylation_type))
+
+    @property
+    def modification_variants_cache(self):
+        return hcd_modifications_of_interest_to_variants_cache
+
+    @modification_variants_cache.setter
+    def modification_variants_cache(self, value):
+        global hcd_modifications_of_interest_to_variants_cache
+        hcd_modifications_of_interest_to_variants_cache = dict(value)
 
     cpdef CComposition composition_of(self, SequencePosition position):
         cdef:
@@ -350,7 +368,6 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             CountTable modifications_of_interest, other_modifications
             Py_ssize_t pos, j
             PyObject *key
-            PyObject *value
             ModificationBase mod
             long count
         if self._last_modification_set is not None:
@@ -360,6 +377,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         delta_composition = CComposition._create(None)
         other_modifications = CountTable._create()
         modifications_of_interest = CountTable._create()
+
         pos = 0
         modification_iterator = CountTableIterator._create(modifications)
         while modification_iterator.has_more():
@@ -433,19 +451,42 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             IonSeriesBase series
             tuple variant_pair
             CountTable updated_modifications
+            PyObject* ptemp
             size_t i, n
         mod_config = self._get_modifications_of_interest(fragment)
         base_composition = fragment.composition.clone()
         base_composition.subtract_from(mod_config.delta_composition)
 
+        # If the modification configuration hasn't changed, reuse the existing variants.
+        #
+        # If this is the first time entering :meth:`partial_loss`, :attr:`_last_modification_set`
+        # is :const:`None`, and :meth:`_get_modifications_of_interest` can never return :const:`None`
+        # so this block will only be entered after at least one pass through the else clause.
         if mod_config is self._last_modification_set:
             variants = self._last_modification_variants
         else:
+            # Recalculate the modifications according to the HCD rules, and update the instance's cache
+            # properties.
+            #
+            # Check the class-wide variant cache to see if these variants have already been calculated,
+            # and if so, reuse them, otherwise calculate them and update the class cache.
             self._replace_cores(mod_config.modifications_of_interest)
             self._last_modification_set = mod_config
-            variants = self._last_modification_variants = self._generate_modification_variants(
-                mod_config.modifications_of_interest,
-                mod_config.other_modifications)
+            ptemp = PyDict_GetItem(
+                hcd_modifications_of_interest_to_variants_cache,
+                self._last_modification_set.modifications_of_interest)
+            # if the combination is new, generate them and update the cache
+            if ptemp == NULL:
+                variants = self._last_modification_variants = self._generate_modification_variants(
+                    mod_config.modifications_of_interest,
+                    mod_config.other_modifications)
+                PyDict_SetItem(
+                    hcd_modifications_of_interest_to_variants_cache,
+                    self._last_modification_set.modifications_of_interest,
+                    variants)
+            # otherwise reuse the cached version
+            else:
+                variants = self._last_modification_variants = <list>ptemp
 
         series = self.series
         fragments = []

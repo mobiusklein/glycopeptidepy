@@ -8,7 +8,7 @@ from cpython cimport PyObject
 from cpython.ref cimport Py_INCREF
 from cpython.object cimport PyObject_Str
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
-from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next
+from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next, PyDict_GetItem
 from cpython.int cimport PyInt_AsLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
@@ -75,13 +75,35 @@ cdef class ChemicalShiftBase(object):
 cdef class IonSeriesBase(object):
 
     def __eq__(self, other):
-        try:
-            return (self is other) or (self.name == other.name)
-        except AttributeError:
+        cdef:
+            IonSeriesBase other_tp
+            object temp
+        if not isinstance(self, IonSeriesBase):
+            temp = self
+            self = <IonSeriesBase>other
+            other = temp
+        if isinstance(other, IonSeriesBase):
+            other_tp = <IonSeriesBase>other
+            return self is other_tp or self.name == other_tp.name
+        else:
             return self.name == other
 
     def __ne__(self, other):
-        return not self == other
+        cdef:
+            IonSeriesBase other_tp
+            object temp
+        if not isinstance(self, IonSeriesBase):
+            temp = self
+            self = <IonSeriesBase>other
+            other = temp
+        if isinstance(other, IonSeriesBase):
+            other_tp = <IonSeriesBase>other
+            return self.name != other_tp.name
+        else:
+            return self.name != other
+
+    def __hash__(self):
+        return self._hash
 
 
 @cython.freelist(1000000)
@@ -168,7 +190,7 @@ cdef class PeptideFragment(FragmentBase):
 
     @staticmethod
     cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
-                                 list flanking_amino_acids=None, object glycosylation=None,
+                                 list flanking_amino_acids=None, dict glycosylation=None,
                                  ChemicalShiftBase chemical_shift=None, CComposition composition=None):
         cdef PeptideFragment self = PeptideFragment.__new__(PeptideFragment)
         self.kind = kind
@@ -244,7 +266,7 @@ cdef class PeptideFragment(FragmentBase):
         return PeptideFragment._create(
             self.series, self.position, self.modification_dict.copy(),
             self.bare_mass, list(self.flanking_amino_acids),
-            self.glycosylation.clone() if self.glycosylation is not None else None,
+            self.glycosylation.copy() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,
             self.composition.clone())
 
@@ -375,8 +397,7 @@ cdef class PeptideFragment(FragmentBase):
             free(name_buffer)
         return name
 
-    @property
-    def is_glycosylated(self):
+    cdef bint _is_glycosylated(self):
         cdef:
             PyObject *pkey
             long value
@@ -396,7 +417,11 @@ cdef class PeptideFragment(FragmentBase):
                 mod = <ModificationBase>pkey
                 if mod.is_a(ModificationCategory_glycosylation):
                     return True
-        return False
+        return False        
+
+    @property
+    def is_glycosylated(self):
+        return self._is_glycosylated()
 
     @property
     def glycosylation_size(self):
@@ -414,3 +439,90 @@ cdef class PeptideFragment(FragmentBase):
             "modification_dict": self.modification_dict, "flanking_amino_acids": self.flanking_amino_acids,
             "chemical_shift": self.chemical_shift
         }
+
+
+cdef class SimpleFragment(FragmentBase):
+    __slots__ = ["name", "mass", "kind", "composition",
+                 "_chemical_shift", "is_glycosylated"]
+
+    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False):
+        self._name = name
+        self._hash = hash(self._name)
+        self._chemical_shift = None
+
+        self.mass = mass
+        self.kind = kind
+        self.composition = composition
+
+        self.chemical_shift = chemical_shift
+        self.is_glycosylated = is_glycosylated
+
+    cpdef clone(self):
+        corrected_mass = self.mass
+        if self._chemical_shift is not None:
+            corrected_mass - self.chemical_shift.mass
+        return self.__class__(self.name, corrected_mass, self.kind,
+                              self.composition,
+                              self._chemical_shift.clone() if self._chemical_shift is not None else None,
+                              self.is_glycosylated)
+
+    def __reduce__(self):
+        corrected_mass = self.mass
+        if self._chemical_shift is not None:
+            corrected_mass - self.chemical_shift.mass
+        return self.__class__, (self.name, corrected_mass, self.kind, self.composition,
+                                self.chemical_shift, self.is_glycosylated)
+
+    def __repr__(self):
+        return ("{self.__class__.__name__}(name={self.name}, "
+                "mass={self.mass:.04f}, series={self.kind})").format(self=self)
+
+    cpdef IonSeriesBase get_series(self):
+        return self.kind
+
+
+@cython.final
+cdef class _NameTree(object):
+    @staticmethod
+    cdef _NameTree _create():
+        cdef _NameTree self = _NameTree.__new__(_NameTree)
+        self.name = None
+        self.children = dict()
+        return self
+
+    def __init__(self, name=None, children=None):
+        if children is None:
+            children = dict()
+        self.name = name
+        self.children = children
+
+    def __getitem__(self, key):
+        return self.get(key)
+
+    cpdef _NameTree get(self, key):
+        cdef:
+            PyObject* presult
+            _NameTree result
+        presult = PyDict_GetItem(self.children, key)
+        if presult == NULL:
+            result = _NameTree._create()
+            PyDict_SetItem(self.children, key, result)
+            return result
+        else:
+            result = <_NameTree>presult
+            return result
+
+    cpdef traverse(self, list parts):
+        cdef:
+            _NameTree node
+            size_t i, n
+
+        node = self
+        n = PyList_GET_SIZE(parts)
+        for i in range(n):
+            kv = <object>PyList_GET_ITEM(parts, i)
+            node = node.get(kv)
+        return node
+
+
+

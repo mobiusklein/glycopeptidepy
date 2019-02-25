@@ -348,8 +348,39 @@ class SimpleFragment(FragmentBase):
         return self.kind
 
 
+try:
+    _SimpleFragment = SimpleFragment
+    from glycopeptidepy._c.structure.fragment import SimpleFragment as _CSimpleFragment
+    SimpleFragment = _CSimpleFragment
+except ImportError:
+    pass
+
+
+try:
+    from glycopeptidepy._c.structure.fragment import _NameTree
+except ImportError:
+
+    class _NameTree(object):
+        def __init__(self, name=None, children=None):
+            if children is None:
+                children = defaultdict(_NameTree)
+            self.name = name
+            self.children = children
+
+        def __getitem__(self, key):
+            return self.children[key]
+
+        def traverse(self, parts):
+            node = self
+            for kv in parts:
+                node = node[kv]
+            return node
+
+
 class StubFragment(SimpleFragment):
     __slots__ = ['glycosylation', 'is_extended']
+
+    _name_cache = _NameTree()
 
     def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False,
                  glycosylation=None, is_extended=False):
@@ -372,7 +403,15 @@ class StubFragment(SimpleFragment):
     @classmethod
     def build_name_from_composition(cls, glycan_composition):
         name = 'peptide'
-        extended_key = ''.join("%s%d" % kv for kv in sorted(glycan_composition.items()))
+        root = cls._name_cache
+        parts = list(glycan_composition.items())
+        # traverse the tree to find the node referring to
+        # this combination of monosaccharides and counts
+        node = root.traverse(parts)
+        extended_key = node.name
+        if extended_key is None:
+            parts.sort(key=lambda x: x[0].mass())
+            node.name = extended_key = ''.join("%s%d" % kv for kv in parts)
         if len(extended_key) > 0:
             name = "%s+%s" % (name, extended_key)
         return name
@@ -421,6 +460,9 @@ except ImportError:
             except AttributeError:
                 return self.name != other
 
+        def __hash__(self):
+            return self._hash
+
 
 @add_metaclass(MemoizedIonSeriesMetaclass)
 class IonSeries(_IonSeriesBase):
@@ -451,9 +493,6 @@ class IonSeries(_IonSeriesBase):
         else:
             self.composition_shift = composition_shift
         self._hash = hash(self.name)
-
-    def __hash__(self):
-        return self._hash
 
     def __repr__(self):
         template = ("{self.__class__.__name__}({self.name}, "
@@ -499,3 +538,4 @@ IonSeries.z1 = IonSeries.zp
 IonSeries.precursor = IonSeries("precursor")
 IonSeries.oxonium_ion = IonSeries("oxonium_ion", includes_peptide=False)
 IonSeries.stub_glycopeptide = IonSeries("stub_glycopeptide")
+IonSeries.other = IonSeries('other')
