@@ -210,11 +210,6 @@ class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         self._use_query = use_query
         self._generator = None
 
-    def __next__(self):
-        if self._generator is None:
-            self._generator = self.stub_fragments()
-        return next(self._generator)
-
     def glycan_composition(self):
         return self.peptide.glycan_composition
 
@@ -310,6 +305,11 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         self.extended = extended
         self.extended_fucosylation = extended_fucosylation
         super(StubGlycopeptideStrategy, self).__init__(peptide, use_query)
+
+    def __next__(self):
+        if self._generator is None:
+            self._generator = self.stub_fragments()
+        return next(self._generator)
 
     def fucosylate_increment(self, shift):
         fucosylated = shift.copy()

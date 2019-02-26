@@ -288,6 +288,16 @@ cdef void count_table_update(count_table* table_a, count_table* table_b):
                 count_table_put(table_a, table_b.bins[i].cells[j].key, value)
 
 
+cdef void count_table_clear(count_table* table):
+    cdef:
+        size_t i, j
+    for i in range(table.size):
+        for j in range(table.bins[i].used):
+            Py_XDECREF(table.bins[i].cells[j].key)
+            table.bins[i].cells[j].key = NULL
+            table.bins[i].cells[j].value = 0
+
+
 cdef count_table* count_table_copy(count_table* table_a):
     cdef:
         count_table* dup
