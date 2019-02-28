@@ -2,7 +2,7 @@ cimport cython
 
 from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
-from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New
+from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem
 from cpython.int cimport PyInt_AsLong
 
@@ -106,14 +106,14 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         self.sequence = sequence = PyList_New(n)
         mass = 0
         for i in range(n):
-            item = <list>PyList_GetItem(seq_list, i)
-            res = _parse_residue(<basestring>PyList_GetItem(item, 0))
+            item = <list>PyList_GET_ITEM(seq_list, i)
+            res = _parse_residue(<basestring>PyList_GET_ITEM(item, 0))
             mass += res.mass
             mods = []
-            mod_strs = <list>PyList_GetItem(item, 1)
+            mod_strs = <list>PyList_GET_ITEM(item, 1)
             m = PyList_Size(mod_strs)
             for j in range(m):
-                mod_str = <basestring>PyList_GetItem(mod_strs, j)
+                mod_str = <basestring>PyList_GET_ITEM(mod_strs, j)
                 if mod_str != '':
                     mod = ModificationImpl(mod_str)
                     if mod.is_tracked_for(ModificationCategory_glycosylation):
