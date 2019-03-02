@@ -125,7 +125,7 @@ cdef class FragmentBase(object):
     """
 
     cpdef IonSeriesBase get_series(self):
-         '''Return the :class:`IonSeries` this fragment belongs to.
+        '''Return the :class:`IonSeries` this fragment belongs to.
 
         Returns
         -------

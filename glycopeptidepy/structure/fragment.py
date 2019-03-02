@@ -543,6 +543,10 @@ except ImportError:
 
         def __hash__(self):
             return self._hash
+    
+        def __reduce__(self):
+            return self.__class__, (self.name, self.direction, self.includes_peptide,
+                                    self.mass_shift, self.regex, self.composition_shift)
 
 
 @add_metaclass(MemoizedIonSeriesMetaclass)
