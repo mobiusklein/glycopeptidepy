@@ -543,7 +543,7 @@ except ImportError:
 
         def __hash__(self):
             return self._hash
-    
+
         def __reduce__(self):
             return self.__class__, (self.name, self.direction, self.includes_peptide,
                                     self.mass_shift, self.regex, self.composition_shift)
@@ -551,9 +551,31 @@ except ImportError:
 
 @add_metaclass(MemoizedIonSeriesMetaclass)
 class IonSeries(_IonSeriesBase):
+    '''An ion series type, reflecting a terminal type and a bond cleavage type.
 
+    Attributes
+    ----------
+    name: str
+        The name of the ion series, like 'b' or 'y'
+    direction: int
+        Whether the fragments from this ion series arise from the N-terminal (1),
+        C-terminal (-1), or neither (0).
+    includes_peptide: bool
+        Whether the fragment includes the peptide backbone or not.
+    mass_shift: float
+        The mass delta applied to the raw components of the fragment.
+    composition_shift: :class:`~.Composition`
+        The elemental composition delta applied to the raw components of the fragment.
+    '''
+    
     @classmethod
     def get(cls, name):
+        '''Get a particular cached :class:`IonSeries` by name
+
+        Returns
+        -------
+        :class:`IonSeries`
+        '''
         return cls(name)
 
     def __init__(self, name, direction=None, includes_peptide=True, mass_shift=None, regex=None,
@@ -588,6 +610,17 @@ class IonSeries(_IonSeriesBase):
         return str(self.name)
 
     def is_member(self, key):
+        '''Test if ``key`` matches this series name.
+
+        Parameters
+        ----------
+        key: str
+            The name of a fragment to test for membership
+        
+        Returns
+        -------
+        bool
+        '''
         if self.regex is None:
             return key.startswith(self.name)
         else:
