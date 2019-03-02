@@ -65,7 +65,6 @@ cdef class ModificationBase(object):
     cpdef bint is_tracked_for(self, object category)
 
 
-@cython.freelist(100000)
 cdef class SequencePosition(object):
     cdef:
         public AminoAcidResidueBase amino_acid

@@ -15,6 +15,9 @@ from glycopeptidepy._c.compat cimport PyStr_AsString, PyStr_FromStringAndSize
 cdef Configuration structure_constants = _structure_constants
 
 
+# this function should use some form of linked list for accumulating positions
+# when the sequence is especially long. The repeated reallocation of the list
+# storing most of the sequence repeatedly seems like a likely performance bottleneck
 cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     '''A simple stateful sequence parser implementing a formally context-free language
     describing components of a polypeptide sequence with N-, C- and internal modifications,

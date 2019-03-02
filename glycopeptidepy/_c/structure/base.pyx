@@ -1,17 +1,23 @@
+cimport cython
 from glypy.composition.ccomposition cimport CComposition
 from glypy.composition import formula as _formula
 
-from cpython.list cimport PyList_GetItem
+from cpython.list cimport PyList_GetItem, PyList_GET_ITEM
 from cpython.sequence cimport PySequence_GetItem
 
 
 cdef object formula = _formula
 
+DEF SAFE_GET = 0
+
 
 cdef class PeptideSequenceBase(object):
 
     cdef SequencePosition get(self, ssize_t i):
-        return <SequencePosition>PyList_GetItem(self.sequence, i)
+        IF SAFE_GET:
+            return <SequencePosition>PyList_GetItem(self.sequence, i)
+        ELSE:
+            return <SequencePosition>PyList_GET_ITEM(self.sequence, i)
 
     cpdef _invalidate(self):
         pass
@@ -171,6 +177,7 @@ cdef class ModificationBase(object):
         return False
 
 
+@cython.freelist(10000000)
 cdef class SequencePosition(object):
 
     def __init__(self, parts):
