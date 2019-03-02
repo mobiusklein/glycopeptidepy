@@ -125,6 +125,12 @@ cdef class FragmentBase(object):
     """
 
     cpdef IonSeriesBase get_series(self):
+         '''Return the :class:`IonSeries` this fragment belongs to.
+
+        Returns
+        -------
+        :class:`IonSeries`
+        '''
         raise NotImplementedError()
 
     def __hash__(self):
@@ -143,15 +149,36 @@ cdef class FragmentBase(object):
 
     @property
     def series(self):
+        '''The :class:`IonSeries` this fragment is drawn from.
+
+        Returns
+        -------
+        :class:`IonSeries`
+        '''
         return self.get_series()
 
     def clone(self):
+        '''Create a copy of this object
+
+        Returns
+        -------
+        :class:`FragmentBase`
+        '''
         raise NotImplementedError()
 
     cpdef ChemicalShiftBase get_chemical_shift(self):
+        '''Returns the chemical shift associated with the fragment.
+
+        Returns
+        -------
+        :class:`ChemicalShift`
+        '''
         return self._chemical_shift
 
     cpdef set_chemical_shift(self, ChemicalShiftBase chemical_shift):
+        '''Sets the chemical shift associated with the fragment, updating
+        the :attr:`mass` and :attr:`chemical_shift`.
+        '''
         if self._chemical_shift is not None:
             self.mass -= self._chemical_shift.mass
         self._chemical_shift = chemical_shift
@@ -187,7 +214,30 @@ cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylat
 
 
 cdef class PeptideFragment(FragmentBase):
+    '''Represents a peptide backbone fragment, such as a peptide b or y ion.
 
+    Attributes
+    ----------
+    series: :class:`IonSeries`
+        The ion series this fragment is from
+    bare_mass: float
+        The unmodified mass of this fragment
+    mass: float
+        The modified, correct mass of this fragment
+    position: int
+        The peptide backbone position index this fragment came from, relative to the
+        starting terminal
+    modification_dict: :class:`~.ModificationIndex`
+        A count of the modifications on this fragment
+    flanking_amino_acids: list
+        The adjacent amino acids of the amide bond that broke to form this fragment
+    glycosylation: dict
+        A position to glycan mapping for glycan structures
+    chemical_shift: :class:`ChemicalShift`
+        An associated chemical shift
+    composition: :class:`~.Composition`
+        The elemental composition of this fragment
+    '''
     @staticmethod
     cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
                                  list flanking_amino_acids=None, dict glycosylation=None,
@@ -291,6 +341,8 @@ cdef class PeptideFragment(FragmentBase):
         return ''.join(fragment_name)
 
     cpdef str get_fragment_name(self):
+        """Build a complete fragment name listing any glycosylation modifications
+        """
         cdef:
             ModificationBase mod_rule
             long count
@@ -433,12 +485,10 @@ cdef class PeptideFragment(FragmentBase):
         return size
 
     def __repr__(self):
-        return ("PeptideFragment(%(type)s %(position)s %(mass)s "
-                "%(modification_dict)s %(flanking_amino_acids)s %(chemical_shift)r)") % {
-            "type": self.series, "position": self.position, "mass": self.mass,
-            "modification_dict": dict(self.modification_dict), "flanking_amino_acids": self.flanking_amino_acids,
-            "chemical_shift": self.chemical_shift
-        }
+        template = ("PeptideFragment({self.series}, {self.position}, "
+                    "{self.mass}, {modification_dict}, {self.flanking_amino_acids},"
+                    " {self.chemical_shift})")
+        return template.format(self=self, modification_dict=dict(self.modification_dict))
 
 
 cdef class SimpleFragment(FragmentBase):
@@ -460,7 +510,7 @@ cdef class SimpleFragment(FragmentBase):
     cpdef clone(self):
         corrected_mass = self.mass
         if self._chemical_shift is not None:
-            corrected_mass - self.chemical_shift.mass
+            corrected_mass -= self.chemical_shift.mass
         return self.__class__(self.name, corrected_mass, self.kind,
                               self.composition,
                               self._chemical_shift.clone() if self._chemical_shift is not None else None,
@@ -469,7 +519,7 @@ cdef class SimpleFragment(FragmentBase):
     def __reduce__(self):
         corrected_mass = self.mass
         if self._chemical_shift is not None:
-            corrected_mass - self.chemical_shift.mass
+            corrected_mass -= self.chemical_shift.mass
         return self.__class__, (self.name, corrected_mass, self.kind, self.composition,
                                 self.chemical_shift, self.is_glycosylated)
 

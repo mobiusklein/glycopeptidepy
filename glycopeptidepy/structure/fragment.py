@@ -1,3 +1,5 @@
+'''Represents fragments of peptides and glycopeptides.
+'''
 import re
 from collections import defaultdict
 from six import add_metaclass
@@ -6,7 +8,6 @@ from .modification import (
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
 from .glycan import HashableGlycanComposition
 from .composition import Composition, formula
-from ..utils import simple_repr
 
 _n_glycosylation = NGlycanCoreGlycosylation()
 _o_glycosylation = OGlycanCoreGlycosylation()
@@ -58,7 +59,12 @@ generic_chemical_shifts_composition = {
 
 
 def format_negative_composition(composition):
+    '''Format a chemical composition as a formula with negative
+    element counts.
+    '''
     return "-%s" % formula({k: -v for k, v in composition.items()})
+
+# pylint: disable=access-member-before-definition,assigning-non-slot,invalid-unary-operand-type
 
 
 try:
@@ -68,6 +74,17 @@ except ImportError:
 
 
 class ChemicalShift(_ChemicalShiftBase):
+    '''Represents a chemical shift, a gain or loss of chemical composition.
+
+    Attributes
+    ----------
+    name: str
+        The name of the modification
+    composition: Composition
+        The chemical composition difference
+    mass: float
+        The mass of the chemical composition shift
+    '''
     def __init__(self, name, composition=None):
         if composition is None:
             composition = generic_chemical_shifts_composition[name]
@@ -76,6 +93,12 @@ class ChemicalShift(_ChemicalShiftBase):
         self.mass = composition.mass
 
     def clone(self):
+        '''Create a copy of this object
+
+        Returns
+        -------
+        :class:`ChemicalShift`
+        '''
         return self.__class__(self.name, self.composition.clone())
 
     def __str__(self):
@@ -85,6 +108,12 @@ class ChemicalShift(_ChemicalShiftBase):
         return "%s(name=%r)" % (self.__class__.__name__, self.name)
 
     def is_loss(self):
+        '''Returns :const:`True` if the chemical shift results in a net loss in mass
+
+        Returns
+        -------
+        :class:`bool`
+        '''
         return self.mass < 0
 
     AllLosses = object()
@@ -113,6 +142,12 @@ class FragmentBase(object):
     __slots__ = ("_chemical_shift", "_name", "_hash")
 
     def get_series(self):
+        '''Return the :class:`IonSeries` this fragment belongs to.
+
+        Returns
+        -------
+        :class:`IonSeries`
+        '''
         raise NotImplementedError()
 
     def __hash__(self):
@@ -131,15 +166,36 @@ class FragmentBase(object):
 
     @property
     def series(self):
+        '''The :class:`IonSeries` this fragment is drawn from.
+
+        Returns
+        -------
+        :class:`IonSeries`
+        '''
         return self.get_series()
 
     def clone(self):
+        '''Create a copy of this object
+
+        Returns
+        -------
+        :class:`FragmentBase`
+        '''
         raise NotImplementedError()
 
     def get_chemical_shift(self):
+        '''Returns the chemical shift associated with the fragment.
+
+        Returns
+        -------
+        :class:`ChemicalShift`
+        '''
         return self._chemical_shift
 
     def set_chemical_shift(self, chemical_shift):
+        '''Sets the chemical shift associated with the fragment, updating
+        the :attr:`mass` and :attr:`chemical_shift`.
+        '''
         if self._chemical_shift is not None:
             self.mass -= self._chemical_shift.mass
         self._chemical_shift = chemical_shift
@@ -180,6 +236,30 @@ class FragmentBase(object):
 
 
 class PeptideFragment(FragmentBase):
+    '''Represents a peptide backbone fragment, such as a peptide b or y ion.
+
+    Attributes
+    ----------
+    series: :class:`IonSeries`
+        The ion series this fragment is from
+    bare_mass: float
+        The unmodified mass of this fragment
+    mass: float
+        The modified, correct mass of this fragment
+    position: int
+        The peptide backbone position index this fragment came from, relative to the
+        starting terminal
+    modification_dict: :class:`~.ModificationIndex`
+        A count of the modifications on this fragment
+    flanking_amino_acids: list
+        The adjacent amino acids of the amide bond that broke to form this fragment
+    glycosylation: dict
+        A position to glycan mapping for glycan structures
+    chemical_shift: :class:`ChemicalShift`
+        An associated chemical shift
+    composition: :class:`~.Composition`
+        The elemental composition of this fragment
+    '''
     concerned_modifications = set(
         [_n_glycosylation,
          _modification_hexnac,
@@ -253,6 +333,8 @@ class PeptideFragment(FragmentBase):
         return ''.join(fragment_name)
 
     def get_fragment_name(self):
+        """Build a complete fragment name listing any glycosylation modifications
+        """
         fragment_name = []
         fragment_name.append(str(self.series))
         fragment_name.append(str(self.position))
@@ -293,12 +375,11 @@ class PeptideFragment(FragmentBase):
         return size
 
     def __repr__(self):
-        return ("PeptideFragment(%(type)s %(position)s %(mass)s "
-                "%(modification_dict)s %(flanking_amino_acids)s %(chemical_shift)r)") % {
-            "type": self.series, "position": self.position, "mass": self.mass,
-            "modification_dict": self.modification_dict, "flanking_amino_acids": self.flanking_amino_acids,
-            "chemical_shift": self.chemical_shift
-        }
+        template = ("PeptideFragment({self.series}, {self.position}, "
+                    "{self.mass}, {modification_dict}, {self.flanking_amino_acids},"
+                    " {self.chemical_shift})")
+        return template.format(self=self, modification_dict=dict(self.modification_dict))
+
 
 
 try:
@@ -327,7 +408,7 @@ class SimpleFragment(FragmentBase):
     def clone(self):
         corrected_mass = self.mass
         if self._chemical_shift is not None:
-            corrected_mass - self.chemical_shift.mass
+            corrected_mass -= self.chemical_shift.mass
         return self.__class__(self.name, corrected_mass, self.kind,
                               self.composition,
                               self._chemical_shift.clone() if self._chemical_shift is not None else None,
@@ -336,7 +417,7 @@ class SimpleFragment(FragmentBase):
     def __reduce__(self):
         corrected_mass = self.mass
         if self._chemical_shift is not None:
-            corrected_mass - self.chemical_shift.mass
+            corrected_mass -= self.chemical_shift.mass
         return self.__class__, (self.name, corrected_mass, self.kind, self.composition,
                                 self.chemical_shift, self.is_glycosylated)
 
@@ -424,18 +505,18 @@ class StubFragment(SimpleFragment):
 
 class MemoizedIonSeriesMetaclass(type):
 
-    def __call__(self, name=None, *args, **kwargs):
-        if not hasattr(self, "_cache"):
-            self._cache = dict()
+    def __call__(cls, name=None, *args, **kwargs):
+        if not hasattr(cls, "_cache"):
+            cls._cache = dict()
         try:
             if name is not None:
-                return self._cache[name]
+                return cls._cache[name]
             else:
                 raise Exception("Must provide a name parameter")
         except KeyError:
             if name is not None:
-                inst = type.__call__(self, name=name, *args, **kwargs)
-                self._cache[inst.name] = inst
+                inst = type.__call__(cls, name=name, *args, **kwargs)
+                cls._cache[inst.name] = inst
                 return inst
             else:
                 raise KeyError("Cannot find an IonSeries for %r" % (name))
