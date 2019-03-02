@@ -406,23 +406,38 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     def __eq__(self, other):
         return str(self) == str(other)
 
-    def base_sequence_equality(self, other):
-        if len(self) != len(other):
+    cpdef bint base_sequence_equality(self, _PeptideSequenceCore other):
+        cdef:
+            size_t n, m, i
+        n = self.get_size()
+        m = other.get_size()
+        if n != m:
             return False
-        for a, b in zip(self, other):
-            if a[0] != b[0]:
+        for i in range(n):
+            if self.get(i).amino_acid != other.get(i).amino_acid:
                 return False
         return True
 
-    def modified_sequence_equality(self, other):
-        if len(self) != len(other):
+    cpdef bint modified_sequence_equality(self, _PeptideSequenceCore other):
+        cdef:
+            size_t n, m, i
+            SequencePosition a, b
+        n = self.get_size()
+        m = other.get_size()
+        if n != m:
             return False
-        for a, b in zip(self, other):
-            if a[0] != b[0] or set(a[1]) != set(b[1]):
+        for i in range(n):
+            a = self.get(i)
+            b = other.get(i)
+            if a != b:
                 return False
+        if self.get_n_term() != other.get_n_term():
+            return  False
+        if self.get_c_term() != other.get_c_term():
+            return False
         return True
 
-    def full_structure_equality(self, other):
+    cpdef bint full_structure_equality(self, _PeptideSequenceCore other):
         sequences_equal = self.modified_sequence_equality(other)
         if sequences_equal:
             return self.glycan == other.glycan

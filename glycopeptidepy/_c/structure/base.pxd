@@ -47,6 +47,8 @@ cdef class AminoAcidResidueBase(object):
     @staticmethod
     cdef AminoAcidResidueBase _create(str name, str symbol, double mass, CComposition composition)
 
+    cdef bint equal_to(self, AminoAcidResidueBase other)
+
 
 
 @cython.freelist(100000)

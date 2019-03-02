@@ -143,6 +143,9 @@ cdef class AminoAcidResidueBase(object):
         except AttributeError:
             return self.name == other or self.symbol == other
 
+    cdef bint equal_to(self, AminoAcidResidueBase other):
+        return self.name == other.name or self.symbol == other.symbol
+
     def __ne__(self, other):
         if self is other:
             return False

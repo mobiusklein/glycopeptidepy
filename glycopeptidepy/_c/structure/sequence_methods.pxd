@@ -33,5 +33,9 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     cpdef basestring get_sequence(self, bint include_glycan=*, bint include_termini=*, str implicit_n_term=*, str implicit_c_term=*)
     cpdef clone(self)
 
+    cpdef bint base_sequence_equality(self, _PeptideSequenceCore other)
+    cpdef bint modified_sequence_equality(self, _PeptideSequenceCore other)
+    cpdef bint full_structure_equality(self, _PeptideSequenceCore other)
+
     cpdef CComposition peptide_composition(self)
     cpdef CComposition total_composition(self)
