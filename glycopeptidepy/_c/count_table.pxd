@@ -14,6 +14,7 @@ cdef struct count_table_bin:
 cdef struct count_table:
     count_table_bin* bins
     size_t size
+    size_t count
 
 
 cdef int initialize_count_table_bin(count_table_bin* bin, size_t size)

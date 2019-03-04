@@ -12,7 +12,104 @@ except ImportError:
     from collections.abc import Mapping, MutableMapping
 
 
+DEF USE_FREELIST = 0
+
+
+cdef struct count_table_bin_freelist_node:
+    count_table_bin* pointer
+    count_table_bin_freelist_node* next
+    int id
+
+
+cdef struct count_table_bin_freelist:
+    count_table_bin_freelist_node* head
+    count_table_bin_freelist_node* unallocated_head
+
+
+cdef int count_table_bin_freelist_put(count_table_bin_freelist* freelist, count_table_bin* bin):
+    cdef:
+        count_table_bin_freelist_node* node
+    if freelist.unallocated_head == NULL:
+        print("Freelist full")
+        free_count_table_bin(bin)
+        return 1
+    # get the next unallocated node and put the allocated pointer
+    # in it
+    print("Returning bin to freelist")
+    node = freelist.unallocated_head
+    print("Returning bin to node %d" % node.id)
+    node.pointer = bin
+    print("Resetting Bins")
+    reset_count_table_bin(bin)
+    freelist.unallocated_head = node.next
+    if freelist.unallocated_head == NULL:
+        print("Unallocated head node is NULL")
+    print("Unallocated head node %d" % node.id)
+    # put this node at the front of the allocated freelist
+    node.next = freelist.head
+    freelist.head = node
+    return 0
+
+
+cdef int count_table_bin_freelist_get(count_table_bin_freelist* freelist, count_table_bin* bin):
+    cdef:
+        count_table_bin_freelist_node* node
+    if freelist.head == NULL:
+        print("Freelist empty")
+        bin[0] =  (<count_table_bin*>PyMem_Malloc(sizeof(count_table_bin)))[0]
+        initialize_count_table_bin(bin, 2)
+        return 1
+    # get the next allocated node and put the pointer it contains into
+    # the output pointer
+    print("Taking bin from freelist")
+    node = freelist.head
+    print("Taking bin from node %d" % node.id)
+    if node.pointer == NULL:
+        print("Bin Pointer is NULL")
+    bin[0] = node.pointer[0]
+    node.pointer = NULL
+    freelist.head = node.next
+    if freelist.head == NULL:
+        print("Allocated head node is NULL")
+    print("Allocated head node %d" % node.id)
+    # put this node at the front of the unallocated freelist
+    node.next = freelist.unallocated_head
+    freelist.unallocated_head = node
+    return 0
+
+
+cdef int initialize_count_table_bin_freelist(size_t n, count_table_bin_freelist* inst):
+    cdef:
+        count_table_bin_freelist_node* node
+        count_table_bin_freelist_node* prev_node
+        size_t i
+    prev_node = NULL
+    for i in range(n):
+        node = <count_table_bin_freelist_node*>PyMem_Malloc(sizeof(count_table_bin_freelist_node))
+        node.id = i
+        node.next = prev_node
+        node.pointer = <count_table_bin*>PyMem_Malloc(sizeof(count_table_bin))
+        initialize_count_table_bin(node.pointer, 2)
+        prev_node = node
+    inst.head = prev_node
+    inst.unallocated_head = NULL
+    return 0
+
+
+
+cdef count_table_bin_freelist* _count_table_bin_freelist = NULL
+
+IF USE_FREELIST:
+    _count_table_bin_freelist = <count_table_bin_freelist*>PyMem_Malloc(sizeof(count_table_bin_freelist))
+    initialize_count_table_bin_freelist(100, _count_table_bin_freelist)
+
+
 cdef int initialize_count_table_bin(count_table_bin* bin, size_t size):
+    if size == 0:
+        bin.cells = NULL
+        bin.used = 0
+        bin.size = size
+        return 0
     bin.cells = <count_table_bin_cell*>PyMem_Malloc(sizeof(count_table_bin_cell) * size)
     if bin.cells == NULL:
         return 1
@@ -20,22 +117,33 @@ cdef int initialize_count_table_bin(count_table_bin* bin, size_t size):
         bin.cells[i].key = NULL
     bin.used = 0
     bin.size = size
+    return 0
 
 
-cdef void free_count_table_bin(count_table_bin* bin):
+cdef void reset_count_table_bin(count_table_bin* bin):
     for i in range(bin.used):
         if bin.cells[i].key != NULL:
             Py_XDECREF(bin.cells[i].key)
             bin.cells[i].key = NULL
-    PyMem_Free(bin.cells)
+    bin.used = 0
+
+
+cdef void free_count_table_bin(count_table_bin* bin):
+    reset_count_table_bin(bin)
+    if bin.cells != NULL:
+        PyMem_Free(bin.cells)
 
 
 cdef int count_table_bin_append(count_table_bin* bin, PyObject* key, long value):
-    if bin.used == bin.size - 1:
-        bin.cells = <count_table_bin_cell*>PyMem_Realloc(bin.cells, sizeof(count_table_bin_cell) * bin.size * 2)
+    if bin.used == bin.size - 1 or bin.size == 0:
+        if bin.cells == NULL:
+            bin.cells = <count_table_bin_cell*>PyMem_Malloc(sizeof(count_table_bin_cell) * 2)
+            bin.size = 2
+        else:
+            bin.cells = <count_table_bin_cell*>PyMem_Realloc(bin.cells, sizeof(count_table_bin_cell) * bin.size * 2)
+            bin.size *= 2
         if bin.cells == NULL:
             return 1
-        bin.size *= 2
     Py_XINCREF(key)
     bin.cells[bin.used].key = key
     bin.cells[bin.used].value = value
@@ -51,7 +159,7 @@ cdef int count_table_bin_find(count_table_bin* bin, PyObject* query, Py_ssize_t*
         if bin.cells[i].key == NULL:
             continue
         Py_XINCREF(bin.cells[i].key)
-        if (<object>bin.cells[i].key) == (query_obj):
+        if (bin.cells[i].key == query) or ((<object>bin.cells[i].key) == (query_obj)):
             Py_XDECREF(bin.cells[i].key)
             cell_index[0] = i
             return 0
@@ -73,22 +181,32 @@ cdef count_table* make_count_table(size_t table_size, size_t bin_size):
         PyErr_SetString(MemoryError, "Could not allocate memory for count_table")
         return NULL
     for i in range(table_size):
-        initialize_count_table_bin(&(table.bins[i]), bin_size)
+        IF USE_FREELIST:
+            count_table_bin_freelist_get(_count_table_bin_freelist, &table.bins[i])
+        ELSE:
+            initialize_count_table_bin(&(table.bins[i]), 0)
     table.size = table_size
+    table.count = 0
     return table
 
 
 cdef void free_count_table(count_table* table):
     for i in range(table.size):
-        free_count_table_bin(&table.bins[i])
+        IF USE_FREELIST:
+            count_table_bin_freelist_put(_count_table_bin_freelist, &table.bins[i])
+        ELSE:
+            free_count_table_bin(&table.bins[i])
     PyMem_Free(table.bins)
     PyMem_Free(table)
 
 
 @cython.cdivision(True)
 cdef int count_table_find_bin(count_table* table, PyObject* query, Py_ssize_t* bin_index) except 1:
+    cdef:
+        Py_hash_t hash_value
     try:
-        bin_index[0] = PyObject_Hash(<object>query) % table.size
+        hash_value = PyObject_Hash(<object>query)
+        bin_index[0] = hash_value % table.size
     except TypeError:
         PyErr_SetString(TypeError, "%r is not hashable" % (<object>query, ))
         return 1
@@ -109,6 +227,7 @@ cdef int count_table_put(count_table* table, PyObject* key, long value) except 1
     if cell_index == -1:
         status = count_table_bin_append(&table.bins[bin_index], key, value)
         Py_XDECREF(key)
+        table.count += 1
         if status != 0:
             return 1
     else:
@@ -137,6 +256,7 @@ cdef int count_table_del(count_table* table, PyObject* key, long* value) except 
         table.bins[bin_index].cells[cell_index].key = NULL
         table.bins[bin_index].cells[cell_index].value = 0
         Py_XDECREF(key)
+        table.count -= 1
         return 0
 
 
@@ -168,6 +288,7 @@ cdef int count_table_increment(count_table* table, PyObject* key, long value):
     status = count_table_bin_find(&table.bins[bin_index], key, &cell_index)
     if cell_index == -1:
         status = count_table_bin_append(&table.bins[bin_index], key, value)
+        table.count += 1
         Py_XDECREF(key)
         if status != 0:
             return 1
@@ -186,6 +307,7 @@ cdef int count_table_decrement(count_table* table, PyObject* key, long value):
     status = count_table_bin_find(&table.bins[bin_index], key, &cell_index)
     if cell_index == -1:
         status = count_table_bin_append(&table.bins[bin_index], key, -value)
+        table.count += 1
         Py_XDECREF(key)
         if status != 0:
             return 1
@@ -250,6 +372,8 @@ cdef void count_table_add(count_table* table_a, count_table* table_b):
     cdef:
         size_t i, j
         long value
+    if table_b.count == 0:
+        return
     for i in range(table_b.size):
         for j in range(table_b.bins[i].used):
             if table_b.bins[i].cells[j].key != NULL:
@@ -261,6 +385,8 @@ cdef void count_table_subtract(count_table* table_a, count_table* table_b):
     cdef:
         size_t i, j
         long value, temp
+    if table_b.count == 0:
+        return
     for i in range(table_b.size):
         for j in range(table_b.bins[i].used):
             if table_b.bins[i].cells[j].key != NULL:
@@ -281,6 +407,8 @@ cdef void count_table_update(count_table* table_a, count_table* table_b):
     cdef:
         size_t i, j
         long value
+    if table_b.count == 0:
+        return
     for i in range(table_b.size):
         for j in range(table_b.bins[i].used):
             if table_b.bins[i].cells[j].key != NULL:
@@ -309,6 +437,7 @@ cdef count_table* count_table_copy(count_table* table_a):
                 count_table_bin_append(
                     &dup.bins[i], table_a.bins[i].cells[j].key,
                     table_a.bins[i].cells[j].value)
+    dup.count = table_a.count
     return dup
 
 
@@ -330,17 +459,13 @@ cdef bint count_table_equals(count_table* table_a, count_table* table_b):
     cdef:
         size_t i, j
         long value
+    if table_a.count != table_b.count:
+        return False
     for i in range(table_a.size):
         for j in range(table_a.bins[i].used):
             if table_a.bins[i].cells[j].key != NULL:
                 count_table_get(table_b, table_a.bins[i].cells[j].key, &value)
                 if table_a.bins[i].cells[j].value != value:
-                    return False
-    for i in range(table_b.size):
-        for j in range(table_b.bins[i].used):
-            if table_b.bins[i].cells[j].key != NULL:
-                count_table_get(table_a, table_b.bins[i].cells[j].key, &value)
-                if table_b.bins[i].cells[j].value != value:
                     return False
     return True
 
@@ -363,7 +488,8 @@ cdef class CountTableIterator(object):
         it.cell_index = 0
         it.next_key = NULL
         it.next_value = 0
-        it.advance()
+        if it.table.count > 0:
+            it.advance()
         return it
 
     cdef bint has_more(self):
@@ -473,7 +599,7 @@ cdef class CountTable(object):
         cdef CountTable inst
         inst = CountTable.__new__(CountTable)
         inst.table = count_table_copy(table.table)
-        return inst        
+        return inst
 
     def __init__(self, obj=None, **kwargs):
         self._initialize_table()
@@ -530,7 +656,9 @@ cdef class CountTable(object):
         self.pop(key)
 
     def __len__(self):
-        return count_table_count(self.table)
+        cdef size_t count =  count_table_count(self.table)
+        assert count == self.table.count
+        return count
 
     def __contains__(self, key):
         cdef long value = self.getitem(key)
@@ -733,14 +861,14 @@ cdef class CountTable(object):
 
     cdef long getitem(self, object key) except *:
         cdef long value
-        cdef int status 
+        cdef int status
         cdef PyObject* pkey = <PyObject*>key
         Py_INCREF(key)
         status = count_table_get(self.table, pkey, &value)
         Py_DECREF(key)
         if status != 0:
             return 0
-        return value        
+        return value
 
     cdef int setitem(self, object key, long value) except 1:
         cdef PyObject* pkey = <PyObject*>key
@@ -784,6 +912,9 @@ cdef class CountTable(object):
         if value == 0:
             return default
         return PyInt_FromLong(value)
+
+    def get_count(self):
+        return self.table.count
 
 
 Mapping.register(CountTable)

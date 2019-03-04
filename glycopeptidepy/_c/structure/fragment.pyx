@@ -179,6 +179,8 @@ cdef class FragmentBase(object):
         '''Sets the chemical shift associated with the fragment, updating
         the :attr:`mass` and :attr:`chemical_shift`.
         '''
+        if self._chemical_shift is None and chemical_shift is None:
+            return
         if self._chemical_shift is not None:
             self.mass -= self._chemical_shift.mass
         self._chemical_shift = chemical_shift
@@ -251,7 +253,7 @@ cdef class PeptideFragment(FragmentBase):
         self.modification_dict = modification_dict
         self.composition = composition
         self._chemical_shift = None
-        
+
         self.flanking_amino_acids = flanking_amino_acids
         self.glycosylation = glycosylation
         self.set_chemical_shift(chemical_shift)
@@ -399,7 +401,7 @@ cdef class PeptideFragment(FragmentBase):
                     int_conv = str_ints[count]
                     memcpy(&name_buffer[index], int_conv.string, int_conv.size)
                     index += int_conv.size
-                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)
                     if size_ref + index > buffer_size:
                         if needs_free:
                             name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref) * 2)
@@ -415,7 +417,7 @@ cdef class PeptideFragment(FragmentBase):
                 elif count == 1:
                     name_buffer[index] = "+"
                     index += 1
-                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)   
+                    tmp_buffer = PyStr_AsUTF8AndSize(mod_rule.name, &size_ref)
                     if size_ref + index > buffer_size:
                         if needs_free:
                             name_buffer = <char*>realloc(name_buffer, sizeof(char) * (buffer_size + size_ref) * 2)
@@ -441,9 +443,9 @@ cdef class PeptideFragment(FragmentBase):
                     memcpy(oversized_buffer, name_buffer, index)
                     name_buffer = oversized_buffer
                     needs_free = True
-                    buffer_size = (buffer_size + size_ref) 
+                    buffer_size = (buffer_size + size_ref)
             memcpy(&name_buffer[index], tmp_buffer, size_ref)
-            index += size_ref        
+            index += size_ref
         name = PyStr_FromStringAndSize(&name_buffer[0], index)
         if needs_free:
             free(name_buffer)
@@ -469,7 +471,7 @@ cdef class PeptideFragment(FragmentBase):
                 mod = <ModificationBase>pkey
                 if mod.is_a(ModificationCategory_glycosylation):
                     return True
-        return False        
+        return False
 
     @property
     def is_glycosylated(self):
@@ -492,8 +494,6 @@ cdef class PeptideFragment(FragmentBase):
 
 
 cdef class SimpleFragment(FragmentBase):
-    __slots__ = ["name", "mass", "kind", "composition",
-                 "_chemical_shift", "is_glycosylated"]
 
     def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False):
         self._name = name
@@ -575,4 +575,48 @@ cdef class _NameTree(object):
         return node
 
 
+cdef _NameTree stub_fragment_name_cache = _NameTree()
 
+
+cdef class StubFragment(SimpleFragment):
+
+    _name_cache = stub_fragment_name_cache
+
+    def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False,
+                 glycosylation=None, is_extended=False):
+        super(StubFragment, self).__init__(
+            name, mass, kind, composition, chemical_shift, is_glycosylated)
+
+        self.glycosylation = glycosylation
+        self.is_extended = is_extended
+
+    cpdef clone(self):
+        dup = super(StubFragment, self).clone()
+        dup.glycosylation = self.glycosylation
+        dup.is_extended = self.is_extended
+        return dup
+
+    @property
+    def glycosylation_size(self):
+        return sum(self.glycosylation.values())
+
+    @classmethod
+    def build_name_from_composition(cls, glycan_composition):
+        name = 'peptide'
+        root = cls._name_cache
+        parts = list(glycan_composition.items())
+        # traverse the tree to find the node referring to
+        # this combination of monosaccharides and counts
+        node = root.traverse(parts)
+        extended_key = node.name
+        if extended_key is None:
+            parts.sort(key=lambda x: x[0].mass())
+            node.name = extended_key = ''.join("%s%d" % kv for kv in parts)
+        if extended_key:
+            name = "%s+%s" % (name, extended_key)
+        return name
+
+    def __reduce__(self):
+        proto = list(super(StubFragment, self).__reduce__())
+        proto[1] = proto[1] + (self.glycosylation, self.is_extended)
+        return tuple(proto)

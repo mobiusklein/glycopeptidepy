@@ -65,6 +65,11 @@ cdef class SimpleFragment(FragmentBase):
     cpdef clone(self)
 
 
+cdef class StubFragment(SimpleFragment):
+    cdef:
+        public object glycosylation
+        public bint is_extended
+
 
 cdef class PeptideFragment(FragmentBase):
     cdef:

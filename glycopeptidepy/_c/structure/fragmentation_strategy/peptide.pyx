@@ -480,7 +480,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             if ptemp == NULL:
                 variants = self._last_modification_variants = self._generate_modification_variants(
                     mod_config.modifications_of_interest,
-                    # do not include extra modifications here so that caching of 
+                    # do not include extra modifications here so that caching of
                     # interesting modificatoin variants does not need to be recalculated
                     # when uninteresting modifications change
                     CountTable._create()
