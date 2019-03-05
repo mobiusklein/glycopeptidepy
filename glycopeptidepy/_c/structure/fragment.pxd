@@ -90,6 +90,7 @@ cdef class PeptideFragment(FragmentBase):
 
     cdef void _update_mass_with_modifications(self)
     cdef bint _is_glycosylated(self)
+    cdef long get_glycosylation_size(self) except -1
 
 
 @cython.final

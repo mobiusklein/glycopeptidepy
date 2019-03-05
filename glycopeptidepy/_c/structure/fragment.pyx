@@ -7,6 +7,7 @@ cimport cython
 from cpython cimport PyObject
 from cpython.ref cimport Py_INCREF
 from cpython.object cimport PyObject_Str
+from cpython cimport PyErr_SetString
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next, PyDict_GetItem
 from cpython.int cimport PyInt_AsLong
@@ -484,6 +485,17 @@ cdef class PeptideFragment(FragmentBase):
         size = 0
         size += self.modification_dict.get(_modification_hexnac, 0)
         size += self.modification_dict.get(_modification_xylose, 0)
+        return size
+
+    cdef long get_glycosylation_size(self) except -1:
+        cdef:
+            long size
+        if self.glycosylation is not None:
+            PyErr_SetString(NotImplementedError, "Method not implemented for glycan collections yet")
+            return -1
+        size = 0
+        size += self.modification_dict.getitem(_modification_hexnac)
+        size += self.modification_dict.getitem(_modification_xylose)
         return size
 
     def __repr__(self):

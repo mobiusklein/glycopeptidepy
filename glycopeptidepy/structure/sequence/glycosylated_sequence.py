@@ -117,7 +117,7 @@ class GlycosylatedSequenceMixin(object):
         if isinstance(value, GlycanComposition):
             self._glycosylation_manager.aggregate = value
         elif isinstance(value, GlycosylationManager):
-            self._glycosylation_manager = value
+            self._glycosylation_manager = value # pylint: disable=assigning-non-slot
         self._invalidate()
 
     @property
