@@ -234,3 +234,24 @@ def sequence_tokenizer_respect_sequons(sequence, known_sites=None):
             positions.append(cur_pos)
         i += 1
     return positions
+
+
+def parse_simple(sequence):
+    '''Parse a simple sequence string without *any* modifications
+    into a chunked token list, matching the return signature of :func:`sequence_tokenizer`
+    '''
+    if sys.version_info[0] > 2 and isinstance(sequence, bytes):
+        sequence = sequence.decode("utf8")
+
+    chunks = [[a, []] for a in sequence]
+    mods = []
+    glycan = None
+    n_term = structure_constants.N_TERM_DEFAULT
+    c_term = structure_constants.C_TERM_DEFAULT
+    return chunks, mods, glycan, n_term, c_term
+
+
+try:
+    from glycopeptidepy._c.parser import parse_simple
+except ImportError:
+    pass

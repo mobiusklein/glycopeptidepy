@@ -10,7 +10,7 @@ cdef object formula = _formula
 
 DEF SAFE_GET = 0
 
-
+@cython.freelist(10000)
 cdef class PeptideSequenceBase(object):
 
     cdef SequencePosition get(self, ssize_t i):
@@ -23,6 +23,7 @@ cdef class PeptideSequenceBase(object):
         pass
 
 
+@cython.freelist(100)
 cdef class TerminalGroup(object):
     def __init__(self, base_composition, modification=None):
         if not isinstance(base_composition, CComposition):
@@ -121,6 +122,7 @@ cdef class TerminalGroup(object):
         return str(self)
 
 
+@cython.freelist(100)
 cdef class AminoAcidResidueBase(object):
     '''
     A base type for classes describing amino acid residues
@@ -161,6 +163,7 @@ cdef class AminoAcidResidueBase(object):
             return self.name != other and self.symbol != other
 
 
+@cython.freelist(100000)
 cdef class ModificationBase(object):
     
     def __copy__(self):

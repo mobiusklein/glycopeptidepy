@@ -13,6 +13,7 @@ from six import text_type
 
 from glycopeptidepy.structure.residue import UnknownAminoAcidException, symbol_to_residue
 from glycopeptidepy.structure.sequence import ProteinSequence
+from glycopeptidepy.structure.parser import parse_simple
 from glycopeptidepy.utils.sequence_tree import SuffixTree
 from glypy.utils.base import opener
 
@@ -566,13 +567,16 @@ class ProteinFastaFileReader(FastaFileReader):
 
     def process_result(self, d):
         try:
-            p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
+            p = ProteinSequence(
+                d['name'], d['sequence'], parser_funciton=parse_simple, annotations=dict(d['name']))
         except UnknownAminoAcidException:
             if self.replace_unknown is None or self.replace_unknown:
                 if self.replace_unknown is None:
                     warnings.warn("Replacing unknown amino acids in %s" % d['name'])
                 d['sequence'] = self._replace_unknown_amino_acids(d['sequence'])
-                p = ProteinSequence(d['name'], d['sequence'], annotations=dict(d['name']))
+                p = ProteinSequence(
+                    d['name'], d['sequence'], parser_funciton=parse_simple,
+                    annotations=dict(d['name']))
             else:
                 raise
         return p

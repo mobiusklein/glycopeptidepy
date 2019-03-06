@@ -2,7 +2,6 @@ cimport cython
 from glypy.composition.ccomposition cimport CComposition
 
 
-@cython.freelist(1000000)
 cdef class PeptideSequenceBase(object):
     cdef:
         public list sequence
@@ -21,7 +20,6 @@ cdef class PeptideSequenceBase(object):
     cpdef _invalidate(self)
 
 
-@cython.freelist(100)
 cdef class TerminalGroup(object):
     cdef:
         public CComposition base_composition
@@ -34,7 +32,6 @@ cdef class TerminalGroup(object):
     cdef void set_modification(self, ModificationBase)
 
 
-@cython.freelist(100)
 cdef class AminoAcidResidueBase(object):
     cdef:
         public basestring name
@@ -50,8 +47,6 @@ cdef class AminoAcidResidueBase(object):
     cdef bint equal_to(self, AminoAcidResidueBase other)
 
 
-
-@cython.freelist(100000)
 cdef class ModificationBase(object):
     cdef:
         public basestring name

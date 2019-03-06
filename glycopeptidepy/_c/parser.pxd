@@ -18,3 +18,5 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
 
 cpdef sequence_tokenizer(object sequence, object implicit_n_term=*, object implicit_c_term=*,
                          object glycan_parser_function=*)
+
+cpdef parse_simple(str sequence)

@@ -267,6 +267,7 @@ hcd_modification_compositions = {
 hcd_modifications_of_interest_to_variants_cache = dict()
 
 
+@cython.freelist(100)
 cdef class ModificationConfiguration(object):
 
     @staticmethod

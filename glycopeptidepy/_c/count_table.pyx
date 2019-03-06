@@ -470,6 +470,7 @@ cdef bint count_table_equals(count_table* table_a, count_table* table_b):
     return True
 
 
+@cython.freelist(100)
 cdef class CountTableIterator(object):
 
     def __init__(self, table):
@@ -584,7 +585,7 @@ cdef class CountTableIterator(object):
         return result
 
 
-
+@cython.freelist(100000)
 cdef class CountTable(object):
 
     @staticmethod

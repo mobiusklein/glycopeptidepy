@@ -1,5 +1,5 @@
 from cpython cimport Py_INCREF, PY_MAJOR_VERSION
-from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
+from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New, PyList_SET_ITEM
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values
 from cpython.sequence cimport PySequence_GetSlice
 
@@ -361,3 +361,24 @@ cpdef sequence_tokenizer(object sequence, object implicit_n_term=None, object im
             return _sequence_tokenizer[str](
                 (<unicode>sequence).encode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
     return _sequence_tokenizer[object](sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
+
+
+cpdef parse_simple(str sequence):
+    cdef:
+        size_t i, n
+        list chunks, chunk, junk
+        str current_aa
+        char* csequence
+
+    n = len(sequence)
+    chunks = PyList_New(n)
+    junk = []
+    csequence = PyStr_AsString(sequence)
+    for i in range(n):
+        next_char = csequence[i]
+        current_aa = PyStr_FromStringAndSize(&next_char, 1)
+        chunk = [current_aa, junk]
+        Py_INCREF(chunk)
+        PyList_SET_ITEM(chunks, i, chunk)
+    
+    return chunks, [], None, structure_constants.N_TERM_DEFAULT, structure_constants.C_TERM_DEFAULT
