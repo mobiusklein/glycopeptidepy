@@ -34,6 +34,7 @@ class FastaHeader(Mapping):
         lead to the collection of attributes stored therein.
     """
     def __init__(self, mapping, original=None):
+        Mapping.__init__(self)
         self._mapping = mapping
         if original is None:
             self.defline = self._make_defline()
@@ -223,6 +224,7 @@ class PEFFDeflineParser(DefLineParserBase):
 
 class PEFFFeature(SequenceABC):
     def __init__(self, *fields, **kwargs):
+        SequenceABC.__init__(self)
         self.fields = tuple(fields)
         self.id = kwargs.get('id')
         self.feature_type = kwargs.get("feature_type")
@@ -631,6 +633,7 @@ def read(f, defline_parser=default_parser, reader_type=ProteinFastaFileParser, *
 
 class PEFFHeaderBlock(Mapping):
     def __init__(self, storage=None, block_type=None):
+        Mapping.__init__(self)
         if storage is None:
             storage = OrderedDict()
         self.block_type = block_type
