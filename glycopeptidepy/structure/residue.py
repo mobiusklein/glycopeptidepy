@@ -145,6 +145,30 @@ degeneracy_index = {
 }
 
 
+standard_residues = [
+    'Ala',
+    'Arg',
+    'Asn',
+    'Asp',
+    'Cys',
+    'Glu',
+    'Gln',
+    'Gly',
+    'His',
+    'Ile',
+    'Leu',
+    'Lys',
+    'Met',
+    'Phe',
+    'Pro',
+    'Ser',
+    'Thr',
+    'Trp',
+    'Tyr',
+    'Val',
+]
+
+
 class UnknownAminoAcidException(KeyError):
     pass
 
@@ -369,12 +393,30 @@ def register_degenerate(name, symbol, mappings):
 register_degenerate("Xle", "J", ["Leu", "Ile"])
 
 
-def get_all_residues():
-    return set(map(AminoAcidResidue, symbol_to_residue))
+def get_all_residues(omit_unknown=True, standard_only=True):
+    '''Get a collection of all :class:`AminoAcidResidue` types defined.
+
+    Parameters
+    ----------
+    omit_unknown: bool
+        Whether to discard ``X`` or not.
+    standard_only: bool
+        Whether to include only the 20 standard amino acids or all
+        defined amino acids.
+    Returns
+    -------
+    set
+    '''
+    if standard_only:
+        return set(map(AminoAcidResidue, symbol_to_residue))
+    residues = set(map(AminoAcidResidue, symbol_to_residue))
+    if omit_unknown:
+        residues.remove(AminoAcidResidue("X"))
+    return residues
 
 
-def get_all_sequencing_residues():
-    residues = set(get_all_residues())
+def get_all_sequencing_residues(omit_unknown=True, standard_only=True):
+    residues = set(get_all_residues(omit_unknown, standard_only))
     for residue in list(residues):
         degenerate = residue.is_degenerate
         if degenerate:

@@ -8,7 +8,7 @@ from cpython.sequence cimport PySequence_GetItem
 
 cdef object formula = _formula
 
-DEF SAFE_GET = 0
+DEF SAFE_GET = 1
 
 @cython.freelist(10000)
 cdef class PeptideSequenceBase(object):
