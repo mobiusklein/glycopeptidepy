@@ -202,8 +202,11 @@ class PEFFDeflineParser(DefLineParserBase):
         db_uid = None
         if defline.startswith(">"):
             defline = defline[1:]
-        prefix, defline = defline.split(":", 1)
-        db_uid, defline = defline.split(" ", 1)
+        try:
+            prefix, defline = defline.split(":", 1)
+            db_uid, defline = defline.split(" ", 1)
+        except ValueError:
+            raise UnparsableDeflineError(defline)
         storage['Prefix'] = prefix
         storage['Tag'] = db_uid
         kv_pattern = re.compile(r"\\(?P<key>\S+)=(?P<value>.+?)(?:\s(?=\\)|$)")
@@ -961,9 +964,22 @@ class FastaIndex(object):
                 return []
             return list(index_matches[0].intersection(*index_matches[1:]))
         else:
+            # Employ partial index coverage to shrink the set of elements to
+            # explore exhaustively
+            index_keys = set(kwargs) & set(self._index_map)
+            if index_keys:
+                query_set = self.query({k: queries[k] for k in index_keys})
+                for k in index_keys:
+                    queries.pop(k)
+            else:
+                # No helpful index, so iterate over all headers.
+                query_set = self.keys()
+
             matches = []
-            # No helpful index, so iterate over all headers.
-            for header in self.keys():
+            # Check each entry for key-value equality, keeping those
+            # cases which match on *all* keys. This isn't SQL, so we
+            # cannot express complex relationships or conditionals
+            for header in query_set:
                 for k, v in queries:
                     try:
                         if header[k] != v:
