@@ -235,7 +235,7 @@ class ModificationRule(ModificationRuleBase):
 
         dup = self.__class__(
             set(propagated_targets), self.name,
-            self.title, self.mass, self.composition,
+            self.title, self.mass, self.composition.copy(),
             self.categories, **self.options)
         dup.names.update(self.names)
         return dup

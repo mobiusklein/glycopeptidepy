@@ -231,3 +231,14 @@ class RestrictedModificationTable(ModificationTable):
         for mod in modifications.values():
             self.add(mod)
         self._include_other_rules()
+
+
+def rule_string_to_specialized_rule(rule_string):
+    from .modificatoin import Modification
+    name, targets = title_cleaner.search(rule_string).groups()
+    targets = {extract_targets_from_string(targets)}
+    # look up the rule in the main name cache, and copy it.
+    rule = Modification(name).rule.clone()
+    rule.targets = targets
+    return rule
+
