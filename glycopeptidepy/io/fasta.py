@@ -93,6 +93,42 @@ class FastaHeader(Mapping):
         keys = set(self._mapping.keys())
         return list(base | keys)
 
+    def startswith(self, prefix):
+        '''Check if the definition line starts with `prefix`.
+
+        If `prefix` starts with ">", trim it.
+
+        Parameters
+        ----------
+        prefix: str
+            The prefix string to test for
+
+        Returns
+        -------
+        bool
+        '''
+        if self.defline is None:
+            return False
+        if prefix[0] == ">"  and self.defline[0] != ">":
+            prefix = prefix[1:]
+        return self.defline.startswith(prefix)
+
+    def endswith(self, suffix):
+        '''Check if the definition line ends with `suffix`.
+
+        Parameters
+        ----------
+        suffix: str
+            The suffix string to test for
+
+        Returns
+        -------
+        bool
+        '''
+        if self.defline is None:
+            return False
+        return self.defline.endswith(suffix)
+
 
 class UnparsableDeflineError(ValueError):
     """Indicate that a definition line could
@@ -389,7 +425,7 @@ class DispatchingDefLineParser(DefLineParserBase):
                 return parts
             except UnparsableDeflineError:
                 continue
-    
+
         if self.graceful:
             return FastaHeader({}, defline)
         else:
@@ -824,11 +860,11 @@ class FastaIndexer(object):
     def build_index(self, stream):
         '''Build an random access and metadata index over the stream
         of Fasta File entries.
-        
+
         Parameters
         ----------
         stream: file-like
-        
+
         Returns
         -------
         :class:`FastaIndex`
@@ -939,7 +975,7 @@ class FastaIndex(object):
             to be included in the results.
         **kwargs:
             Additional key-value pairs to search for
-        
+
         Results
         -------
         :class:`list`:
@@ -989,3 +1025,9 @@ class FastaIndex(object):
                 else:
                     matches.append(header)
         return matches
+
+    def prefix_filter(self, prefix):
+        return [entry for entry in self if entry.prefix(prefix)]
+
+    def suffix_filter(self, suffix):
+        return [entry for entry in self if entry.suffix(suffix)]
