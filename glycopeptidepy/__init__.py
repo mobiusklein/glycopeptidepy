@@ -11,6 +11,7 @@ from .structure.residue import (
 from .enzyme import Protease, cleave
 from .structure.glycan import (
     HashableGlycanComposition, GlycosylationType, TypedGlycanComposition)
+from .structure.composition import (Composition, ChemicalCompositionError)
 
 
 def parse(string, peptide_class=PeptideSequence):
@@ -31,4 +32,6 @@ __all__ = [
 
     "HashableGlycanComposition", "GlycosylationType", "TypedGlycanComposition",
     "Glycosylation",
+
+    "Composition", "ChemicalCompositionError",
 ]
