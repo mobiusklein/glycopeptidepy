@@ -408,7 +408,7 @@ def get_all_residues(omit_unknown=True, standard_only=True):
     set
     '''
     if standard_only:
-        return set(map(AminoAcidResidue, symbol_to_residue))
+        return set(map(AminoAcidResidue, standard_residues))
     residues = set(map(AminoAcidResidue, symbol_to_residue))
     if omit_unknown:
         residues.remove(AminoAcidResidue("X"))
