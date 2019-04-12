@@ -12,7 +12,7 @@ from glypy import MonosaccharideResidue
 from .residue import Residue as AminoAcidResidue, memoize, get_all_residues
 from .composition import Composition
 from .modification import Modification
-
+from .base import SequencePosition
 
 class AminoAcidSequenceBuildingBlock(object):
     @classmethod
@@ -90,6 +90,9 @@ class AminoAcidSequenceBuildingBlock(object):
 
     def clone(self):
         return self.__class__(self.residue, tuple(self.modifications))
+
+    def as_sequence_position(self):
+        return SequencePosition([self.residue, list(self.modifications)])
 
 
 class ModificationBuildingBlock(object):
