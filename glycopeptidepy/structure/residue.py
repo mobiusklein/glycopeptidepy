@@ -417,9 +417,15 @@ def get_all_residues(omit_unknown=True, standard_only=True):
 
 def get_all_sequencing_residues(omit_unknown=True, standard_only=True):
     residues = set(get_all_residues(omit_unknown, standard_only))
+    residues.add(AminoAcidResidue("J"))
+
     for residue in list(residues):
         degenerate = residue.is_degenerate
         if degenerate:
             for degen in degenerate:
                 residues.remove(degen)
     return residues
+
+
+AminoAcidResidue.get_all_residues = staticmethod(get_all_residues)
+AminoAcidResidue.get_all_sequencing_residues = staticmethod(get_all_sequencing_residues)
