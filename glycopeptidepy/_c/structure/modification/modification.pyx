@@ -34,7 +34,7 @@ cdef class ModificationInstanceBase(ModificationBase):
         return self._hash
 
     def __eq__(self, other):
-        if isinstance(self, ModificationInstanceBase):        
+        if isinstance(self, ModificationInstanceBase):
             if isinstance(other, ModificationBase):
                 return (<ModificationBase>other).name in (<ModificationInstanceBase>self).rule.names
             else:
