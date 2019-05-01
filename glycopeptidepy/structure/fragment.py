@@ -544,10 +544,6 @@ except ImportError:
         def __hash__(self):
             return self._hash
 
-        def __reduce__(self):
-            return self.__class__, (self.name, self.direction, self.includes_peptide,
-                                    self.mass_shift, self.regex, self.composition_shift)
-
 
 @add_metaclass(MemoizedIonSeriesMetaclass)
 class IonSeries(_IonSeriesBase):
@@ -567,7 +563,7 @@ class IonSeries(_IonSeriesBase):
     composition_shift: :class:`~.Composition`
         The elemental composition delta applied to the raw components of the fragment.
     '''
-    
+
     @classmethod
     def get(cls, name):
         '''Get a particular cached :class:`IonSeries` by name
@@ -601,6 +597,10 @@ class IonSeries(_IonSeriesBase):
             self.composition_shift = composition_shift
         self._hash = hash(self.name)
 
+    def __reduce__(self):
+        return self.__class__, (self.name, self.direction, self.includes_peptide, self.mass_shift,
+                                self.regex, self.composition_shift)
+
     def __repr__(self):
         template = ("{self.__class__.__name__}({self.name}, "
                     "direction={self.direction}, mass_shift={self.mass_shift})")
@@ -616,7 +616,7 @@ class IonSeries(_IonSeriesBase):
         ----------
         key: str
             The name of a fragment to test for membership
-        
+
         Returns
         -------
         bool
