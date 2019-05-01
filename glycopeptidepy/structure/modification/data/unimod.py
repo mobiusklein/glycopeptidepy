@@ -12,7 +12,7 @@ from sqlalchemy import exc as sa_exc
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from glycresoft_sqlalchemy.structure.composition import Composition, _make_isotope_string
+from glypy.composition.composition import Composition, _make_isotope_string
 
 Base = declarative_base()
 
@@ -20,7 +20,7 @@ _unimod_xml_download_url = "http://www.unimod.org/xml/unimod_tables.xml"
 
 try:
     basestring
-except:
+except NameError:
     basestring = (str, bytes)
 
 
@@ -506,13 +506,20 @@ class Modification(Base, HasFullNameMixin):
         return inst
 
 
-class MiscNotesModifications(Base):
-    __tablename__ = "MiscNotesModifications"
+class NoteBase(object):
     _tag_name = "misc_notes"
 
     id = Column(Integer, primary_key=True)
-    modification_id = Column(Integer, ForeignKey(Modification.id), index=True)
     text = Column(UnicodeText)
+
+    def __str__(self):
+        return self.text
+
+
+class MiscNotesModifications(Base, NoteBase):
+    __tablename__ = "MiscNotesModifications"
+
+    modification_id = Column(Integer, ForeignKey(Modification.id), index=True)
 
     @classmethod
     def _from_tag(cls, tag, modification_id):
@@ -537,6 +544,8 @@ class Specificity(Base):
     group = Column(Integer, index=True)
     neutral_losses = relationship("SpecificityToNeutralLoss")
 
+    notes = relationship("MiscNotesSpecificities")
+
     position = relationship(Position)
 
     @classmethod
@@ -546,11 +555,29 @@ class Specificity(Base):
             id=int(attrib['record_id']),
             position_id=int(attrib['position_key']),
             classification_id=int(attrib["classifications_key"]),
+            group=int(attrib['spec_group']),
             hidden=bool(int(attrib["hidden"])),
             amino_acid=attrib["one_letter"],
             modification_id=int(attrib["mod_key"]),
             )
+        for note in tag:
+            if note.tag == MiscNotesSpecificities._tag_name:
+                model_note = MiscNotesSpecificities._from_tag(note, inst.id)
+                if model_note is not None:
+                    inst.notes.append(model_note)
         return inst
+
+
+class MiscNotesSpecificities(Base, NoteBase):
+    __tablename__ = "MiscNotesSpecificities"
+
+    specificity_id = Column(Integer, ForeignKey(Specificity.id), index=True)
+
+    @classmethod
+    def _from_tag(cls, tag, specificity_id):
+        if tag.text is None:
+            return
+        return cls(text=tag.text, specificity_id=specificity_id)
 
 
 class NeutralLoss(Base):
@@ -743,3 +770,58 @@ class Unimod(object):
 
 def load(path=None):
     return Unimod(path)
+
+
+def unimod_modification_to_dict(mod):
+    spec = {
+        "approved": mod.approved,
+        "avge_mass": mod.average_mass,
+        "composition": mod.composition,
+        "full_name": mod.full_name,
+        "mono_mass": mod.monoisotopic_mass,
+        "record_id": mod.id,
+        "specificity": [
+            unimod_specificity_to_dict(s) for s in mod.specificities
+        ],
+        "title": mod.code_name,
+        "alt_names": mod.alternative_names + [mod.ex_code_name]
+    }
+    return spec
+
+
+def unimod_specificity_to_dict(specificity):
+    spec = {
+        "classification": str(specificity.classification),
+        "hidden": specificity.hidden,
+        "position": str(specificity.position),
+        "site": specificity.amino_acid,
+        "spec_group": specificity.group
+    }
+    spec['neutral_losses'] = [
+        unimod_neutral_loss_to_dict(nl) for nl in specificity.neutral_losses
+    ]
+    return spec
+
+
+def unimod_neutral_loss_to_dict(neutral_loss):
+    spec = {
+        "composition": neutral_loss.composition,
+        "mono_mass": neutral_loss.monoisotopic_mass,
+    }
+    return spec
+
+
+if __name__ == "__main__":
+    import sys
+    import json
+
+    db = Unimod()
+    mods = db.mods
+    encoded = [unimod_modification_to_dict(mod) for mod in mods]
+
+    try:
+        fname = sys.argv[1]
+        with open(fname, 'wt') as fh:
+            json.dump(encoded, fh, sort_keys=True, indent=4)
+    except IndexError:
+        json.dump(encoded, sys.stdout, sort_keys=True, indent=4)

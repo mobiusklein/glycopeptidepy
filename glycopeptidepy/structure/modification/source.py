@@ -5,6 +5,11 @@ from pkg_resources import resource_stream
 from io import StringIO
 from copy import deepcopy
 
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
+
 from ..composition import Composition
 
 from .target import title_cleaner, extract_targets_from_string
@@ -124,7 +129,7 @@ class ModificationTable(ModificationSource):
         self.store = dict()
 
         for rule in rules:
-            if not isinstance(rule, ModificationRule):
+            if isinstance(rule, Mapping):
                 rule = ModificationRule(**rule)
             if rule.name in self.other_modifications:
                 continue
@@ -184,7 +189,7 @@ class ModificationTable(ModificationSource):
         return rule
 
     def add(self, rule):
-        if not isinstance(rule, ModificationRule):
+        if isinstance(rule, Mapping):
             rule = ModificationRule(**rule)
         for name in rule.names:
             try:
@@ -234,11 +239,10 @@ class RestrictedModificationTable(ModificationTable):
 
 
 def rule_string_to_specialized_rule(rule_string):
-    from .modificatoin import Modification
+    from .modification import Modification
     name, targets = title_cleaner.search(rule_string).groups()
     targets = {extract_targets_from_string(targets)}
     # look up the rule in the main name cache, and copy it.
     rule = Modification(name).rule.clone()
     rule.targets = targets
     return rule
-

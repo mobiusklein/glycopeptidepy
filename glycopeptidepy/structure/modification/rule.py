@@ -1,3 +1,13 @@
+'''Represent rules describing peptide modifications with
+particular chemical properties, specificities, and other
+metadata.
+
+The core data structure is :class:`ModificationRule`, which
+in addition to its chemical composition, mass, target specificities,
+and categorical descriptors, carries a substantial amount of information
+about what its names are.
+'''
+
 import re
 
 from collections import defaultdict
@@ -103,11 +113,23 @@ class ModificationRule(ModificationRuleBase):
 
     @staticmethod
     def reduce(rules):
+        """Given a collection of :class:`ModificationRule` instances, combine
+        those with the same name into a single object using :meth:`ModificationRule.__add__`
+
+        Parameters
+        ----------
+        rules : :class:`list` of :class:`ModificationRule`
+            The rules to collapse
+
+        Returns
+        -------
+        list
+        """
         collector = defaultdict(list)
         for rule in rules:
             collector[rule.name].append(rule)
         reductions = []
-        for rule_name, rules in collector.items():
+        for _, rules in collector.items():
             accum = rules[0]
             for other in rules[1:]:
                 accum = accum + other
@@ -118,6 +140,25 @@ class ModificationRule(ModificationRuleBase):
     def from_protein_prospector(cls, amino_acid_specificity, modification_name,
                                 title=None, monoisotopic_mass=None,
                                 neutral_losses=None):
+        """Build a :class:`ModificationRule` from data scraped from Protein Prospector
+
+        Parameters
+        ----------
+        amino_acid_specificity : str
+            The amino acid and position target specificity
+        modification_name : str
+            The name of the modification
+        title : str, optional
+            The display title for the modification, by default None
+        monoisotopic_mass : float, optional
+            The monoisotopic mass shift of the modification, by default None
+        neutral_losses : list, optional
+            Any neutral losses associated with the modification, by default None
+
+        Returns
+        -------
+        :class:`ModificationRule`
+        """
         if neutral_losses is None:
             neutral_losses = []
         # If the specificity is a string, parse it into rules
@@ -144,6 +185,18 @@ class ModificationRule(ModificationRuleBase):
 
     @classmethod
     def from_unimod(cls, unimod_entry):
+        """Createa a :class:`ModificationRule` instances from a :class:`dict` scraped
+        from Unimod.
+
+        Parameters
+        ----------
+        unimod_entry : dict
+            The Unimod entry description for this modificatoin
+
+        Returns
+        -------
+        :class:`ModificationRule`
+        """
         specificity = unimod_entry["specificity"]
         monoisotopic_mass = unimod_entry["mono_mass"]
         full_name = unimod_entry["full_name"]
@@ -160,42 +213,36 @@ class ModificationRule(ModificationRuleBase):
 
     @staticmethod
     def _get_preferred_name(names):
-        return min(filter(lambda x: not x.startswith("UNIMOD:"), names), key=len)
+        return min([x for x in names if not x.startswith("UNIMOD:")], key=len)
 
     def __init__(self, amino_acid_specificity, modification_name,
                  title=None, monoisotopic_mass=None, composition=None,
                  categories=None, alt_names=None, neutral_losses=None,
-                 aliases=None,
-                 **kwargs):
+                 aliases=None, **kwargs):
         if neutral_losses is None:
             neutral_losses = []
         if categories is None:
             categories = []
         if aliases is None:
             aliases = set()
-        # Attempt to parse the protein prospector name which contains the
-        # target in
-        try:
-            self.common_name = title_cleaner.search(title).groupdict()['name']
-        except Exception:
-            self.common_name = modification_name
+
+        self.mass = float(monoisotopic_mass)
+        self.composition = composition
+        self.options = kwargs
 
         if alt_names is None:
             alt_names = set()
 
-        self.unimod_name = modification_name
-        self.mass = float(monoisotopic_mass)
-        self.title = title if title is not None else modification_name
-        self.composition = composition
-        self.names = {self.unimod_name, self.common_name, self.title} | alt_names
-        for name in list(self.names):
-            self.names.update(name.split(" or "))
-        self.categories = list(categories)
-        self.options = kwargs
+        self._configure_names(modification_name, title, alt_names, aliases)
+        self._configure_targets(amino_acid_specificity)
+        self._configure_categories(categories)
+
+        self.neutral_losses = neutral_losses
+
+    def _configure_targets(self, amino_acid_specificity):
         self._n_term_targets = None
         self._c_term_targets = None
-        self.name = self._get_preferred_name(self.names)
-        self.aliases = aliases
+
         # The type of the parameter passed for amino_acid_specificity is variable
         # so select the method correct for the passed type
 
@@ -205,7 +252,8 @@ class ModificationRule(ModificationRuleBase):
                 self.targets = set([
                     extract_targets_from_string(amino_acid_specificity)])
             except TypeError:
-                raise TypeError("Could not extract targets from %s" % amino_acid_specificity)
+                raise TypeError("Could not extract targets from %s" %
+                                amino_acid_specificity)
 
         # If the specificity is already a rule, store it as a list of one rules
         elif isinstance(amino_acid_specificity, ModificationTarget):
@@ -217,13 +265,32 @@ class ModificationRule(ModificationRuleBase):
         else:
             raise ValueError("Could not interpret target specificity from %r" % (
                 amino_acid_specificity,))
-        self.neutral_losses = neutral_losses
+
+    def _configure_names(self, modification_name, title, alt_names, aliases):
+
+        # Attempt to parse the protein prospector name which contains the
+        # target in
+        try:
+            self.common_name = title_cleaner.search(title).groupdict()['name']
+        except Exception:
+            self.common_name = modification_name
+
+        self.unimod_name = modification_name
+        self.title = title if title is not None else modification_name
+        self.names = {self.unimod_name, self.common_name, self.title} | alt_names - {''}
+        for name in list(self.names):
+            self.names.update(name.split(" or "))
+        self.aliases = aliases
+        self.name = self._get_preferred_name(self.names)
+        self._hash = hash(self.name)
+
+    def _configure_categories(self, categories):
+        self.categories = list(categories)
         categories = set(self.categories)
         for target in self.targets:
             categories.update(
                 target.classification)
         self.categories = list(categories)
-        self._hash = hash(self.name)
 
     @property
     def is_standard(self):
@@ -451,7 +518,7 @@ class AnonymousModificationRule(ModificationRule):
     def serialize(self):
         return "@" + self.name + "-" + str(self.mass)
 
-    def clone(self):
+    def clone(self, propagated_targets=None):
         dup = self.__class__(self.name, self.mass, **self.options)
         return dup
 
@@ -491,7 +558,7 @@ class AminoAcidSubstitution(AnonymousModificationRule):
                     mass += Modification(mod).mass
         return mass
 
-    def __init__(self, original_residue, substitution_residue, **kwargs):
+    def __init__(self, original_residue, substitution_residue, **kwargs): # pylint: disable=super-init-not-called
         if not isinstance(original_residue, AminoAcidResidue):
             original_residue = AminoAcidResidue(original_residue)
         if not isinstance(substitution_residue, AminoAcidResidue):

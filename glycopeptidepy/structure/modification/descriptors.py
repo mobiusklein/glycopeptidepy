@@ -38,7 +38,9 @@ class ModificationCategory(Enum):
     pre_translational = 11
     co_translational = 12
     synthetic_peptide_protect = 13
-
+    cross_link = 14
+    cid_cleavable_cross_link = 15
+    other_cleavable_cross_link = 16
 
 ModificationCategory.substitution.add_name("AA substitution")
 ModificationCategory.glycosylation.add_name("other_glycosylation")
@@ -55,3 +57,6 @@ ModificationCategory.pre_translational.add_name("Pre-translational")
 ModificationCategory.non_standard_residue.add_name("Non-standard residue")
 ModificationCategory.co_translational.add_name("Co-translational")
 ModificationCategory.synthetic_peptide_protect.add_name("Synth. pep. protect. gp.")
+ModificationCategory.cross_link.add_name("Cross-link")
+ModificationCategory.cid_cleavable_cross_link.add_name("CID cleavable cross-link")
+ModificationCategory.other_cleavable_cross_link.add_name("Other cleavable cross-link")
