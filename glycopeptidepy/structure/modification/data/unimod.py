@@ -819,6 +819,7 @@ if __name__ == "__main__":
     mods = db.mods
     encoded = [unimod_modification_to_dict(mod) for mod in mods]
 
+    # need method to impose patches
     try:
         fname = sys.argv[1]
         with open(fname, 'wt') as fh:
