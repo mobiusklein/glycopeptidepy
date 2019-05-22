@@ -348,7 +348,8 @@ def parse(tree, error=False):
             if error:
                 raise
             else:
-                warnings.warn("An exception %r occurred while parsing feature type %s" % (e, feature_type))
+                warnings.warn("An exception %r occurred while parsing feature type %s for %s" % (
+                    e, feature_type, accessions[0]))
     keywords = set()
     for kw in tree.findall(".//up:keyword", nsmap):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
