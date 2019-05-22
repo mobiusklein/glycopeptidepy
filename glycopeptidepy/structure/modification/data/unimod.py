@@ -818,7 +818,7 @@ if __name__ == "__main__":
     db = Unimod()
     mods = db.mods
     encoded = [unimod_modification_to_dict(mod) for mod in mods]
-
+    encoded.sort(key=lambda x: x["record_id"])
     # need method to impose patches
     try:
         fname = sys.argv[1]
