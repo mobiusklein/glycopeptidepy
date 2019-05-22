@@ -55,6 +55,33 @@ def edit_distance(s1, s2):
     return distances[-1]
 
 
+def longest_common_substring(seq1, seq2):
+    n = len(seq1)
+    m = len(seq2)
+    solution_matrix = [[0 for i in range(m)] for j in range(n)]
+    # track the length of the current longest common subsequence
+    z = 0
+    result = []
+    for i in range(n):
+        for j in range(m):
+            if seq1[i] == seq2[j]:
+                # match the start of one string
+                if i == 0 or j == 0:
+                    solution_matrix[i][j] = 1
+                else:
+                    solution_matrix[i][j] = solution_matrix[i - 1][j - 1] + 1
+                # new longest substring
+                if solution_matrix[i][j] > z:
+                    z = solution_matrix[i][j]
+                    result = list(seq1[i - z + 1:i + 1])
+                # extending existing solution (may be invalid)
+                elif solution_matrix[i][j] == z:
+                    result.extend(list(seq1[i - z + 1:i + 1]))
+            else:
+                solution_matrix[i][j] = 0
+    return result
+
+
 def reverse_preserve_sequon(sequence, prefix_len=0, suffix_len=1, peptide_type=None, known_sites=None):
     if peptide_type is None:
         peptide_type = PeptideSequence
