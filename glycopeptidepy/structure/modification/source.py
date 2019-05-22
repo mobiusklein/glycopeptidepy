@@ -113,11 +113,13 @@ class ModificationTable(ModificationSource):
     _custom_rules = {}
 
     @classmethod
-    def register_new_rule(cls, rule):
+    def register_custom_rule(cls, rule):
         cls._custom_rules[rule.name] = rule
 
+    register_new_rule = register_custom_rule
+
     @classmethod
-    def remove_rule(cls, rule):
+    def remove_custom_rule(cls, rule):
         try:
             cls._custom_rules.pop(rule.name)
         except AttributeError:
@@ -199,6 +201,14 @@ class ModificationTable(ModificationSource):
                     self.store[name] += rule
             except KeyError:
                 self.store[name] = rule
+
+    def remove(self, rule):
+        try:
+            names = rule.names
+        except AttributeError:
+            names = [rule]
+        for name in names:
+            self.store.pop(name, None)
 
     def get_modification(self, name):
         return self[name]()
