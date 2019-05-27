@@ -1,3 +1,4 @@
+# pylint: disable=assigning-non-slot
 from ..base import SequencePosition
 from ..modification import ModificationCategory, Modification, SequenceLocation
 from ..terminal_group import _make_terminal_group
@@ -43,6 +44,18 @@ class MutableSequenceMixin(object):
                              (modification_type, position))
 
     def add_modification(self, position, modification_type):
+        '''
+        Add a modification by name to a specific residue. If the
+        position is the N-term or the C-term, the terminal modification will
+        be replaced.
+
+        Parameters
+        ----------
+        position: int
+            The position of the modification to add
+        modification_type: str or Modification
+            The modification to add
+        '''
         self._invalidate()
         if isinstance(modification_type, Modification):
             mod = modification_type

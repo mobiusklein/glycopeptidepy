@@ -30,6 +30,15 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
             seq._init_from_components(iterable, glycan_composition, n_term, c_term, **kwargs)
         return seq
 
+    def modified_residues(self):
+        """Find all the modified residue positions in the sequence
+
+        Returns
+        -------
+        list of :class:`~.SequencePosition`
+        """
+        return [(i, position) for i, position in enumerate(self) if position.modifications]
+
     def subsequence(self, slice_obj):
         sub = self[slice_obj]
         subseq = self.from_iterable(sub)

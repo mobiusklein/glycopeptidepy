@@ -1,9 +1,13 @@
+'''Represent queryable databases of peptide modifications from diverse
+sources.
+'''
 import csv
 import json
 
-from pkg_resources import resource_stream
 from io import StringIO
 from copy import deepcopy
+
+from pkg_resources import resource_stream
 
 try:
     from collections.abc import Mapping
@@ -24,19 +28,54 @@ from .glycosylation import (
 
 
 def load_from_csv(stream):
+    """Load a sequence of :class:`~.ModificationRule` objects from
+    a CSV stream
+
+    Parameters
+    ----------
+    stream : file-like
+        A file-like object over a CSV
+
+    Returns
+    -------
+    list of :class:`~.ModificationRule`
+    """
     modification_definitions = []
     parser = csv.DictReader(stream)
-    modification_definitions = [rec for rec in parser]
+    modification_definitions = [ModificationRule(**rec) for rec in parser]
     return modification_definitions
 
 
 def load_from_json(stream):
+    """Load a sequence of :class:`~.ModificationRule` objects from
+    a JSON stream.
+
+    :class:`~.ModificationRule` objects are constructed using the
+    :meth:`~.ModificationRule.from_unimod` constructor instead of
+    the default flat constructor.
+
+    Parameters
+    ----------
+    stream : file-like
+        A file-like object over a JSON
+
+    Returns
+    -------
+    list of :class:`~.ModificationRule`
+    """
     modification_definitions = []
     modification_definitions = list(map(ModificationRule.from_unimod, json.load(stream)))
     return modification_definitions
 
 
 class ModificationSource(object):
+    """An abstract collection of :class:`~.ModificationRule` objects.
+
+    This class primarily deals with loading rules from file sources and
+    managing global states. It should not be used instantiated directly,
+    instead, use :class:`ModificationTable`.
+    """
+
     _table_definition_file = staticmethod(lambda: StringIO(
         resource_stream(__name__, "data/ProteinProspectorModifications-for_gly2.csv").read(
         ).decode("utf-8")))
@@ -63,7 +102,8 @@ class ModificationSource(object):
 
     @classmethod
     def load_from_file(cls, stream=None, format="csv"):
-        '''Load the rules definitions from a CSV or JSON file and instantiate a ModificationSource from it'''
+        '''Load the rules definitions from a CSV or JSON file and instantiate a
+        :class:`ModificationSource` from it'''
         if stream is None:
             return cls.load_from_file_default()
         if format == "csv":
@@ -92,9 +132,65 @@ class ModificationSource(object):
         cls.bootstrapped = instance
         return instance
 
+    def resolve(self, key):
+        """Locate a :class:`~.Modification` instance from
+        `key`.
+
+        May call :meth:`~.ModificationRule.resolve`.
+
+        Parameters
+        ----------
+        key : str
+            The name of the :class:`~.ModificationRule`
+
+        Returns
+        -------
+        :class:`~.ModificationRule`
+        """
+        raise NotImplementedError()
+
+    def __getitem__(self, key):
+        raise NotImplementedError()
+
+    def get_modification(self, name):
+        """Create a :class:`~.Modification` from the specified name
+
+        Parameters
+        ----------
+        name : :class:`str`
+            The name of the :class:`~.ModificationRule` to base the :class:`~.Modification`.
+
+        Returns
+        -------
+        :class:`~.Modification`
+        """
+        return self.resolve(name)()
+
+    def __call__(self, key):
+        """Create a :class:`~.Modification` from the specified name
+
+        Parameters
+        ----------
+        name : :class:`str`
+            The name of the :class:`~.ModificationRule` to base the :class:`~.Modification`.
+
+        Returns
+        -------
+        :class:`~.Modification`
+
+        See Also
+        --------
+        :meth:`get_modification`
+        """
+        return self.get_modification(key)
+
+
 
 class ModificationTable(ModificationSource):
+    '''A :class:`~.Mapping` connecting modification names to :class:`~.ModificationRule`
+    instances.
 
+    '''
     other_modifications = {
         "HexNAc": hexnac_modification,
         "Xyl": xylose_modification,
@@ -151,14 +247,31 @@ class ModificationTable(ModificationSource):
             yield key
 
     def _include_other_rules(self):
-        for name, rule in self.other_modifications.items():
+        for _name, rule in self.other_modifications.items():
             self.add(rule)
 
     def register_alias(self, name, alias):
+        """Add a new name to an existing rule, and make that name
+        resolvable.
+
+        Parameters
+        ----------
+        name : :class:`str`
+            The name of an existing :class:`~.ModificationRule`
+        alias : :class:`str`
+            The new name to add to the rule denoted by `name`.
+        """
         rule = self[name]
         rule.aliases.add(alias)
+        self.store[alias] = rule
 
     def rules(self):
+        """The set of all :class:`~.ModificationRule` instances in this object
+
+        Returns
+        -------
+        set
+        """
         return set(self.store.values()) | set(self._custom_rules.values())
 
     def __getitem__(self, key):
@@ -191,6 +304,17 @@ class ModificationTable(ModificationSource):
         return rule
 
     def add(self, rule):
+        """Add a new :class:`~.ModificationRule` to this object.
+
+        If `rule` shares names with other rules and their masses match,
+        they will be merged.
+
+        Parameters
+        ----------
+        rule : :class:`~.ModificationRule` or :class:`Mapping`
+            The rule to add. If is a :class:`Mapping`, it will be coerced
+            into a :class:`~.ModificationRule`
+        """
         if isinstance(rule, Mapping):
             rule = ModificationRule(**rule)
         for name in rule.names:
@@ -198,11 +322,25 @@ class ModificationTable(ModificationSource):
                 if self.store[name] is rule:
                     continue
                 else:
+                    alt_rule = self.store[name]
+                    if abs(alt_rule.mass - rule.mass) > 1e-3:
+                        continue
                     self.store[name] += rule
             except KeyError:
                 self.store[name] = rule
 
     def remove(self, rule):
+        """Remove an existing :class:`~.ModificationRule` from this object.
+
+        If `rule` is a :class:`~.ModificationRule`, all of its `names` will be
+        removed. If `rule` is a :class:`str`, then only that name will be removed.
+
+        Parameters
+        ----------
+        rule : :class:`~.ModificationRule` or :class:`str`
+            Either a :class:`~.ModificationRule`, or a single :class:`str` denoting
+            the name of the rule to remove.
+        """
         try:
             names = rule.names
         except AttributeError:
@@ -210,8 +348,6 @@ class ModificationTable(ModificationSource):
         for name in names:
             self.store.pop(name, None)
 
-    def get_modification(self, name):
-        return self[name]()
 
 
 class RestrictedModificationTable(ModificationTable):
