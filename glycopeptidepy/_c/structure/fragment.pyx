@@ -49,12 +49,18 @@ cdef char* atemp
 
 for i in range(ARRAY_SIZE):
     pa = str(i)
-    a = <char*>malloc(sizeof(char) * z)
     atemp = PyStr_AsUTF8AndSize(pa, &z)
+    a = <char*>malloc(sizeof(char) * z)
     strcpy(a, atemp)
     a[z] = "\0"
     str_ints[i].string = a
     str_ints[i].size = z
+
+
+def _get_string_cell(int i):
+    cdef string_cell cell = str_ints[i]
+    print(cell.size)
+    print(cell.string)
 
 
 @cython.freelist(100)
@@ -188,6 +194,7 @@ cdef class FragmentBase(object):
         if chemical_shift is not None:
             self.mass += chemical_shift.mass
         self._name = self.get_fragment_name()
+        self._hash = hash(self._name)
 
     chemical_shift = property(get_chemical_shift, set_chemical_shift)
 
@@ -516,7 +523,7 @@ cdef class SimpleFragment(FragmentBase):
         self.kind = kind
         self.composition = composition
 
-        self.chemical_shift = chemical_shift
+        self.set_chemical_shift(chemical_shift)
         self.is_glycosylated = is_glycosylated
 
     cpdef clone(self):
