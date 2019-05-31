@@ -281,7 +281,7 @@ class ModificationRule(ModificationRuleBase):
         for name in list(self.names):
             self.names.update(name.split(" or "))
         self.aliases = aliases
-        self.name = self._get_preferred_name(self.names)
+        self.name = str(self._get_preferred_name(self.names))
         self._hash = hash(self.name)
 
     def _configure_categories(self, categories):

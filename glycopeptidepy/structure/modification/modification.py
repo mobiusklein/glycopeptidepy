@@ -54,11 +54,31 @@ except ImportError:
 
 
 class Modification(ModificationInstanceBase):
+    """Represents a peptide modification, with a fixed mass and optionally
+    a composition.
 
-    """Represents a molecular modification, which may be bound at a given position,
-    or may be present at multiple locations. This class pulls double duty,
-    and when describing the total number of modifications of a type on a molecule, its
-    position attributes are unused."""
+    :class:`Modification` objects are usually bound to a :class:`~.ModificationRule`
+    object which defines their properties. Though the essential properties are copied
+    into the :class:`Modification` instance, the rule still holds additional metadata
+    and behaviors.
+
+    Modifications are equal to anything that their :attr:`rule` is equal to by name,
+    and hash based upon their :attr:`name`.
+
+    Attributes
+    ----------
+    name: str
+        The preferred name of the modification
+    mass: float
+        The monosisotopic mass of the modification
+    composition: :class:`~.Composition`
+        The elemental composition of the modification. This
+        attribute may be missing when the modification is not
+        defined from a molecule but an arbitrary mass shift.
+    rule: :class:`~.ModificationRule`
+        The rule that defines the modification type this object represents
+        an instance of.
+    """
 
     # If the C extension base class is available, do not declare redundant slot
     # descriptors.
@@ -75,6 +95,27 @@ class Modification(ModificationInstanceBase):
 
     def _resolve_name(self, rule_string):
         return self._table.resolve(rule_string)
+
+    @classmethod
+    def from_rule(cls, rule):
+        '''Create a new :class:`Modification` instance from a :class:`~.ModificationRule`
+        instance directly.
+
+        This method is marginally faster than the default initialization behavior which
+        checks to see if the rule is a string.
+
+        Parameters
+        ----------
+        rule: :class:`~.ModificationRule`
+            The rule this modification will follow
+
+        Returns
+        -------
+        :class:`Modification`
+        '''
+        inst = cls.__new__(cls)
+        inst._init_from_rule(rule)
+        return inst
 
     def __init__(self, rule):
         if(isinstance(rule, basestring)):
