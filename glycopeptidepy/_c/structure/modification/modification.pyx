@@ -28,6 +28,21 @@ cdef class ModificationInstanceBase(ModificationBase):
             self.composition = None
 
     cpdef bint is_tracked_for(self, category):
+        """Determine if :attr:`rule` is tracked by a particular
+        behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+        This relationship is distinct from :meth:`is_a` which merely observes that
+        the semantic relationship holds, not that any actual behavior is available.
+
+        Parameters
+        ----------
+        category : :class:`~.ModificationCategory`
+            The category to check
+
+        Returns
+        -------
+        bool
+        """
         return self.rule.is_tracked_for(category)
 
     def __hash__(self):

@@ -1,6 +1,13 @@
 
 cdef class ModificationRuleBase(ModificationBase):
     cpdef bint is_a(self, object category):
+        '''Returns whether or not this :class:`ModificationRule` object belongs to
+        the specified :class:`~.ModificationCategory`.
+
+        Returns
+        -------
+        bool
+        '''
         return category in self.categories
 
     def __hash__(self):

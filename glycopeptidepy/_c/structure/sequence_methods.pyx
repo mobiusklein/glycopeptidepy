@@ -5,6 +5,7 @@ from cpython cimport PyObject
 from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem
 from cpython.int cimport PyInt_AsLong
+from cpython.float cimport PyFloat_AsDouble
 
 from glycopeptidepy._c.structure.base cimport (
     PeptideSequenceBase,
@@ -31,8 +32,16 @@ cdef object GlycosylationManagerImpl = GlycosylationManager
 
 cdef dict terminal_group_cache = dict()
 
+# Helpers and Caches -----------------
 
 cdef TerminalGroup _make_terminal_group(basestring base_composition_formula, ModificationBase modification=None):
+    """A cache for creating :class:`~.TerminalGroup` instances from base formula and
+    modification.
+
+    Returns
+    -------
+    TerminalGroup
+    """
     key = (base_composition_formula, modification)
     result = PyDict_GetItem(terminal_group_cache, key)
     if result == NULL:
@@ -46,6 +55,22 @@ cdef dict amino_acid_cache = dict()
 
 
 cdef AminoAcidResidueBase _parse_residue(basestring residue_string):
+    """A substitute cache for :class:`~.AminoAcidResidue` instantiation.
+
+    Normally, creating an :class:`AminoAcidResidue` instance passes through
+    a cache in the class's constructor. This however incurs a lot of Python
+    overhead because it must go through the class's ``__call__`` slot *every
+    time*, so there are many pointer jumps along the way.
+
+    This function implements a cache in front of that cache because creating
+    AminoAcidResidue instances is done so frequently by the :class:`_PeptideSequenceCore`
+    initialization code. It just maintains a static mapping between the amino acid symbol
+    to the instance of the AminoAcidResidue that represents it, e.g. "N" -> Asparagine.
+
+    Returns
+    -------
+    AminoAcidResidueBase
+    """
     result = PyDict_GetItem(amino_acid_cache, residue_string)
     if result == NULL:
         inst = AminoAcidResidueImpl(residue_string)
@@ -53,6 +78,26 @@ cdef AminoAcidResidueBase _parse_residue(basestring residue_string):
         return inst
     return <AminoAcidResidueBase>result
 
+
+cdef dict implicit_terminal_cache = dict()
+
+
+cdef ModificationBase _get_implicit_terminal(basestring terminal_name):
+    """A cache for storing the Modification mapping for implicit N- and C-terminal
+    groups
+
+    Returns
+    -------
+    ModificationBase
+    """
+    result = PyDict_GetItem(implicit_terminal_cache, terminal_name)
+    if result == NULL:
+        inst = ModificationImpl(terminal_name)
+        PyDict_SetItem(implicit_terminal_cache, terminal_name, inst)
+        return inst
+    return <ModificationBase>result
+
+# -------------------
 
 cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylation
 
@@ -159,7 +204,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         if sequence == "" or sequence is None:
             pass
         else:
-            seq_list, modifications, glycan, n_term, c_term = parser_function(
+            seq_list, modifications, glycan, n_term, c_term = <tuple>parser_function(
                 sequence)
             self._init_from_parsed_string(seq_list, glycan, n_term, c_term)
 
@@ -362,7 +407,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         total += self._c_term.mass
         gc = self.glycan_composition
         if gc:
-            total += gc.mass()
+            total += PyFloat_AsDouble(gc.mass())
         return total
 
     cpdef CComposition peptide_composition(self):
@@ -479,34 +524,49 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             ModificationBase mod
             basestring mod_str, n_term, c_term, rep
             bint needs_terminals
+            TerminalGroup terminal
+            ModificationBase implicit_terminal
 
         seq_list = []
         n = self.get_size()
         for i in range(n):
             position = self.get(i)
-            mod_str = ''
             m = PyList_Size(position.modifications)
             if m > 0:
-                mod_strs = []
-                for j in range(m):
-                    mod = <ModificationBase>PyList_GetItem(position.modifications, j)
-                    mod_strs.append(mod.serialize())
-                mod_str = '|'.join(mod_strs)
-                mod_str = "(" + mod_str + ")"
-            seq_list.append(position.amino_acid.symbol + mod_str)
+                if m == 1:
+                    mod = <ModificationBase>PyList_GetItem(position.modifications, 0)
+                    mod_str = "(%s)" % mod.serialize()
+                else:
+                    mod_strs = []
+                    for j in range(m):
+                        mod = <ModificationBase>PyList_GetItem(position.modifications, j)
+                        mod_strs.append(mod.serialize())
+                    mod_str = '|'.join(mod_strs)
+                    mod_str = "(%s)" % mod_str
+                seq_list.append(position.amino_acid.symbol + mod_str)
+            else:
+                seq_list.append(position.amino_acid.symbol)
+
         rep = ''.join(seq_list)
         if include_termini:
             needs_terminals = False
+            # Handle N-terminal
             n_term = ""
-            if self.n_term is not None and self.get_n_term() != implicit_n_term:
-                n_term = "({0})-".format(self.get_n_term().serialize())
+            terminal = self.get_n_term()
+            implicit_terminal = _get_implicit_terminal(implicit_n_term)
+            if terminal is not None and not terminal.equal_to(implicit_terminal):
+                n_term = "(%s)-" % terminal.serialize()
                 needs_terminals = True
+
+            # Handle C-terminal
             c_term = ""
-            if self.c_term is not None and self.get_c_term() != implicit_c_term:
-                c_term = "-({0})".format(self.get_c_term().serialize())
+            terminal = self.get_c_term()
+            implicit_terminal = _get_implicit_terminal(implicit_c_term)
+            if terminal is not None and not terminal.equal_to(implicit_terminal):
+                c_term = "-(%s)" % terminal.serialize()
                 needs_terminals = True
             if needs_terminals:
-                rep = "{}{}{}".format(n_term, rep, c_term)
+                rep = "".join((n_term, rep, c_term))
         if include_glycan:
             if self._glycosylation_manager.aggregate is not None:
                 rep += str(self._glycosylation_manager.aggregate)
@@ -524,6 +584,6 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             glycan = None
         inst._init_from_components(
             self.sequence, glycan,
-            self.n_term.modification,
-            self.c_term.modification)
+            self.get_n_term().get_modification(),
+            self.get_c_term().get_modification())
         return inst

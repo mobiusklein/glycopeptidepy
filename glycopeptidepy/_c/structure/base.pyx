@@ -73,12 +73,12 @@ cdef class TerminalGroup(object):
     def modification(self, ModificationBase value):
         self.set_modification(value)
 
-    cpdef TerminalGroup  modify(self, ModificationBase modification):
+    cpdef TerminalGroup modify(self, ModificationBase modification):
         return self.__class__(self.base_composition, modification)
 
     cdef CComposition get_composition(self):
         cdef ModificationBase modification = self.get_modification()
-        
+
         if modification is None:
             return self.base_composition
         mod_comp = modification.composition
@@ -93,9 +93,7 @@ cdef class TerminalGroup(object):
         return template.format(self=self)
 
     def __str__(self):
-        if self.modification is not None:
-            return str(self.modification)
-        return formula(self.base_composition)
+        return self.serialize()
 
     def __eq__(self, other):
         if other is None:
@@ -112,14 +110,35 @@ cdef class TerminalGroup(object):
                 except AttributeError:
                     return NotImplemented
 
+    cdef bint equal_to(self, object other):
+        cdef:
+            TerminalGroup other_terminal
+        if isinstance(other, TerminalGroup):
+            other_terminal = <TerminalGroup>other
+            return (self.base_composition == other_terminal.base_composition) and (
+                self.modification == other_terminal.modification)
+        else:
+            if isinstance(other, basestring):
+                from glycopeptidepy.structure.modification import Modification
+                return self.composition == Modification(other).composition
+            elif isinstance(other, ModificationBase):
+                return self.composition == (<ModificationBase>other).composition
+            else:
+                try:
+                    return self.composition == other.composition
+                except AttributeError:
+                    return False
+
     def __ne__(self, other):
         return not (self == other)
 
     def __hash__(self):
         return hash(formula(self.get_composition()))
 
-    def serialize(self):
-        return str(self)
+    cpdef str serialize(self):
+        if self.modification is not None:
+            return str(self.modification)
+        return formula(self.base_composition)
 
 
 @cython.freelist(100)
@@ -165,11 +184,18 @@ cdef class AminoAcidResidueBase(object):
 
 @cython.freelist(100000)
 cdef class ModificationBase(object):
-    
+
     def __copy__(self):
         return self.clone()
 
     cpdef bint is_a(self, object category):
+        '''Returns whether or not this :class:`ModificationBase` object belongs to
+        the specified :class:`~.ModificationCategory`.
+
+        Returns
+        -------
+        bool
+        '''
         return False
 
     cpdef basestring serialize(self):
@@ -177,6 +203,21 @@ cdef class ModificationBase(object):
         return self.name
 
     cpdef bint is_tracked_for(self, object category):
+        """Determine if this :class:`ModificationBase` is tracked by a particular
+        behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+        This relationship is distinct from :meth:`is_a` which merely observes that
+        the semantic relationship holds, not that any actual behavior is available.
+
+        Parameters
+        ----------
+        category : :class:`~.ModificationCategory`
+            The category to check
+
+        Returns
+        -------
+        bool
+        """
         return False
 
 
@@ -214,7 +255,7 @@ cdef class SequencePosition(object):
             other_t = other
             return self.amino_acid == other_t.amino_acid and self.modifications == other_t.modifications
         else:
-            return self.amino_acid == other.amino_acid and self.modifications == other.modifications            
+            return self.amino_acid == other.amino_acid and self.modifications == other.modifications
 
     def __ne__(self, other):
         return not (self == other)

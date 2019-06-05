@@ -2,7 +2,7 @@ import unittest
 import pickle
 
 from glycopeptidepy.structure import sequence, modification, residue, composition, parser
-from glypy import GlycanComposition, Glycan, MonosaccharideResidue
+from glypy import GlycanComposition, MonosaccharideResidue
 
 
 HYDROGEN = composition.Composition("H").mass
@@ -153,12 +153,6 @@ class PeptideSequenceSuiteBase(object):
     def test_n_glycan_sequons(self):
         seq = self.parse_sequence(p2).deglycosylate()
         self.assertTrue(4 in seq.n_glycan_sequon_sites)
-
-    def test_terminal_modification(self):
-        seq = self.parse_sequence(p2).deglycosylate()
-        ref = seq.clone()
-        seq.n_term = Modification("TMT6plex")
-        self.assertAlmostEqual(ref.mass + Modification("TMT6plex").mass, seq.mass)
 
     def test_o_glycopeptide(self):
         masses = [

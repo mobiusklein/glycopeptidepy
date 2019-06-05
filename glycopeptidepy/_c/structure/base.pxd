@@ -30,6 +30,8 @@ cdef class TerminalGroup(object):
     cdef CComposition get_composition(self)
     cpdef TerminalGroup  modify(self, ModificationBase modification)
     cdef void set_modification(self, ModificationBase)
+    cdef bint equal_to(self, object other)
+    cpdef str serialize(self)
 
 
 cdef class AminoAcidResidueBase(object):
