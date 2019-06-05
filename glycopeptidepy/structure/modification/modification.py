@@ -12,6 +12,13 @@ def _Modifcation_reconstructor():
 
 class ModificationInstanceBase(ModificationBase):
     def is_a(self, category):
+        '''Returns whether or not this :class:`ModificationRule` object belongs to
+        the specified :class:`~.ModificationCategory`.
+
+        Returns
+        -------
+        bool
+        '''
         return self.rule.is_a(category)
 
     def serialize(self):
@@ -50,7 +57,6 @@ try:
     from glycopeptidepy._c.structure.modification.modification import ModificationInstanceBase
 except ImportError:
     _has_c = False
-    pass
 
 
 class Modification(ModificationInstanceBase):
@@ -143,6 +149,21 @@ class Modification(ModificationInstanceBase):
         return self.__class__(self.rule)
 
     def is_tracked_for(self, category):
+        """Determine if :attr:`rule` is tracked by a particular
+        behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+        This relationship is distinct from :meth:`is_a` which merely observes that
+        the semantic relationship holds, not that any actual behavior is available.
+
+        Parameters
+        ----------
+        category : :class:`~.ModificationCategory`
+            The category to check
+
+        Returns
+        -------
+        bool
+        """
         return self.rule.is_tracked_for(category)
 
     def get_fragments(self, *args, **kwargs):

@@ -41,7 +41,7 @@ class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modificat
     __slots__ = ()
 
     def __init__(self, parts):
-        return super(SequencePosition, self).__init__(*parts)
+        super(SequencePosition, self).__init__(*parts)
 
     def __repr__(self):
         return repr(list(self))

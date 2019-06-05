@@ -49,6 +49,13 @@ try:
 except ImportError:
     class ModificationRuleBase(ModificationBase):
         def is_a(self, category):
+            '''Returns whether or not this :class:`ModificationRule` object belongs to
+            the specified :class:`~.ModificationCategory`.
+
+            Returns
+            -------
+            bool
+            '''
             return category in self.categories
 
         def __hash__(self):
@@ -281,7 +288,12 @@ class ModificationRule(ModificationRuleBase):
         for name in list(self.names):
             self.names.update(name.split(" or "))
         self.aliases = aliases
-        self.name = str(self._get_preferred_name(self.names))
+        preferred_name = self.options.get("preferred_name")
+        if preferred_name is not None:
+            self.names.add(preferred_name)
+            self.name = str(preferred_name)
+        else:
+            self.name = str(self._get_preferred_name(self.names))
         self._hash = hash(self.name)
 
     def _configure_categories(self, categories):
@@ -294,6 +306,19 @@ class ModificationRule(ModificationRuleBase):
 
     @property
     def is_standard(self):
+        """Indicates whether the :class:`ModificationRule` describes a modification which
+        has been specified from a reference source, and may be fully reconstructed from
+        its name alone.
+
+        This property is not strictly enforced, and does not cover all aspects of the object's
+        state. It does however provide a general guide for whether or not a modification is able
+        to be translated from :mod:`glycopeptidepy`'s internal representation into something that
+        another program *should* be able to understand.
+
+        Returns
+        -------
+        bool
+        """
         return True
 
     def clone(self, propagated_targets=None):
@@ -468,6 +493,21 @@ class ModificationRule(ModificationRuleBase):
         return True
 
     def is_tracked_for(self, category):
+        """Determine if this :class:`ModificationRule` is tracked by a particular
+        behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+        This relationship is distinct from :meth:`is_a` which merely observes that
+        the semantic relationship holds, not that any actual behavior is available.
+
+        Parameters
+        ----------
+        category : :class:`~.ModificationCategory`
+            The category to check
+
+        Returns
+        -------
+        bool
+        """
         return False
 
 
