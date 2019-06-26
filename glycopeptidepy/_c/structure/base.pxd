@@ -69,3 +69,5 @@ cdef class SequencePosition(object):
 
     @staticmethod
     cdef SequencePosition _create(AminoAcidResidueBase amino_acid, list modifications)
+
+    cdef double get_mass(self)

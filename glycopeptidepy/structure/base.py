@@ -46,6 +46,13 @@ class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modificat
     def __repr__(self):
         return repr(list(self))
 
+    @property
+    def mass(self):
+        mass = self.amino_acid.mass
+        for mod in self.modifications:
+            mass += mod.mass
+        return mass
+
 
 try:
     from glycopeptidepy._c.structure.base import (

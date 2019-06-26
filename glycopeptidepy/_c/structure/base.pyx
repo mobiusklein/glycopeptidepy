@@ -2,7 +2,7 @@ cimport cython
 from glypy.composition.ccomposition cimport CComposition
 from glypy.composition import formula as _formula
 
-from cpython.list cimport PyList_GetItem, PyList_GET_ITEM
+from cpython.list cimport PyList_GetItem, PyList_GET_ITEM, PyList_Size
 from cpython.sequence cimport PySequence_GetItem
 
 
@@ -276,3 +276,20 @@ cdef class SequencePosition(object):
         inst.modifications = modifications
         return inst
 
+    cdef double get_mass(self):
+        cdef:
+            double mass
+            size_t i, n
+            ModificationBase mod
+
+        mass = 0
+        mass += self.amino_acid.mass
+        n = PyList_Size(self.modifications)
+        for i in range(n):
+            mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
+            mass += mod.mass
+        return mass
+
+    @property
+    def mass(self):
+        return self.get_mass()
