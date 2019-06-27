@@ -1,5 +1,7 @@
 from six import string_types as basestring
 
+from glypy.utils import classproperty
+
 from ..base import ModificationBase
 
 from .source import ModificationTable
@@ -100,7 +102,28 @@ class Modification(ModificationInstanceBase):
         ModificationTable.register_new_rule(rule)
 
     def _resolve_name(self, rule_string):
+        """Look up a :class:`~.ModificationRule` by name in :attr:`modification_table`.
+
+        If the modification rule has not been registered with :attr:`modification_table`, and `rule_string`
+        is not a full modification specification string, this may fail.
+
+        Parameters
+        ----------
+        rule_string : :class:`str`
+            The name or specification of a :class:`~.ModificationRule`
+        """
         return self._table.resolve(rule_string)
+
+    @classproperty
+    def modification_table(self):
+        """Access the class-wide :class:`~.ModificationTable` instance which all dynamic name
+        lookups pass through.
+
+        Returns
+        -------
+        :class:`~.ModificationTable`
+        """
+        return self._table
 
     @classmethod
     def from_rule(cls, rule):
@@ -124,10 +147,29 @@ class Modification(ModificationInstanceBase):
         return inst
 
     def __init__(self, rule):
+        """Instantiate a :class:`Modification` instance from a template.
+
+        Parameters
+        ----------
+        rule : :class:`str` or :class:`~.ModificationRule`
+            Either the name of a modification rule as a string (to be resolved with
+            :meth:`_resolve_name`) or an actual :class:`~.ModificationRule`, which will
+            be used to populate all other attributes.
+        """
         if(isinstance(rule, basestring)):
             rule = self._resolve_name(rule)
 
         self._init_from_rule(rule)
+
+    @property
+    def names(self):
+        '''Returns the alternative names for this :class:`Modification`'s :attr:`rule`
+
+        Returns
+        -------
+        frozenset
+        '''
+        return frozenset(self.rule.names)
 
     def __repr__(self):
         return self.serialize()
