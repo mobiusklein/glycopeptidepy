@@ -673,5 +673,5 @@ class NeutralLoss(NeutralLossBase):
         for loss in specificity.get('neutral_losses', []):
             if loss['mono_mass'] == 0:
                 continue
-            result.append(cls(loss['composition'], loss['mono_mass']))
+            result.append(cls(Composition(loss['composition']), loss['mono_mass']))
         return result
