@@ -1,3 +1,4 @@
+from glypy.composition.ccomposition cimport CComposition
 from glycopeptidepy._c.structure.base cimport ModificationBase
 
 
@@ -12,3 +13,11 @@ cdef class ModificationRuleBase(ModificationBase):
         public basestring unimod_name
 
         public Py_hash_t _hash
+
+
+cdef class NeutralLossBase(object):
+    cdef:
+        public CComposition composition
+        public double mass
+        public object label
+

@@ -16,7 +16,7 @@ from collections import Iterable
 from six import string_types as basestring
 
 from ..base import ModificationBase
-from ..composition import Composition
+from ..composition import Composition, formula
 from ..residue import AminoAcidResidue
 
 from .utils import ModificationNameResolutionError
@@ -212,11 +212,15 @@ class ModificationRule(ModificationRuleBase):
         alt_names = set(unimod_entry.get('alt_names', ()))
         if record_id is not None:
             alt_names.add("UNIMOD:%d" % (record_id))
+        neutral_losses = set()
+        for losses in map(NeutralLoss.from_unimod_specificity, specificity):
+            neutral_losses.update(losses)
+        neutral_losses = list(neutral_losses)
         specificity = list(map(ModificationTarget.from_unimod_specificity, specificity))
         return cls(
             specificity, full_name, title, monoisotopic_mass,
             composition=Composition({str(k): int(v) for k, v in unimod_entry['composition'].items()}),
-            alt_names=alt_names)
+            alt_names=alt_names, neutral_losses=neutral_losses)
 
     @staticmethod
     def _get_preferred_name(names):
@@ -634,3 +638,40 @@ TMT10plex = [
     ('TMT10-130C', 129.1338685),
     ('TMT10-131', 130.13090353)
 ]
+
+
+try:
+    from glycopeptidepy._c.structure.modification.rule import NeutralLossBase
+except ImportError:
+    class NeutralLossBase(object):
+        def __eq__(self, other):
+            return self.label == other.label and self.mass == other.mass
+
+        def __ne__(self, other):
+            return not self == other
+
+        def __hash__(self):
+            return hash(self.label)
+
+
+class NeutralLoss(NeutralLossBase):
+
+    def __init__(self, composition, mass, label=None):
+        if label is None:
+            label = formula(composition)
+        self.composition = composition
+        self.mass = mass
+        self.label = label
+
+    def __repr__(self):
+        template = "{self.__class__.__name__}({self.composition}, {self.mass}, {self.label})"
+        return template.format(self=self)
+
+    @classmethod
+    def from_unimod_specificity(cls, specificity):
+        result = []
+        for loss in specificity.get('neutral_losses', []):
+            if loss['mono_mass'] == 0:
+                continue
+            result.append(cls(loss['composition'], loss['mono_mass']))
+        return result

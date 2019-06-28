@@ -119,6 +119,8 @@ def _formula_parser(formula, session):
                 name = _make_isotope_string(element, int(isotope))
             else:
                 name = element
+            if name == '0':
+                continue
             is_brick = session.query(Brick).filter(Brick.brick == name).first()
             if is_brick is None:
                 composition[str(name)] += count

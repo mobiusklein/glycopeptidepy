@@ -30,3 +30,15 @@ cdef class ModificationRuleBase(ModificationBase):
     def __ne__(self, other):
         return not self == other
 
+
+cdef class NeutralLossBase(object):
+    def __eq__(self, other):
+        if other is None:
+            return False
+        return self.label == (<NeutralLossBase>other).label and self.mass == (<NeutralLossBase>other).mass
+
+    def __ne__(self, other):
+        return not self == other
+
+    def __hash__(self):
+        return hash(self.label)

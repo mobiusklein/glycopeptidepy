@@ -276,7 +276,7 @@ class CoreGlycosylation(Glycosylation):
         self.targets = set()
 
     def clone(self):
-        return self.__class__()
+        return self.__class__(self.mass, )
 
     def __reduce__(self):
         return self.__class__, (self.mass, )
