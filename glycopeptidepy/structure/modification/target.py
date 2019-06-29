@@ -214,10 +214,17 @@ class ModificationTarget(object):
         return rep
 
     def __eq__(self, other):
-        return repr(self) == repr(other)
+        if self.amino_acid_targets != other.amino_acid_targets:
+            return False
+        elif self.position_modifier != other.position_modifier:
+            return False
+        return True
+
+    def __ne__(self, other):
+        return not self == other
 
     def __hash__(self):
-        return hash(repr(self))
+        return hash(self.amino_acid_targets)
 
     def __len__(self):
         position_modifier_count = 0
