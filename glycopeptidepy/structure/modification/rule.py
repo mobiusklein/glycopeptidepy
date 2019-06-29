@@ -79,6 +79,14 @@ def _ModificationRule_reconstructor(tp):
     return tp.__new__(tp)
 
 
+def _merge_dictlists(adict, bdict):
+    result = dict()
+    for key in set(adict) | set(bdict):
+        result[key] = list(set(adict.get(key, [])) | set(bdict.get(key, [])))
+    return result
+
+
+
 class ModificationRule(ModificationRuleBase):
     '''Represent the name, mass, and position specifities associated with a given modification.
     Additionally stores information on metadata about this rule computed from these values and
@@ -212,11 +220,11 @@ class ModificationRule(ModificationRuleBase):
         alt_names = set(unimod_entry.get('alt_names', ()))
         if record_id is not None:
             alt_names.add("UNIMOD:%d" % (record_id))
-        neutral_losses = set()
+        neutral_losses = list()
         for losses in map(NeutralLoss.from_unimod_specificity, specificity):
-            neutral_losses.update(losses)
-        neutral_losses = list(neutral_losses)
+            neutral_losses.append(losses)
         specificity = list(map(ModificationTarget.from_unimod_specificity, specificity))
+        neutral_losses = dict(zip(specificity, neutral_losses))
         return cls(
             specificity, full_name, title, monoisotopic_mass,
             composition=Composition({str(k): int(v) for k, v in unimod_entry['composition'].items()}),
@@ -231,7 +239,7 @@ class ModificationRule(ModificationRuleBase):
                  categories=None, alt_names=None, neutral_losses=None,
                  aliases=None, **kwargs):
         if neutral_losses is None:
-            neutral_losses = []
+            neutral_losses = dict()
         if categories is None:
             categories = []
         if aliases is None:
@@ -408,6 +416,7 @@ class ModificationRule(ModificationRuleBase):
             dup.names = self.names | other.names
             dup.aliases = self.aliases | other.aliases
             dup.name = self._get_preferred_name(dup.names)
+            dup.neutral_losses = _merge_dictlists(self.neutral_losses, other.neutral_losses)
             dup.options.update(other.options)
             return dup
         else:
