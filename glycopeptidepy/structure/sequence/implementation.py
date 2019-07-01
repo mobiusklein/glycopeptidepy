@@ -2,6 +2,7 @@ from six import string_types as basestring
 
 from ..fragmentation_strategy import HCDFragmentationStrategy
 from ..fragment import IonSeries
+from ..base import SequencePosition
 
 from .base import _PeptideSequenceCore
 from .glycosylated_sequence import GlycosylatedSequenceMixin
@@ -16,9 +17,34 @@ stub_glycopeptide_series = IonSeries.stub_glycopeptide
 class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSequenceMixin):
     @classmethod
     def from_iterable(cls, iterable, glycan_composition=None, n_term=None, c_term=None, text=None, **kwargs):
+        """Construct a :class:`PeptideSequence` instance from an arbitrary iterable of (amino acid, [modifications...])
+        pairs.
+
+        Parameters
+        ----------
+        iterable: :class:`~.Iterable`
+            An arbitrary :class:`~.Iterable` of two-element pairs where the first element denotes
+            the amino acid at that position while the second is a list of modifications. These elements
+            may be denoted by actual objects of the appropriate type or as strings (so long as all are are
+            typed object or strings) and will be coerced accordingly.
+        glycan_composition: :class:`str` or :class:`~.GlycanComposition`
+            An optional glycan composition given either as a string or a typed object. Will be coerced
+            as needed.
+        n_term: :class:`~.TerminalGroup`
+            The amino terminal group
+        c_term: :class:`~.TerminalGroup`
+            The carboxyl terminal group
+        text: :class:`bool`
+            Whether or not to enforce text parsing. Defaults to :const:`None` which results in automatic
+            detection.
+
+        Returns
+        -------
+        :class:`PeptideSequence`
+        """
         seq = cls()
+        iterable = list(iterable)
         if text is None:
-            iterable = list(iterable)
             try:
                 if isinstance(iterable[0][0], basestring):
                     text = True
@@ -27,7 +53,11 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         if text:
             seq._init_from_parsed_string(iterable, glycan_composition, n_term, c_term)
         else:
-            seq._init_from_components(iterable, glycan_composition, n_term, c_term, **kwargs)
+            seq._init_from_components(
+                # Coerce all pairs in the input to :class:`SequencePosition` because :meth:`_init_from_components`
+                # assumes that its input is a strictly typed list.
+                list(map(SequencePosition, iterable)),
+                glycan_composition, n_term, c_term, **kwargs)
         return seq
 
     def modified_residues(self):
@@ -38,6 +68,16 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         list of :class:`~.SequencePosition`
         """
         return [(i, position) for i, position in enumerate(self) if position.modifications]
+
+    def strip_modifications(self):
+        """Return a copy of this sequence with all modifications removed.
+
+        Returns
+        -------
+        :class:`PeptideSequence`
+        """
+        parts = [[pos.amino_acid, []] for pos in self]
+        return self.from_iterable(parts)
 
     def subsequence(self, slice_obj):
         sub = self[slice_obj]
@@ -118,7 +158,7 @@ def list_to_sequence(seq_list, wrap=True):
             flat_chunks.extend(chunk)
         else:
             flat_chunks.append(chunk)
-    seq = Sequence.from_iterable(flat_chunks) if wrap else flat_chunks
+    seq = PeptideSequence.from_iterable(flat_chunks) if wrap else flat_chunks
     return seq
 
 
