@@ -33,6 +33,22 @@ class _ModificationResolver(object):
         self.rule_types = list(rule_types) or []
 
     def register(self, rule_type):
+        """Register a :class:`~.ModificationRule` subclass with
+        the parsing cascade this object represents.
+
+        This method may be used as a decorator for target classes.
+
+        Parameters
+        ----------
+        rule_type: :class:`ModificationRule` subclass
+            The subclass to register
+
+        Returns
+        -------
+        :class:`ModificationRule` subclass
+            The `rule_type` value, allowing this method to be used
+            as a decorator.
+        """
         self.rule_types.append(rule_type)
         return rule_type
 
@@ -48,6 +64,8 @@ try:
     from glycopeptidepy._c.structure.modification.rule import ModificationRuleBase
 except ImportError:
     class ModificationRuleBase(ModificationBase):
+        """Represent common properties of modification rules.
+        """
         def is_a(self, category):
             '''Returns whether or not this :class:`ModificationRule` object belongs to
             the specified :class:`~.ModificationCategory`.
@@ -303,9 +321,10 @@ class ModificationRule(ModificationRuleBase):
         preferred_name = self.options.get("preferred_name")
         if preferred_name is not None:
             self.names.add(preferred_name)
-            self.name = str(preferred_name)
+            self.preferred_name = self.name = str(preferred_name)
         else:
-            self.name = str(self._get_preferred_name(self.names))
+            self.preferred_name = self.name = str(
+                self._get_preferred_name(self.names))
         self._hash = hash(self.name)
 
     def _configure_categories(self, categories):
@@ -560,11 +579,11 @@ class AnonymousModificationRule(ModificationRule):
     def is_standard(self):
         return False
 
-    def valid_site(self, *args, **kwargs):
+    def valid_site(self, *args, **kwargs):  # pylint: disable=arguments-differ
         raise TypeError(
             "AnonymousModificationRule does not support site validation")
 
-    def find_valid_sites(self, *args, **kwargs):
+    def find_valid_sites(self, *args, **kwargs):  # pylint: disable=arguments-differ
         raise TypeError(
             "AnonymousModificationRule does not support site validation")
 
