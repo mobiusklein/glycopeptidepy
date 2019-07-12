@@ -387,10 +387,9 @@ class ModificationRule(ModificationRuleBase):
 
     def why_valid(self, amino_acid=None, position_modifiers=None):
         possible_targets = [target for target in self.targets if target.valid_site(
-            amino_acid, position_modifiers)]
-        if len(possible_targets) == 0:
-            raise ValueError("No valid targets. %s for %s" %
-                             (str(amino_acid) + str(position_modifiers), self))
+            amino_acid, position_modifiers)[0]]
+        if not possible_targets:
+            return None
         minimized_target = min(possible_targets, key=len)
         return minimized_target
 
