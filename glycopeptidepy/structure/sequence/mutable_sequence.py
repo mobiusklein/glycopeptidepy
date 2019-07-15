@@ -20,6 +20,12 @@ class MutableSequenceMixin(object):
             The position of the modification to drop
         modification_type: str or Modification
             The modification to drop
+
+        Raises
+        ------
+        ValueError:
+            If the `modification_type` is not found at `position`, a :class:`ValueError` will
+            be raised.
         '''
         dropped_index = None
         self._invalidate()
@@ -30,12 +36,15 @@ class MutableSequenceMixin(object):
             self.c_term = _make_terminal_group(structure_constants.C_TERM_DEFAULT)
             return
 
-        for i, mod in enumerate(self.sequence[position][1]):
+        for i, mod in enumerate(self.sequence[position].modifications):
             if modification_type == mod.rule:
                 dropped_index = i
                 break
+        if dropped_index is None:
+            raise ValueError("Modification not found! %s @ %s" %
+                             (modification_type, position))
         try:
-            drop_mod = self.sequence[position][1].pop(dropped_index)
+            drop_mod = self.sequence[position].modifications.pop(dropped_index)
             self.mass -= drop_mod.mass
             if drop_mod.is_tracked_for(ModificationCategory.glycosylation):
                 self._glycosylation_manager.pop(position)

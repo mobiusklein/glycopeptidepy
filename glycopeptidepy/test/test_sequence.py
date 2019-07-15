@@ -127,11 +127,13 @@ class PeptideSequenceSuiteBase(object):
     def test_add_remove_modification(self):
         p = self.parse_sequence("ENGTISR")
         ref_mass = p.mass
+        assert not p.has_modification(1, "Deamidated")
         p.add_modification(1, "Deamidated")
+        assert p.has_modification(1, "Deamidated")
         self.assertAlmostEqual(self.parse_sequence(str(p)).mass, p.mass, 5)
 
         p.drop_modification(1, "Deamidated")
-
+        assert not p.has_modification(1, "Deamidated")
         self.assertAlmostEqual(p.mass, ref_mass, 5)
 
     def test_picklability(self):

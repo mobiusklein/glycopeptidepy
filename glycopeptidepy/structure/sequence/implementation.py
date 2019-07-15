@@ -3,6 +3,7 @@ from six import string_types as basestring
 from ..fragmentation_strategy import HCDFragmentationStrategy
 from ..fragment import IonSeries
 from ..base import SequencePosition
+from ..modification import SequenceLocation
 
 from .base import _PeptideSequenceCore
 from .glycosylated_sequence import GlycosylatedSequenceMixin
@@ -68,6 +69,28 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         list of :class:`~.SequencePosition`
         """
         return [(i, position) for i, position in enumerate(self) if position.modifications]
+
+    def has_modification(self, position, modification_type):
+        '''Check if a modification is present on the sequence
+
+        Parameters
+        ----------
+        position: int
+            The position in the sequence to check for the modification
+        modification_type: str or Modification
+            The modification to check for.
+
+        Returns
+        -------
+        bool:
+            Whether or not `modification_typ` is present at `position`
+        '''
+        if position is SequenceLocation.n_term:
+            return self.n_term == modification_type
+        elif position is SequenceLocation.c_term:
+            return self.c_term == modification_type
+        return modification_type in self.sequence[position].modifications
+
 
     def strip_modifications(self):
         """Return a copy of this sequence with all modifications removed.
