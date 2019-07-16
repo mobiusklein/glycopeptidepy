@@ -111,29 +111,6 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
             subseq.c_term = self.c_term
         return subseq
 
-    def break_at(self, idx):
-        if self._fragment_index is None:
-            self._build_fragment_index()
-        return self._fragment_index[idx]
-
-    def _build_fragment_index(self, types=tuple('bycz')):
-        self._fragment_index = [[] for i in range(len(self) + 1)]
-        for series in types:
-            series = IonSeries(series)
-            if series.direction > 0:
-                g = self.get_fragments(
-                    series)
-                for frags in g:
-                    position = self._fragment_index[frags[0].position]
-                    position.append(frags)
-            else:
-                g = self.get_fragments(
-                    series)
-                for frags in g:
-                    position = self._fragment_index[
-                        len(self) - frags[0].position]
-                    position.append(frags)
-
     def get_fragments(self, kind, chemical_shifts=None, strategy=None, include_neutral_losses=False, **kwargs):
         """Generate fragments from this structure according to the strategy specified
         by ``strategy``, returning an iterator over the sequence of theoretical fragments.

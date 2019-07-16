@@ -274,14 +274,12 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         """
         self._mass = 0.0
         self.sequence = []
-        self._fragment_index = None
 
         self._glycosylation_manager = GlycosylationManagerImpl(self)
 
         self._n_term = None
         self._c_term = None
 
-        self._fragments_map = {}
         self._total_composition = None
         self._peptide_composition = None
 

@@ -32,18 +32,10 @@ hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
 
 def make_fragment(self, key):
-    if not hasattr(self, '_fragments_map'):
-        self._fragments_map = {}
-    try:
-        return self._fragments_map[key]
-    except KeyError:
-        for group in self.get_fragments(key[0]):
-            for frag in group:
-                self._fragments_map[frag.name] = frag
-        try:
-            return self._fragments_map[key]
-        except KeyError:
-            raise KeyError("Unknown Fragment %r" % (key,))
+    for group in self.get_fragments(key[0]):
+        for frag in group:
+            if frag.name == key:
+                return frag
 
 
 class TestSequenceParser(unittest.TestCase):

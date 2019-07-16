@@ -10,8 +10,6 @@ cdef class PeptideSequenceBase(object):
         public TerminalGroup _n_term
         public TerminalGroup _c_term
 
-        public object _fragment_index
-        public object _fragments_map
         public CComposition _total_composition
         public CComposition _peptide_composition
 

@@ -11,3 +11,4 @@ htmlcov/
 .vscode
 .pytest_cache
 .ipynb_checkpoints
+Untitled*.ipynb

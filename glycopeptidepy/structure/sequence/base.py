@@ -138,7 +138,6 @@ class _PeptideSequenceCore(PeptideSequenceBase):
         self._n_term = None
         self._c_term = None
 
-        self._fragments_map = {}
         self._total_composition = None
         self._peptide_composition = None
 
