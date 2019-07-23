@@ -517,7 +517,7 @@ class ModificationRule(ModificationRuleBase):
 
     def as_spec_strings(self):
         for target in self.targets:
-            yield "%s (%s)" % (self.title, target.serialize())
+            yield "%s (%s)" % (self.name, target.serialize())
 
     @property
     def is_core(self):
