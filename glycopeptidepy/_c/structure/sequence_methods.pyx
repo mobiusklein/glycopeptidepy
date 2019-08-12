@@ -447,7 +447,10 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     # equality methods
 
     def __eq__(self, other):
-        return str(self) == str(other)
+        if isinstance(other, _PeptideSequenceCore):
+            return self.full_structure_equality(<_PeptideSequenceCore>other)
+        else:
+            return str(self) == str(other)
 
     cpdef bint base_sequence_equality(self, _PeptideSequenceCore other):
         cdef:
