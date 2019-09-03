@@ -1,4 +1,5 @@
-import re
+'''A REST API for the UniProt protein database and a parser for their XML format.
+'''
 import csv
 import warnings
 import threading
@@ -306,7 +307,7 @@ def _open_url_for(accession):
 def parse(tree, error=False):
     seq = tree.find(
         ".//up:entry/up:sequence", nsmap).text.replace(
-        "\n", '')
+            "\n", '')
     names = [el.text for el in tree.findall(
         ".//up:protein/*/up:fullName", nsmap)]
     recommended_name_tag = tree.find(
@@ -409,19 +410,19 @@ class ProteinDownloader(object):  # pragma: no cover
     def download(cls, accession_iterable, chunk_size=15, ordered=True):
         accession_iterable = list(accession_iterable)
         chunks = cls.chunk(accession_iterable, chunk_size)
-        proteome = []
+        proteins = []
         for chunk in chunks:
-            proteome.extend(cls.fetch(chunk))
+            proteins.extend(cls.fetch(chunk))
         if not ordered:
-            return proteome
+            return proteins
         acc_map = {}
-        for prot in proteome:
+        for prot in proteins:
             for acc in prot.accessions:
                 acc_map[acc] = prot
-        proteome = []
+        proteins = []
         for acc in accession_iterable:
-            proteome.append(acc_map.get(acc))
-        return proteome
+            proteins.append(acc_map.get(acc))
+        return proteins
 
     def __call__(self, *args, **kwargs):
         return self.download(*args, **kwargs)
