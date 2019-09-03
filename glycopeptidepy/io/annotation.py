@@ -7,26 +7,26 @@ from . import uniprot
 class AnnotationMeta(type):
     _cache = {}
 
-    def __new__(cls, name, parents, attrs):
-        new_type = type.__new__(cls, name, parents, attrs)
+    def __new__(mcs, name, parents, attrs):
+        new_type = type.__new__(mcs, name, parents, attrs)
         try:
-            cls._cache[name] = new_type
+            mcs._cache[name] = new_type
         except AttributeError:
             pass
         return new_type
 
-    def _type_for_name(self, feature_type):
-        return self._cache[feature_type]
+    def _type_for_name(cls, feature_type):
+        return cls._cache[feature_type]
 
-    def from_dict(self, d):
+    def from_dict(cls, d):
         name = d.pop('__class__')
-        impl = self._type_for_name(name)
+        impl = cls._type_for_name(name)  # pylint: disable=no-value-for-parameter
         return impl(**d)
 
 
 @add_metaclass(AnnotationMeta)
 class AnnotationBase(object):
-    def __init__(self, feature_type, description):
+    def __init__(self, feature_type, description, **kwargs):
         self.feature_type = feature_type
         self.description = description
 
@@ -50,8 +50,8 @@ class AnnotationBase(object):
 
 
 class AnnotatedResidue(AnnotationBase):
-    def __init__(self, position, feature_type, description):
-        super(AnnotatedResidue, self).__init__(feature_type, description)
+    def __init__(self, position, feature_type, description, **kwargs):
+        super(AnnotatedResidue, self).__init__(feature_type, description, **kwargs)
         self.position = position
 
     @property
@@ -78,8 +78,9 @@ class AnnotatedResidue(AnnotationBase):
 
 
 class AnnotatedInterval(AnnotationBase):
-    def __init__(self, start, end, feature_type, description):
-        super(AnnotatedInterval, self).__init__(feature_type, description)
+    def __init__(self, start, end, feature_type, description, **kwargs):
+        super(AnnotatedInterval, self).__init__(
+            feature_type, description, **kwargs)
         self.start = start
         self.end = end
 
@@ -99,12 +100,34 @@ class AnnotatedInterval(AnnotationBase):
         return hash((self.feature_type, self.description, self.start, self.end))
 
 
+class Domain(AnnotatedInterval):
+    feature_type = 'domain'
+
+    def __init__(self, domain_type, start, end, **kwargs):
+        super(Domain, self).__init__(
+            start, end, self.feature_type, self.feature_type, **kwargs)
+        self.domain_type = domain_type
+
+    @property
+    def name(self):
+        return self.domain_type
+
+    def __repr__(self):
+        template = '{self.__class__.__name__}({self.domain_type!r}, {self.start}, {self.end})'
+        return template.format(self=self)
+
+    def to_dict(self):
+        d = super(Domain, self).to_dict()
+        d['domain_type'] = self.domain_type
+        return d
+
+
 class PeptideBase(AnnotatedInterval):
     feature_type = None
 
     def __init__(self, start, end, **kwargs):
         super(PeptideBase, self).__init__(
-            start, end, self.feature_type, self.feature_type)
+            start, end, self.feature_type, self.feature_type, **kwargs)
 
     def __repr__(self):
         template = '{self.__class__.__name__}({self.start}, {self.end})'
@@ -136,14 +159,15 @@ class ProteolyticSite(AnnotatedResidue):
 
     def __init__(self, position, **kwargs):
         super(ProteolyticSite, self).__init__(
-            self.position, self.feature_type, self.feature_type)
+            self.position, self.feature_type, self.feature_type, **kwargs)
 
 
 class ModifiedResidue(AnnotatedResidue):
     feature_type = 'modified residue'
 
     def __init__(self, position, modification, **kwargs):
-        super(ModifiedResidue, self).__init__(position, self.feature_type, modification)
+        super(ModifiedResidue, self).__init__(
+            position, self.feature_type, modification, **kwargs)
 
     @property
     def modification(self):
@@ -162,7 +186,7 @@ class SimpleVariant(AnnotatedResidue):
     feature_type = "simple variant"
 
     def __init__(self, position, substitution, **kwargs):
-        super(SimpleVariant, self).__init__(position, self.feature_type, (substitution))
+        super(SimpleVariant, self).__init__(position, self.feature_type, substitution, **kwargs)
 
     @property
     def substitution(self):
@@ -179,7 +203,7 @@ class ComplexVariant(AnnotatedInterval):
 
     def __init__(self, start, end, substitution, **kwargs):
         super(ComplexVariant, self).__init__(
-            start, end, self.feature_type, (substitution))
+            start, end, self.feature_type, substitution, **kwargs)
 
     @property
     def substitution(self):
@@ -221,7 +245,7 @@ class AnnotationCollection(object):
         return cls([AnnotationBase.from_dict(di) for di in d])
 
     def dump(self, fp):
-        json.dump(self.to_json())
+        json.dump(self.to_json(), fp)
 
     @classmethod
     def load(cls, fp):
