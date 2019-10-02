@@ -2,6 +2,8 @@
 from collections import defaultdict
 from itertools import product, combinations
 
+from glypy.structure.glycan_composition import FrozenGlycanComposition
+
 from glycopeptidepy.utils.collectiontools import descending_combination_counter, _AccumulatorBag
 from glycopeptidepy.structure import constants as structure_constants
 from glycopeptidepy.structure.composition import (
@@ -323,6 +325,15 @@ for key, value in _residue_to_neutral_loss.items():
     exd_sidechain_losses[R(key)].extend(value)
 
 
+class GlycanCompositionFragment(SimpleFragment):
+    __slots__ = ('glycan_composition', )
+
+    def __init__(self, name, mass, kind, composition, glycan_composition, chemical_shift=None):
+        super(GlycanCompositionFragment, self).__init__(
+            name, mass, kind, composition, chemical_shift=chemical_shift, is_glycosylated=True)
+        self.glycan_composition = glycan_composition
+
+
 class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragmentingStrategyBase):
     glycan_fragment_ladder = "Y"
 
@@ -369,7 +380,8 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                     name = ''.join("%s%d" % kv for kv in sorted(key.items(), key=lambda x: x[0].mass()))
                     mass = frag_spec['mass']
                     composition = frag_spec['composition']
-                    fragments.append(SimpleFragment(name, mass, IonSeries.other, composition))
+                    fragments.append(GlycanCompositionFragment(
+                        name, mass, IonSeries.other, composition, frag_spec['key']))
                 return fragments
             else:
                 fragments = sorted(glycosylation.rule.get_fragments(
@@ -402,11 +414,16 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
         ]
         fragment_combinations = product(*fragments)
         results = []
+        has_multiple_nonlocalized_cores = len(glycosylations) > 1 and sum(
+            g[1].rule.is_core for g in glycosylations) == len(glycosylations)
         for fragment_set in fragment_combinations:
             if fragment_set == ():
                 continue
             delta_composition = Composition()
             new_modifications = ModificationIndex(stripped_modifications)
+            aggregate_glycan_composition = None
+            if has_multiple_nonlocalized_cores:
+                aggregate_glycan_composition = FrozenGlycanComposition()
             for glycan_fragment in fragment_set:
                 if glycan_fragment is None:
                     continue
@@ -414,6 +431,12 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 new_modifications[subfragment] += 1
                 delta_composition += subfragment.composition
 
+                if has_multiple_nonlocalized_cores and glycan_fragment is not None:
+                    aggregate_glycan_composition += glycan_fragment.glycan_composition
+
+            if aggregate_glycan_composition is not None:
+                if any(aggregate_glycan_composition[k] > v for k, v in self.peptide.glycan_composition.items()):
+                    continue
             extended_fragment = PeptideFragment(
                 bare_fragment.series, bare_fragment.position, new_modifications,
                 bare_fragment.bare_mass,
