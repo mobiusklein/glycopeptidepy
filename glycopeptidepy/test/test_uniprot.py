@@ -26,9 +26,8 @@ class UniProtClientTest(unittest.TestCase):
 
     def test_search(self):
         result = uniprot.search('Aggrecan')
-        top = result[:5]
-        for res in top:
+        for res in result:
             if res['Entry'] == 'P16112':
                 break
         else:
-            raise AssertionError("Did not find Human Aggrecan in the top five search results")
+            raise AssertionError("Did not find Human Aggrecan in the search results")
