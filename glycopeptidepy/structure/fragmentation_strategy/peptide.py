@@ -477,8 +477,5 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
                 composition=bare_fragment.composition + delta_composition)
             results.append(extended_fragment)
-        if not all(g[1].rule.is_core for g in glycosylations):
-            # include the intact fragment if it is not just loaded with
-            # cores
-            results.append(fragment)
+        results.append(fragment)
         return results
