@@ -334,7 +334,63 @@ class GlycanCompositionFragment(SimpleFragment):
         self.glycan_composition = glycan_composition
 
 
-class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragmentingStrategyBase):
+class _GlycanFragmentingMixin(_GlycanFragmentingStrategyBase):
+
+    def _make_fragmentation_strategy(self):
+        strat = StubGlycopeptideStrategy(self.peptide, True)
+        return strat
+
+    def _get_glycan_composition_fragments(self, glycosylation, series, position):
+        strat = self._make_fragmentation_strategy()
+        gc = strat.glycan_composition()
+        if glycosylation.rule.glycosylation_type == GlycosylationType.n_linked:
+            gen = strat.n_glycan_composition_fragments(gc)
+        elif glycosylation.rule.glycosylation_type == GlycosylationType.o_linked:
+            gen = strat.o_glycan_composition_fragments(gc)
+        elif glycosylation.rule.glycosylation_type == GlycosylationType.glycosaminoglycan:
+            gen = strat.gag_linker_composition_fragments(gc)
+        else:
+            gen = []
+        fragments = []
+        for frag_spec in gen:
+            key = frag_spec['key']
+            if not key:
+                continue
+            name = ''.join("%s%d" % kv for kv in sorted(
+                key.items(), key=lambda x: x[0].mass()))
+            mass = frag_spec['mass']
+            composition = frag_spec['composition']
+            fragments.append(GlycanCompositionFragment(
+                name, mass, IonSeries.other, composition, frag_spec['key']))
+        return fragments
+
+    def _get_glycan_structure_fragments(self, glycosylation, series, position):
+        fragments = sorted(glycosylation.rule.get_fragments(
+            series, max_cleavages=self.max_glycan_cleavages),
+            key=lambda x: x.mass)
+        return fragments
+
+    def _get_glycan_fragments(self, glycosylation, series, position):
+        try:
+            return self._glycan_fragment_cache[glycosylation, series, position]
+        except KeyError:
+            if glycosylation.rule.is_composition:
+                fragments = self._get_glycan_composition_fragments(glycosylation, series, position)
+            else:
+                fragments = self._get_glycan_structure_fragments(glycosylation, series, position)
+            self._glycan_fragment_cache[glycosylation, series, position] = fragments
+            return fragments
+
+    def _wrap_glycan_fragment(self, fragment):
+        try:
+            return self._glycan_fragment_wrapper_cache[fragment]
+        except KeyError:
+            result = self._glycan_fragment_wrapper_cache[fragment] = GlycanFragment(
+                fragment)
+            return result
+
+
+class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragmentingMixin):
     glycan_fragment_ladder = "Y"
 
     def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, max_glycan_cleavages=None,
@@ -358,48 +414,6 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 continue
             stripped_modifications[modification] = count
         return glycosylations, stripped_modifications
-
-    def _wrap_glycan_fragment(self, fragment):
-        try:
-            return self._glycan_fragment_wrapper_cache[fragment]
-        except KeyError:
-            result = self._glycan_fragment_wrapper_cache[fragment] = GlycanFragment(fragment)
-            return result
-
-    def _get_glycan_fragments(self, glycosylation, series, position):
-        try:
-            return self._glycan_fragment_cache[glycosylation, series, position]
-        except KeyError:
-            if glycosylation.rule.is_composition:
-                strat = StubGlycopeptideStrategy(self.peptide, True)
-                gc = strat.glycan_composition()
-                if glycosylation.rule.glycosylation_type == GlycosylationType.n_linked:
-                    gen = strat.n_glycan_composition_fragments(gc)
-                elif glycosylation.rule.glycosylation_type == GlycosylationType.o_linked:
-                    gen = strat.o_glycan_composition_fragments(gc)
-                elif glycosylation.rule.glycosylation_type == GlycosylationType.glycosaminoglycan:
-                    gen = strat.gag_linker_composition_fragments(gc)
-                else:
-                    gen = []
-                fragments = []
-                for frag_spec in gen:
-                    key = frag_spec['key']
-                    if not key:
-                        continue
-                    name = ''.join("%s%d" % kv for kv in sorted(key.items(), key=lambda x: x[0].mass()))
-                    mass = frag_spec['mass']
-                    composition = frag_spec['composition']
-                    fragments.append(GlycanCompositionFragment(
-                        name, mass, IonSeries.other, composition, frag_spec['key']))
-                self._glycan_fragment_cache[glycosylation,
-                                            series, position] = fragments
-                return fragments
-            else:
-                fragments = sorted(glycosylation.rule.get_fragments(
-                    series, max_cleavages=self.max_glycan_cleavages),
-                    key=lambda x: x.mass)
-                self._glycan_fragment_cache[glycosylation, series, position] = fragments
-                return fragments
 
     def _get_glycan_loss_combinations(self, glycosylations, glycan_fragment_ladder):
         glycosylations = tuple(glycosylations)
