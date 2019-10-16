@@ -189,8 +189,11 @@ cdef class FragmentBase(object):
         raise NotImplementedError()
 
     def __hash__(self):
-        if self._hash is None:
-            self._hash = hash(self.name)
+        if self._hash == -1:
+            if self._name is None:
+                self._update_hash_name()
+            else:
+                self._hash = hash(self._name)
         return self._hash
 
     def __eq__(self, other):
@@ -241,6 +244,10 @@ cdef class FragmentBase(object):
         self._chemical_shift = chemical_shift
         if chemical_shift is not None:
             self.mass += chemical_shift.mass
+        self._name = self.get_fragment_name()
+        self._hash = hash(self._name)
+
+    cdef void _update_hash_name(self):
         self._name = self.get_fragment_name()
         self._hash = hash(self._name)
 
@@ -316,8 +323,8 @@ cdef class PeptideFragment(FragmentBase):
 
         self._update_mass_with_modifications()
 
-        self._name = self.get_fragment_name()
-        self._hash = hash(self._name)
+        self._name = None
+        self._hash = -1
         return self
 
     def __init__(self, kind, position, modification_dict, mass, flanking_amino_acids=None,
@@ -338,10 +345,8 @@ cdef class PeptideFragment(FragmentBase):
         self.set_chemical_shift(chemical_shift)
         self._update_mass_with_modifications()
 
-        self._name = self.get_fragment_name()
-
-        self._hash = hash(self._name)
-
+        self._name = None
+        self._hash = -1
 
     cdef void _update_mass_with_modifications(self):
         cdef:
