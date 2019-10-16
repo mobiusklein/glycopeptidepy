@@ -10,7 +10,7 @@ from cpython.object cimport PyObject_Str
 from cpython cimport PyErr_SetString
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next, PyDict_GetItem
-from cpython.int cimport PyInt_AsLong
+from cpython.int cimport PyInt_AsLong, PyInt_FromLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
 
@@ -41,21 +41,69 @@ DEF ARRAY_SIZE = 2 ** 12
 DEF DEFAULT_FRAGMENT_NAME_BUFFER_SIZE = 128
 
 cdef string_cell[ARRAY_SIZE] str_ints
-cdef int i
-cdef Py_ssize_t z
-cdef str pa
-cdef char* a
-cdef char* atemp
+cdef dict str_int_overflow_intern_cache = {}
 
-for i in range(ARRAY_SIZE):
-    pa = str(i)
+cdef void init_str_ints():
+    cdef int i
+    cdef Py_ssize_t z
+    cdef str pa
+    cdef char* a
+    cdef char* atemp
+
+    for i in range(ARRAY_SIZE):
+        pa = str(i)
+        atemp = PyStr_AsUTF8AndSize(pa, &z)
+        a = <char*>malloc(sizeof(char) * z)
+        strcpy(a, atemp)
+        a[z] = "\0"
+        str_ints[i].string = a
+        str_ints[i].size = z
+
+
+init_str_ints()
+
+
+cdef int get_str_int(int i, string_cell* out):
+    '''Get a `string_cell` for a given integer.
+
+    For integers < 2 ** 12, go through the `str_ints` array
+    fast path, otherwise use `str_int_overflow_intern_cache`.
+
+    `str_int_overflow_intern_cache` keeps a mapping from PyInt to
+    an immortalized PyStr whose internal buffer is used to serve
+    the `char*` for `string_cell` instances larger than  2 ** 12 - 1.
+    '''
+    cdef:
+        PyObject* ptemp
+        object py_i
+        str pa
+        Py_ssize_t z
+    if i < ARRAY_SIZE:
+        out[0] = str_ints[i]
+        return 0
+
+    py_i = PyInt_FromLong(i)
+    ptemp = PyDict_GetItem(str_int_overflow_intern_cache, py_i)
+    if ptemp == NULL:
+        pa = str(py_i)
+        Py_INCREF(pa)
+        PyDict_SetItem(str_int_overflow_intern_cache, py_i, pa)
+    else:
+        pa = <str>ptemp
     atemp = PyStr_AsUTF8AndSize(pa, &z)
-    a = <char*>malloc(sizeof(char) * z)
-    strcpy(a, atemp)
-    a[z] = "\0"
-    str_ints[i].string = a
-    str_ints[i].size = z
+    out.string = atemp
+    out.size = z
+    return 0
 
+
+def _debug_get_str_int(int i):
+    cdef:
+        string_cell out
+        int result
+    result = get_str_int(i, &out)
+    print(result)
+    print(out.string)
+    print(out.size)
 
 def _get_string_cell(int i):
     cdef string_cell cell = str_ints[i]
@@ -381,7 +429,7 @@ cdef class PeptideFragment(FragmentBase):
         memcpy(&name_buffer[index], tmp_buffer, size_ref)
         index += size_ref
 
-        int_conv = str_ints[self.position]
+        get_str_int(self.position, &int_conv)
         memcpy(&name_buffer[index], int_conv.string, int_conv.size)
         index += int_conv.size
 
