@@ -253,7 +253,7 @@ cdef class SequencePosition(object):
             SequencePosition other_t
         if isinstance(other, SequencePosition):
             other_t = other
-            return self.amino_acid == other_t.amino_acid and self.modifications == other_t.modifications
+            return self.amino_acid.equal_to(other_t.amino_acid) and self.modifications == other_t.modifications
         else:
             return self.amino_acid == other.amino_acid and self.modifications == other.modifications
 
@@ -289,6 +289,41 @@ cdef class SequencePosition(object):
             mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
             mass += mod.mass
         return mass
+
+    cpdef bint has_modification(self, modification):
+        cdef:
+            size_t i, n
+            ModificationBase mod
+
+        n = PyList_Size(self.modifications)
+        for i in range(n):
+            mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
+            if modification == mod:
+                return True
+        return False
+
+    cpdef bint is_modified(self):
+        return PyList_Size(self.modifications) > 0
+
+    cpdef add_modification(self, modification):
+        self.modifications.append(modification)
+
+    cpdef drop_modification(self, modification):
+        cdef:
+            size_t i, n,
+            int index
+            ModificationBase mod
+
+        n = PyList_Size(self.modifications)
+        index = -1
+        for i in range(n):
+            mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
+            if modification == mod:
+                index = i
+                break
+        if index == -1:
+            raise ValueError("Modification %s not found" % modification)
+        return self.modifications.pop(index)
 
     @property
     def mass(self):

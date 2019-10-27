@@ -60,6 +60,12 @@ cdef class ModificationBase(object):
     cpdef bint is_tracked_for(self, object category)
 
 
+ctypedef fused modification_or_string:
+    str
+    unicode
+    ModificationBase
+
+
 cdef class SequencePosition(object):
     cdef:
         public AminoAcidResidueBase amino_acid
@@ -69,3 +75,9 @@ cdef class SequencePosition(object):
     cdef SequencePosition _create(AminoAcidResidueBase amino_acid, list modifications)
 
     cdef double get_mass(self)
+
+    cpdef bint has_modification(self, modification)
+    cpdef bint is_modified(self)
+
+    cpdef drop_modification(self, modification)
+    cpdef add_modification(self, modification)
