@@ -9,6 +9,7 @@ from cpython.ref cimport Py_INCREF
 from cpython.object cimport PyObject_Str
 from cpython cimport PyErr_SetString
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
+from cpython.sequence cimport PySequence_Fast, PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next, PyDict_GetItem
 from cpython.int cimport PyInt_AsLong, PyInt_FromLong
 from cpython.float cimport PyFloat_AsDouble
@@ -634,16 +635,24 @@ cdef class _NameTree(object):
             result = <_NameTree>presult
             return result
 
-    cpdef traverse(self, list parts):
+    cpdef traverse(self, list_or_iterable parts):
         cdef:
             _NameTree node
             size_t i, n
+            object parts_fast
 
         node = self
-        n = PyList_GET_SIZE(parts)
-        for i in range(n):
-            kv = <object>PyList_GET_ITEM(parts, i)
-            node = node.get(kv)
+        if list_or_iterable is list:
+            n = PyList_GET_SIZE(parts)
+            for i in range(n):
+                kv = <object>PyList_GET_ITEM(parts, i)
+                node = node.get(kv)
+        else:
+            parts_fast = PySequence_Fast(parts, "Expected a sequence")
+            n = PySequence_Fast_GET_SIZE(parts_fast)
+            for i in range(n):
+                kv = <object>PySequence_Fast_GET_ITEM(parts_fast, i)
+                node = node.get(kv)
         return node
 
 

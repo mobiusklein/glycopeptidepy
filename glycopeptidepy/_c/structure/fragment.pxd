@@ -94,6 +94,11 @@ cdef class PeptideFragment(FragmentBase):
     cdef long get_glycosylation_size(self) except -1
 
 
+ctypedef fused list_or_iterable:
+    list
+    object
+
+
 @cython.final
 cdef class _NameTree(object):
     cdef:
@@ -104,4 +109,4 @@ cdef class _NameTree(object):
     cdef _NameTree _create()
 
     cpdef _NameTree get(self, key)
-    cpdef traverse(self, list parts)
+    cpdef traverse(self, list_or_iterable parts)
