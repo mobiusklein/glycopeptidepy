@@ -357,9 +357,13 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             mass = base_mass
             composition = base_composition.clone()
             is_extended = False
+            n_positions = len(positions)
             for site in positions:
                 mass += site['mass']
-                aggregate_glycosylation += (site['key'])
+                if n_positions > 1:
+                    aggregate_glycosylation += (site['key'])
+                else:
+                    aggregate_glycosylation = site['key']
                 composition += site['composition']
                 is_extended |= site['is_extended']
             is_glycosylated = (mass != base_mass)

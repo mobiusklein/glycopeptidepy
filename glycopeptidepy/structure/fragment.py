@@ -503,6 +503,12 @@ class StubFragment(SimpleFragment):
         return tuple(proto)
 
 
+try:
+    from glycopeptidepy._c.structure.fragment import StubFragment
+except ImportError:
+    pass
+
+
 class MemoizedIonSeriesMetaclass(type):
 
     def __call__(cls, name=None, *args, **kwargs):
