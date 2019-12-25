@@ -11,7 +11,10 @@ about what its names are.
 import re
 
 from collections import defaultdict
-from collections import Iterable
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 
 from six import string_types as basestring
 
