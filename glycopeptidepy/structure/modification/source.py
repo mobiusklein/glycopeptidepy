@@ -3,6 +3,7 @@ sources.
 '''
 import csv
 import json
+import bisect
 
 from io import StringIO
 from copy import deepcopy
@@ -349,7 +350,6 @@ class ModificationTable(ModificationSource):
             self.store.pop(name, None)
 
 
-
 class RestrictedModificationTable(ModificationTable):
     def __init__(self, rules=None, constant_modifications=None, variable_modifications=None):
         super(RestrictedModificationTable, self).__init__(rules)
@@ -392,3 +392,29 @@ def rule_string_to_specialized_rule(rule_string):
     rule = Modification(name).rule.clone()
     rule.targets = targets
     return rule
+
+
+class ModificationMassSearch(object):
+    def __init__(self, rules):
+        self.index = [(rule.mass, rule) for rule in rules]
+        self.index.sort(key=lambda x: (x[0], str(x[1])))
+
+    def find_lower_bound(self, mass, error_tolerance=1e-5):
+        i = bisect.bisect_left(self.index, (mass, ''))
+        while i > 0:
+            rmass, _rule = self.index[i]
+            if error_tolerance <= abs(rmass - mass) / mass:
+                i -= 1
+            else:
+                break
+        return i
+
+    def search_mass(self, mass, error_tolerance=1e-5):
+        i = self.find_lower_bound(mass, error_tolerance)
+        out = []
+        for j in range(i, len(self.index)):
+            rmass, rule = self.index[j]
+            if abs(rmass - mass) / mass > error_tolerance:
+                break
+            out.append(rule)
+        return out
