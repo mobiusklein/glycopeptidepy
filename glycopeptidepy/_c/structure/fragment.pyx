@@ -681,8 +681,24 @@ cdef class StubFragment(SimpleFragment):
     def glycosylation_size(self):
         return sum(self.glycosylation.values())
 
+    cpdef str base_name(self):
+        """Simply return the base fragment's name, omitting any chemical modification,
+        e.g. peptide+HexNAc1"""
+
+        # If the chemical shift is :const:`None`, there was no change to :attr:`_name`,
+        # so just return it, otherwise we need to recompute the name from scratch using
+        # :attr:`glycosylation` and :meth:`build_name_from_composition`
+        if self.get_chemical_shift() is None:
+            return self._name
+        else:
+            return self.build_name_from_composition(self.glycosylation)
+
     @classmethod
     def build_name_from_composition(cls, glycan_composition):
+        cdef:
+            basestring name, extended_key
+            _NameTree root, node
+            list parts
         name = 'peptide'
         root = cls._name_cache
         parts = list(glycan_composition.items())

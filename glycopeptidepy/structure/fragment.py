@@ -224,7 +224,7 @@ class FragmentBase(object):
 
     chemical_shift = property(get_chemical_shift, set_chemical_shift)
 
-    def generate_chemical_shiftes(self, losses=ChemicalShift.AllLosses):
+    def generate_chemical_shifts(self, losses=ChemicalShift.AllLosses):
         if losses is ChemicalShift.AllLosses:
             losses = generic_chemical_shifts_composition.keys()
 
@@ -501,6 +501,12 @@ class StubFragment(SimpleFragment):
         proto = list(super(StubFragment, self).__reduce__())
         proto[1] = proto[1] + (self.glycosylation, self.is_extended)
         return tuple(proto)
+
+    def base_name(self):
+        if self.chemical_shift is None:
+            return self._name
+        else:
+            return self.build_name_from_composition(self.glycosylation)
 
 
 try:
