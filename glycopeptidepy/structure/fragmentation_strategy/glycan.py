@@ -857,6 +857,13 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         return (a for a in [])
 
 
+try:
+    from glycopeptidepy._c.structure.fragmentation_strategy.glycan import (
+        GlycanCompositionFragmentStrategyBase, StubGlycopeptideStrategy, GlycanCompositionFragment)
+    _has_c = True
+except ImportError:
+    _has_c = False
+
 class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
 
     def __init__(self, peptide, use_query=False, oxonium=True, all_series=False, allow_ambiguous=False,
