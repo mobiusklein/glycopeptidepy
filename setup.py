@@ -57,6 +57,8 @@ def make_extensions():
                       sources=["glycopeptidepy/_c/structure/fragmentation_strategy/base.pyx"]),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.peptide",
                       sources=["glycopeptidepy/_c/structure/fragmentation_strategy/peptide.pyx"]),
+            Extension("glycopeptidepy._c.structure.fragmentation_strategy.glycan",
+                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/glycan.pyx"]),
         ], compiler_directives=cython_directives, force=force_cythonize)
     except ImportError:
         extensions = [
@@ -76,6 +78,8 @@ def make_extensions():
                       sources=["glycopeptidepy/_c/structure/fragmentation_strategy/base.c"]),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.peptide",
                       sources=["glycopeptidepy/_c/structure/fragmentation_strategy/peptide.c"]),
+            Extension("glycopeptidepy._c.structure.fragmentation_strategy.glycan",
+                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/glycan.c"]),
         ]
     return extensions
 

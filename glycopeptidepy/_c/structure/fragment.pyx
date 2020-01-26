@@ -663,6 +663,30 @@ cdef class StubFragment(SimpleFragment):
 
     _name_cache = stub_fragment_name_cache
 
+    @staticmethod
+    cdef StubFragment _create(str name, double mass, IonSeriesBase kind, CComposition composition,
+                              ChemicalShiftBase chemical_shift, bint is_glycosylated, object glycosylation,
+                              bint is_extended):
+        cdef:
+            StubFragment self
+
+        self = StubFragment.__new__(StubFragment)
+        self._name = name
+        self._hash = hash(self._name)
+        self._chemical_shift = None
+
+        self.mass = mass
+        self.kind = kind
+        self.composition = composition
+
+        self.set_chemical_shift(chemical_shift)
+        self.is_glycosylated = is_glycosylated
+
+        self.glycosylation = glycosylation
+        self.is_extended = is_extended
+
+        return self
+
     def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False,
                  glycosylation=None, is_extended=False):
         super(StubFragment, self).__init__(

@@ -9,6 +9,7 @@ except Exception:
 
 from glypy import MonosaccharideResidue
 
+from .sequence import PeptideSequenceBase
 from .residue import Residue as AminoAcidResidue, memoize, get_all_residues
 from .composition import Composition
 from .modification import Modification
@@ -93,6 +94,10 @@ class AminoAcidSequenceBuildingBlock(object):
 
     def as_sequence_position(self):
         return SequencePosition([self.residue, list(self.modifications)])
+
+    @classmethod
+    def from_sequence_position(cls, position):
+        return cls(position.amino_acid, tuple(position.modifications))
 
 
 class ModificationBuildingBlock(object):
@@ -207,7 +212,11 @@ class SequenceComposition(dict):
 
     def extend(self, *args):
         for residue in args:
-            self[residue] += 1
+            if isinstance(residue, PeptideSequenceBase):
+                for pos in residue:
+                    self[AminoAcidSequenceBuildingBlock.from_sequence_position(pos)] += 1
+            else:
+                self[residue] += 1
 
     def __iadd__(self, other):
         for elem, cnt in (other.items()):

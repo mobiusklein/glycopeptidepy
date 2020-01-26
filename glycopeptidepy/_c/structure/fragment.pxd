@@ -71,6 +71,11 @@ cdef class StubFragment(SimpleFragment):
         public object glycosylation
         public bint is_extended
 
+    @staticmethod
+    cdef StubFragment _create(str name, double mass, IonSeriesBase kind, CComposition composition,
+                              ChemicalShiftBase chemical_shift, bint is_glycosylated, object glycosylation,
+                              bint is_extended)
+
 
 cdef class PeptideFragment(FragmentBase):
     cdef:

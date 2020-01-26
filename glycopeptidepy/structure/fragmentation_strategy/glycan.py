@@ -341,6 +341,20 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             result[i - 1] = fucosylated
         return result
 
+    def _validate_glycan_composition(self, aggregate_glycosylation, glycan):
+        invalid = False
+        if self._use_query:
+            for key, value in aggregate_glycosylation.items():
+                if glycan.query(key) < value:
+                    invalid = True
+                    break
+        else:
+            for key, value in aggregate_glycosylation.items():
+                if glycan[key] < value:
+                    invalid = True
+                    break
+        return invalid
+
     def n_glycan_stub_fragments(self):
         glycan = self.glycan_composition()
         self._use_query = self._guess_query_mode(glycan)
@@ -368,17 +382,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
                 is_extended |= site['is_extended']
             is_glycosylated = (mass != base_mass)
             if len(positions) > 1:
-                invalid = False
-                if self._use_query:
-                    for key, value in aggregate_glycosylation.items():
-                        if glycan.query(key) < value:
-                            invalid = True
-                            break
-                else:
-                    for key, value in aggregate_glycosylation.items():
-                        if glycan[key] < value:
-                            invalid = True
-                            break
+                invalid = self._validate_glycan_composition(aggregate_glycosylation, glycan)
                 if invalid:
                     continue
             glycosylation = _prepare_glycan_composition_from_mapping(
