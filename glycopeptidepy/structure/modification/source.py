@@ -277,10 +277,10 @@ class ModificationTable(ModificationSource):
 
     def __getitem__(self, key):
         try:
-            try:
-                # First try the key in the custom mapping
+            # First try the key in the custom mapping
+            if key in self._custom_rules:
                 return self._custom_rules[key]
-            except KeyError:
+            else:
                 # Next try the normal store
                 return self.store[key]
         except KeyError:
