@@ -1027,7 +1027,7 @@ class FastaIndex(object):
         return matches
 
     def prefix_filter(self, prefix):
-        return [entry for entry in self if entry.prefix(prefix)]
+        return [entry for entry in self if entry.startswith(prefix)]
 
     def suffix_filter(self, suffix):
-        return [entry for entry in self if entry.suffix(suffix)]
+        return [entry for entry in self if entry.endswith(suffix)]
