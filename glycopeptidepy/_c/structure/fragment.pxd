@@ -76,6 +76,11 @@ cdef class StubFragment(SimpleFragment):
                               ChemicalShiftBase chemical_shift, bint is_glycosylated, object glycosylation,
                               bint is_extended)
 
+ctypedef fused mapping_types:
+        CountTable
+        dict
+        object
+
 
 cdef class PeptideFragment(FragmentBase):
     cdef:
@@ -115,3 +120,5 @@ cdef class _NameTree(object):
 
     cpdef _NameTree get(self, key)
     cpdef traverse(self, list_or_iterable parts)
+
+cdef basestring build_name_from_composition(mapping_types glycan_composition)

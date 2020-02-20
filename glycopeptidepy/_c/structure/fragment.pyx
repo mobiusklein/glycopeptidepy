@@ -21,7 +21,7 @@ from glycopeptidepy._c.structure.base cimport ModificationBase
 
 from glycopeptidepy._c.compat cimport PyStr_AsUTF8AndSize, PyStr_FromStringAndSize
 
-from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator
+from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator, count_table_items
 
 from glycopeptidepy.structure.modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
@@ -659,6 +659,36 @@ cdef class _NameTree(object):
 cdef _NameTree stub_fragment_name_cache = _NameTree()
 
 
+cdef object pair_mass(tuple x):
+    tmp = <object>PyTuple_GetItem(x, 0)
+    return tmp.mass()
+
+
+cdef basestring build_name_from_composition(mapping_types glycan_composition):
+        cdef:
+            basestring name, extended_key
+            _NameTree root, node
+            list parts
+        name = 'peptide'
+        root = stub_fragment_name_cache
+        if mapping_types is dict:
+            parts = PyDict_Items(glycan_composition)
+        elif mapping_types is CountTable:
+            parts = count_table_items(glycan_composition.table)
+        elif mapping_types is object:
+            parts = list(glycan_composition.items())
+        # traverse the tree to find the node referring to
+        # this combination of monosaccharides and counts
+        node = root.traverse(parts)
+        extended_key = node.name
+        if extended_key is None:
+            parts.sort(key=pair_mass)
+            node.name = extended_key = ''.join("%s%d" % kv for kv in parts)
+        if extended_key:
+            name = "%s+%s" % (name, extended_key)
+        return name
+
+
 cdef class StubFragment(SimpleFragment):
 
     _name_cache = stub_fragment_name_cache
@@ -719,23 +749,7 @@ cdef class StubFragment(SimpleFragment):
 
     @classmethod
     def build_name_from_composition(cls, glycan_composition):
-        cdef:
-            basestring name, extended_key
-            _NameTree root, node
-            list parts
-        name = 'peptide'
-        root = cls._name_cache
-        parts = list(glycan_composition.items())
-        # traverse the tree to find the node referring to
-        # this combination of monosaccharides and counts
-        node = root.traverse(parts)
-        extended_key = node.name
-        if extended_key is None:
-            parts.sort(key=lambda x: x[0].mass())
-            node.name = extended_key = ''.join("%s%d" % kv for kv in parts)
-        if extended_key:
-            name = "%s+%s" % (name, extended_key)
-        return name
+        return build_name_from_composition(glycan_composition)
 
     def __reduce__(self):
         proto = list(super(StubFragment, self).__reduce__())

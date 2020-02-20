@@ -13,7 +13,9 @@ from glypy.composition.ccomposition cimport CComposition
 from glycopeptidepy._c.structure.fragmentation_strategy.base cimport FragmentationStrategyBase
 
 from glycopeptidepy._c.count_table cimport CountTable
-from glycopeptidepy._c.structure.fragment cimport IonSeriesBase, StubFragment, _NameTree
+from glycopeptidepy._c.structure.fragment cimport (
+    IonSeriesBase, StubFragment, _NameTree,
+    build_name_from_composition)
 from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
 
 from glycopeptidepy.structure.fragment import (
@@ -482,11 +484,14 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             per_site_shifts.append(core_shifts)
         for _positions in product(*per_site_shifts):
             positions = <tuple>_positions
-            aggregate_glycosylation = CountTable._create()
             mass = base_mass
             composition = base_composition.clone()
             is_extended = False
             n_positions = PyTuple_Size(positions)
+            if n_positions > 1:
+                aggregate_glycosylation = CountTable._create()
+            else:
+                aggregate_glycosylation = None
             for i in range(n_positions):
                 site = <GlycanCompositionFragment>PyTuple_GetItem(positions, i)
                 mass += site.mass
@@ -505,7 +510,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             name_key = str(glycosylation)
             ptemp = PyDict_GetItem(_composition_name_cache, name_key)
             if ptemp == NULL:
-                name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+                name = build_name_from_composition(aggregate_glycosylation)
                 PyDict_SetItem(_composition_name_cache, name_key, name)
             else:
                 name = <str>ptemp
@@ -562,11 +567,11 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 composition.add_from(site.composition)
                 is_extended |= site.is_extended
             is_glycosylated = (mass != base_mass)
-            if n_positions:
+            if n_positions > 1:
                 invalid = self._validate_glycan_composition(aggregate_glycosylation, glycan)
                 if invalid:
                     continue
-            name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            name = build_name_from_composition(aggregate_glycosylation)
             if name in seen:
                 continue
             seen.add(name)
@@ -725,7 +730,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 invalid = self._validate_glycan_composition(aggregate_glycosylation, glycan)
                 if invalid:
                     continue
-            name = StubFragment.build_name_from_composition(aggregate_glycosylation)
+            name = build_name_from_composition(aggregate_glycosylation)
             if name in seen:
                 continue
             seen.add(name)
