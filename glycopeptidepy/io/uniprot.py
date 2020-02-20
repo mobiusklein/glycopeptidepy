@@ -462,22 +462,98 @@ def search(query):
     return [dict(zip(header, line)) for line in reader]
 
 
-def proteome(format='fasta', raw=False, **kwargs):
-    query = "&".join(["query=%s:%s" % (k, v) for k, v in kwargs])
-    uri = "https://www.uniprot.org/uniprot/{query}&force=no&format={format}"
-    url = uri.format(query=query, format=format)
-    response = requests.get(url, stream=True)
-    response_buffer = response.raw
-    data = response_buffer.read()
-    if response.headers.get("content-encoding") == 'gzip':
-        response_buffer = gzip.GzipFile(mode='rb', fileobj=io.BytesIO(data))
+class _UniProtRestClientBase(object):
+
+    def _get_response_buffer(self, url):
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        response_buffer = response.raw
         data = response_buffer.read()
-    if raw:
+        if response.headers.get("content-encoding") == 'gzip':
+            response_buffer = gzip.GzipFile(
+                mode='rb', fileobj=io.BytesIO(data))
+            data = response_buffer.read()
         return data
-    if format == 'fasta':
-        from .fasta import ProteinFastaFileReader
-        return ProteinFastaFileReader(io.BytesIO(data))
-    elif format == 'xml':
-        return etree.fromstring(data)
-    else:
+
+
+
+class ProteomeSearchResult(dict):
+    bind = None
+
+    def download(self, raw=False, format='fasta'):
+        return self.bind.get(self['Proteome ID'], raw=raw, format=format)
+
+
+class ProteomeClient(_UniProtRestClientBase):
+
+    SearchResultType = ProteomeSearchResult
+
+    def search(self, format='tab', raw=False, **kwargs):
+        query = "&".join(["query=%s:%s" % (k, v) for k, v in kwargs.items()])
+        uri = "https://www.uniprot.org/proteomes/?{query}&sort=score&format={format}&sort=score"
+        url = uri.format(query=query, format=format)
+        data = self._get_response_buffer(url)
+        if raw:
+            return io.BytesIO(data)
+        if format == 'tab':
+            result = list(map(self.SearchResultType, csv.DictReader(io.BytesIO(data), delimiter='\t')))
+            for item in result:
+                item.bind = self
+            return result
+        elif format == 'list':
+            result = []
+            for line in data.splitlines():
+                r = self.SearchResultType({
+                    "Proteome ID": line.strip()
+                })
+                r.bind = self
+                result.append(r)
+            return result
         return io.BytesIO(data)
+
+    def get(self, proteome_id, include_isoforms=False, raw=False, format='fasta'):
+        uri = "https://www.uniprot.org/uniprot/?{query}&{params}&force=no&format={format}"
+        query = {"proteome": proteome_id, }
+        query = '&'.join(["query=%s:%s" % (k, v) for k, v in query.items()])
+        params = {"include": str(bool(include_isoforms)).lower()}
+        params = '&'.join(["%s=%s" % (k, v) for k, v in params.items()])
+        url = uri.format(query=query, params=params, format=format)
+        data = self._get_response_buffer(url)
+        if raw:
+            return io.BytesIO(data)
+        if format == 'fasta':
+            from .fasta import ProteinFastaFileReader
+            return ProteinFastaFileReader(io.BytesIO(data))
+        elif format == 'xml':
+            return etree.fromstring(data)
+        else:
+            return io.BytesIO(data)
+
+proteome = ProteomeClient()
+
+
+class TaxonomyClient(_UniProtRestClientBase):
+
+    def search(self, format='tab', raw=False, params=None, **kwargs):
+        if params is None:
+            params = dict()
+        query = "&".join(["query=%s:%s" % (k, v) for k, v in kwargs.items()])
+        params = '&'.join(["%s=%s" % (k, v) for k, v in params.items()])
+        if params:
+            params += '&'
+        uri = "https://www.uniprot.org/taxonomy/?{query}&{params}sort=score&format={format}&sort=score"
+        url = uri.format(query=query, params=params, format=format)
+        data = self._get_response_buffer(url)
+        if raw:
+            return io.BytesIO(data)
+        if format == 'tab':
+            result = list(map(dict, csv.DictReader(
+                io.BytesIO(data), delimiter='\t')))
+            return result
+        elif format == 'list':
+            result = data.splitlines()
+            return result
+        return io.BytesIO(data)
+
+
+taxonomy = TaxonomyClient()
