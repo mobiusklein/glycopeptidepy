@@ -5,3 +5,4 @@ recursive-include glycopeptidepy/structure/modification/data *.json
 recursive-include glycopeptidepy *.c *.h
 recursive-include glycopeptidepy *.pyx
 recursive-include glycopeptidepy *.pxd
+include requirements.txt
