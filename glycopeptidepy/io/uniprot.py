@@ -305,12 +305,19 @@ def _open_url_for(accession):
 
 
 def parse(tree, error=False):
-    seq = tree.find(
-        ".//up:entry/up:sequence", nsmap).text.replace(
-            "\n", '')
-    names = [el.text for el in tree.findall(
+    entry = tree.find(".//up:entry", nsmap)
+    if entry is None:
+        if hasattr(tree, "tag") and tree.tag.endswith("entry"):
+            entry = tree
+        else:
+            raise ValueError("Could not find root entry!")
+    seq = entry.find(
+        ".//up:sequence", nsmap).text
+    if seq is not None:
+        seq = seq.replace("\n", '')
+    names = [el.text for el in entry.findall(
         ".//up:protein/*/up:fullName", nsmap)]
-    recommended_name_tag = tree.find(
+    recommended_name_tag = entry.find(
         ".//up:protein/*/up:recommendedName", nsmap)
     if recommended_name_tag is not None:
         if recommended_name_tag.text.strip():
@@ -322,24 +329,24 @@ def parse(tree, error=False):
             recommended_name = names[0]
         except IndexError:
             recommended_name = ""
-    gene_name_tag = tree.find(".//up:entry/up:name", nsmap)
+    gene_name_tag = entry.find(".//up:name", nsmap)
     if gene_name_tag is not None:
         gene_name = gene_name_tag.text
     else:
         gene_name = ""
-    accessions = [el.text for el in tree.findall(
+    accessions = [el.text for el in entry.findall(
         ".//up:accession", nsmap)]
     dbreferences = defaultdict(list)
-    for tag in tree.findall(".//up:dbReference", nsmap):
+    for tag in entry.findall(".//up:dbReference", nsmap):
         db = tag.attrib['type']
-        entry = dict(id=tag.attrib['id'])
+        rec = dict(id=tag.attrib['id'])
         for prop in tag.findall(".//up:property", nsmap):
-            entry[prop.attrib['type']] = prop.attrib['value']
-        dbreferences[db].append(entry)
+            rec[prop.attrib['type']] = prop.attrib['value']
+        dbreferences[db].append(rec)
 
     features = []
     exc_type = Exception
-    for tag in tree.findall(".//up:feature", nsmap):
+    for tag in entry.findall(".//up:feature", nsmap):
         feature_type = tag.attrib['type']
         try:
             feature_obj = UniProtFeatureBase.handle_tag(tag)
@@ -352,7 +359,7 @@ def parse(tree, error=False):
                 warnings.warn("An exception %r occurred while parsing feature type %s for %s" % (
                     e, feature_type, accessions[0]))
     keywords = set()
-    for kw in tree.findall(".//up:keyword", nsmap):
+    for kw in entry.findall(".//up:keyword", nsmap):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
     return UniProtProtein(
         seq, features, recommended_name, gene_name, names, accessions,
