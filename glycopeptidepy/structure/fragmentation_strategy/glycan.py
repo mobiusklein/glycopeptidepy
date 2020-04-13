@@ -784,7 +784,7 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
 
         xyl_in_aggregate = glycan[xyl]
         if xyl_in_aggregate == 0:
-            xyl_in_aggregate = glycan.query("Xyl", exact=False)
+            xyl_in_aggregate = glycan.query("Pen", exact=False)
         core_shifts = []
         for xyl_count in range(max(0, xyl_in_aggregate) + 1):
             if xyl_count == 0:
