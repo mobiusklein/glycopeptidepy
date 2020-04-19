@@ -118,6 +118,10 @@ class GlycosylatedSequenceMixin(object):
             self._glycosylation_manager.aggregate = value
         elif isinstance(value, GlycosylationManager):
             self._glycosylation_manager = value # pylint: disable=assigning-non-slot
+        elif value is None:
+            pass
+        else:
+            raise TypeError("Cannot convert %s %r" % (type(value), value))
         self._invalidate()
 
     @property
@@ -157,7 +161,8 @@ class GlycosylatedSequenceMixin(object):
             for mod in mods:
                 self.drop_modification(i, mod)
         self._glycosylation_manager.clear()
-        self.glycan = None
+        # This line is a no-op.
+        # self.glycan = None
         return self
 
     def glycan_fragments(self, oxonium=True, all_series=False, allow_ambiguous=False,

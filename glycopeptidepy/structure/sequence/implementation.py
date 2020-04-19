@@ -111,6 +111,16 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
             subseq.c_term = self.c_term
         return subseq
 
+    def reverse(self):
+        slc = slice(None, None, -1)
+        seq = self.subsequence(slc)
+        if seq.glycan_composition != self.glycan_composition:
+            if seq.glycan_composition:
+                raise ValueError("Cannot recalculate partially ambiguous glycan composition")
+            else:
+                seq.glycan = self.glycan_composition.clone()
+        return seq
+
     def get_fragments(self, kind, chemical_shifts=None, strategy=None, include_neutral_losses=False, **kwargs):
         """Generate fragments from this structure according to the strategy specified
         by ``strategy``, returning an iterator over the sequence of theoretical fragments.
