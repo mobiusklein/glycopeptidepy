@@ -406,12 +406,16 @@ class GlycanFragment(Glycosylation):
         self.name = self.unimod_name = self.title = self.common_name = fragment.name
         self.names = {self.name, }
         self.composition = fragment.composition
+        self.fragment = fragment
+        self._set_defaults()
 
+    def _set_defaults(self):
         self.categories = [ModificationCategory.glycosylation]
         self.aliases = set()
         self.targets = set()
         self.options = {}
         self._hash = hash(self.name)
+
 
     def __reduce__(self):
         return _GlycanFragment_reconstructor, (), self.__getstate__()
@@ -421,6 +425,7 @@ class GlycanFragment(Glycosylation):
             'name': self.name,
             'composition': self.composition,
             'mass': self.mass,
+            "fragment": self.fragment
         }
         return state
 
@@ -429,9 +434,5 @@ class GlycanFragment(Glycosylation):
         self.name = self.unimod_name = self.title = self.common_name = state['name']
         self.names = {self.name, }
         self.composition = state['composition']
-
-        self.categories = [ModificationCategory.glycosylation]
-        self.aliases = set()
-        self.targets = set()
-        self.options = {}
-        self._hash = hash(self.name)
+        self.fragment = state.get("fragment")
+        self._set_defaults()
