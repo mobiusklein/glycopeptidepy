@@ -118,6 +118,10 @@ class MatureProtein(PeptideBase):
     feature_type = 'mature protein'
 
 
+class Chain(PeptideBase):
+    feature_type = 'chain'
+
+
 class Domain(UniProtFeatureBase):
     feature_type = 'domain'
 
@@ -290,9 +294,37 @@ class GlycosylationSite(UniProtFeatureBase):
         return cls(position, glycosylation_type, feature.attrib["description"])
 
 
-UniProtProtein = make_struct("UniProtProtein", (
+_UniProtProtein = make_struct("UniProtProtein", (
     "sequence", "features", "recommended_name", "gene_name", "names", "accessions",
     "keywords", "dbreferences"))
+
+
+class UniProtProtein(_UniProtProtein):
+    __slots__ = ()
+
+    def features_of_type(self, feature_type):
+        if isinstance(feature_type, basestring):
+            return [feature for feature in self.features if feature.feature_type == feature_type]
+        elif isinstance(feature_type, type):
+            return [feature for feature in self.features if isinstance(feature, feature_type)]
+        else:
+            raise TypeError("Can't use object of type %r, %r" % (type(feature_type), feature_type))
+
+    @property
+    def chains(self):
+        return self.features_of_type(Chain)
+
+    @property
+    def domains(self):
+        return self.features_of_type(Domain)
+
+    @property
+    def variants(self):
+        return self.features_of_type(SequenceVariant)
+
+    @property
+    def peptides(self):
+        return self.features_of_type(PeptideBase)
 
 
 def get_etree_for(accession):
