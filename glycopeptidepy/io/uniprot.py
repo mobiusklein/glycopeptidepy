@@ -118,12 +118,8 @@ class MatureProtein(PeptideBase):
     feature_type = 'mature protein'
 
 
-class Chain(PeptideBase):
-    feature_type = 'chain'
-
-
-class Domain(UniProtFeatureBase):
-    feature_type = 'domain'
+class SpanBase(UniProtFeatureBase):
+    feature_type = "__spanbase__"
 
     def __init__(self, name, start, end, known=True):
         self.name = name
@@ -166,6 +162,14 @@ class Domain(UniProtFeatureBase):
     @property
     def description(self):
         return self.name
+
+
+class Domain(SpanBase):
+    feature_type = 'domain'
+
+
+class Chain(SpanBase):
+    feature_type = 'chain'
 
 
 class RegionOfInterest(Domain):
