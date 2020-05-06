@@ -312,7 +312,7 @@ def parse(tree, error=False):
         else:
             raise ValueError("Could not find root entry!")
     seq = entry.find(
-        ".//up:sequence", nsmap).text
+        "./up:sequence", nsmap).text
     if seq is not None:
         seq = seq.replace("\n", '')
     names = [el.text for el in entry.findall(
