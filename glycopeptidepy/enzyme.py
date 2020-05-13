@@ -264,6 +264,7 @@ enzyme_rules = {
     'asp-n_ambic': '(?=[DE])',
     'asp-n': '(?=[BD])',
     'leukocyte elastase': '(?<=[ALIV])(?!P)',
+    'alpha-lytic protease': '[TASV]',
 }
 
 
