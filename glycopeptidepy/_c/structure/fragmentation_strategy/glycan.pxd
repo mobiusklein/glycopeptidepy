@@ -36,7 +36,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
     cpdef GlycanCompositionFragment fucosylate_increment(self, GlycanCompositionFragment shift)
     cpdef GlycanCompositionFragment xylosylate_increment(self, GlycanCompositionFragment shift)
     cpdef list fucosylate_extended(self, GlycanCompositionFragment shift, long fucose_count)
-    cpdef bint _validate_glycan_composition(self, aggregate_glycosylation, glycan)
+    cpdef bint _validate_glycan_composition(self, CountTable aggregate_glycosylation, glycan)
 
 
     cpdef list n_glycan_composition_fragments(self, object glycan, int core_count=*, int iteration_count=*)

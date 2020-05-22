@@ -5,6 +5,7 @@ from cpython cimport PyObject
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem, PyTuple_Size
 from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New
+from cpython.int cimport PyInt_AsLong
 from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
 
@@ -12,7 +13,7 @@ from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.fragmentation_strategy.base cimport FragmentationStrategyBase
 
-from glycopeptidepy._c.count_table cimport CountTable
+from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator
 from glycopeptidepy._c.structure.fragment cimport (
     IonSeriesBase, StubFragment, _NameTree,
     build_name_from_composition)
@@ -52,7 +53,11 @@ cdef class _CompositionTree(object):
     def __getitem__(self, key):
         return self.root[key]
 
-    cpdef object build(self, pair_sequence):
+    cpdef object build(self, list pair_sequence):
+        cdef:
+            tuple item
+            int i, n
+        # n = PyList_Size(pair_sequence)
         node = self.root.traverse(pair_sequence)
         if node.name is None:
             # modify the hashable glycan composition before calculating
@@ -70,7 +75,7 @@ cdef _CompositionTree _composition_tree_root = _CompositionTree()
 cdef dict _composition_name_cache = dict()
 
 
-cpdef _prepare_glycan_composition_from_mapping(mapping):
+cdef _prepare_glycan_composition_from_mapping(CountTable mapping):
     pair_sequence = mapping.items()
     return _composition_tree_root.build(pair_sequence)
 
@@ -110,7 +115,7 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         self._generator = None
 
     cpdef glycan_composition(self):
-        return self.peptide.glycan_composition
+        return self.peptide.glycan_composition.obj
 
     cpdef bint _guess_query_mode(self, glycan_composition):
         # these guesses will work for N-glycans and common types of mucin-type O-glycans
@@ -222,18 +227,34 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             self._generator = self.stub_fragments()
         return next(self._generator)
 
-    cpdef bint _validate_glycan_composition(self, aggregate_glycosylation, glycan):
-        cdef bint invalid = False
+    cpdef bint _validate_glycan_composition(self, CountTable aggregate_glycosylation, glycan):
+        cdef:
+            bint invalid = False
+            int i, n
+            long v, ov
+            object key
+            PyObject* pkey
+            CountTableIterator iterator
         if self._use_query:
             for key, value in aggregate_glycosylation.items():
                 if glycan.query(key) < value:
                     invalid = True
                     break
         else:
-            for key, value in aggregate_glycosylation.items():
-                if glycan[key] < value:
+            iterator = CountTableIterator._create(aggregate_glycosylation)
+            pkey = NULL
+            getter = glycan._getitem_fast
+            while iterator.has_more():
+                iterator.get_next_value(&pkey, &v)
+                key = <object>pkey
+                ov = PyInt_AsLong(getter(key))
+                if ov < v:
                     invalid = True
                     break
+            # for key, value in aggregate_glycosylation.items():
+            #     if glycan[key] < value:
+            #         invalid = True
+            #         break
         return invalid
 
     cpdef GlycanCompositionFragment fucosylate_increment(self, GlycanCompositionFragment shift):
