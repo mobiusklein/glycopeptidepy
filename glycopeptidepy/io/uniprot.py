@@ -341,6 +341,20 @@ def _open_url_for(accession):
 
 
 def parse(tree, error=False):
+    '''Parse an XML document into a :class:`UniProtProtein`.
+
+    Parameters
+    ----------
+    tree: lxml.etree.Element
+        The root XML element of the tree to parse.
+    errors: bool
+        Whether to treat errors during feature parsing
+        as warnings or exceptions.
+
+    Returns
+    -------
+    UniProtProtein
+    '''
     entry = tree.find(".//up:entry", nsmap)
     if entry is None:
         if hasattr(tree, "tag") and tree.tag.endswith("entry"):
@@ -400,6 +414,26 @@ def parse(tree, error=False):
     return UniProtProtein(
         seq, features, recommended_name, gene_name, names, accessions,
         keywords, dbreferences)
+
+
+def parse_all(tree, error=False):
+    """Parse an XML document containing multiple <up:entry> elements into
+    a list of :class:`UniProtProtein` instances.
+
+    Parameters
+    ----------
+    tree : lxml.etree.Element
+        The root element of the XML document to parse.
+    errors: bool
+        Whether to treat errors during feature parsing
+        as warnings or exceptions.
+
+    Returns
+    -------
+    list
+    """
+    entries = tree.findall(".//up:entry", nsmap)
+    return [parse(e, error=error) for e in entries]
 
 
 def get_features_for(accession, error=False):
