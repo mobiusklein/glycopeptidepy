@@ -676,7 +676,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                             if extra_hexnac_count:
                                 key_ct = CountTable._create()
                                 key_ct.setitem(_HEXNAC, hexnac_count + extra_hexnac_count)
-                                key_ct.setitem(_HEX, hexose_count)
+                                if hexose_count > 0:
+                                    key_ct.setitem(_HEX, hexose_count)
                                 shift = GlycanCompositionFragment._create(
                                     (
                                         (hexnac_count + extra_hexnac_count) * _HEXNAC_mass) + (
@@ -693,7 +694,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                                 for extra_hexose_count in range(hexose_in_aggregate - hexose_count):
                                     if extra_hexose_count > 0 and extra_hexose_count + hexose_count > 0:
                                         key_ct = CountTable._create()
-                                        key_ct.setitem(_HEXNAC, hexnac_count + extra_hexnac_count)
+                                        if hexnac_count > 0:
+                                            key_ct.setitem(_HEXNAC, hexnac_count + extra_hexnac_count)
                                         key_ct.setitem(_HEX, hexose_count + extra_hexose_count)
                                         shift = GlycanCompositionFragment._create(
                                             (
