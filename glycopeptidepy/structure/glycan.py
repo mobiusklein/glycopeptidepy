@@ -275,6 +275,9 @@ class GlycanCompositionProxy(Mapping):
         return len(self.obj)
 
 
+WATER_OFFSET = Composition({"H": 2, "O": 1})
+
+
 class GlycosylationManager(dict):
     def __init__(self, parent, aggregate=None):
         self.parent = parent
@@ -350,8 +353,7 @@ class GlycosylationManager(dict):
         self.invalidate()
 
     def _patch_aggregate(self):
-        offset = Composition({"H": 2, "O": 1})
-        self.aggregate.composition_offset -= offset
+        self.aggregate.composition_offset -= WATER_OFFSET
 
     def total_composition(self):
         total = Composition()
