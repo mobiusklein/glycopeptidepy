@@ -1,7 +1,7 @@
 from glypy import GlycanComposition
 
 from .. import constants as structure_constants
-from ..glycan import (GlycosylationManager, glycosylation_site_detectors, GlycosylationType)
+from ..glycan import (GlycosylationManager, glycosylation_site_detectors, GlycosylationType, GlycanCompositionWithOffsetProxy)
 from ..modification import ModificationCategory, Modification
 from ..residue import Residue
 from ..fragmentation_strategy import OxoniumIonStrategy, StubGlycopeptideStrategy
@@ -114,7 +114,7 @@ class GlycosylatedSequenceMixin(object):
 
     @glycan.setter
     def glycan(self, value):
-        if isinstance(value, GlycanComposition):
+        if isinstance(value, (GlycanComposition, GlycanCompositionWithOffsetProxy)):
             self._glycosylation_manager.aggregate = value
         elif isinstance(value, GlycosylationManager):
             self._glycosylation_manager = value # pylint: disable=assigning-non-slot

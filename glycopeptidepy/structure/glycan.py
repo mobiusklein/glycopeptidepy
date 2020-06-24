@@ -203,6 +203,9 @@ class TypedGlycan(NamedGlycan):
 
 
 class GlycanCompositionProxy(Mapping):
+    '''A mapping-like object that imitates the GlycanComposition interface in
+    a read-only fashion.
+    '''
     def __init__(self, glycan_composition):
         self.obj = glycan_composition
 
@@ -273,6 +276,35 @@ class GlycanCompositionProxy(Mapping):
 
     def __len__(self):
         return len(self.obj)
+
+
+class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
+    """A :class:`GlycanCompositionProxy` that pretends to allow you to
+    mutate the :attr:`composition_offset` attribute of the underlying
+    composition, but instead stores that within the proxy, leaving the
+    underlying compostion unchanged.
+
+    This type should be useful for re-using the same :class:`FrozenGlycanComposition`
+    object without repeatedly copying and invalidating its cached properties. When
+    this object is copied, the underlying GlycanComposition is not copied, only
+    the proxy.
+    """
+    def __init__(self, obj, offset=None):
+        if offset is None:
+            offset = Composition()
+        self.obj = obj
+        self.composition_offset = offset
+
+    def clone(self, *args, **kwargs):
+        return self.__class__(self.obj, self.composition_offset.copy())
+
+    def mass(self, *args, **kwargs):
+        mass = self.obj.mass(*args, **kwargs)
+        return mass + self.composition_offset.mass
+
+    def total_composition(self):
+        comp = self.obj.total_composition()
+        return comp + self.composition_offset
 
 
 WATER_OFFSET = Composition({"H": 2, "O": 1})
