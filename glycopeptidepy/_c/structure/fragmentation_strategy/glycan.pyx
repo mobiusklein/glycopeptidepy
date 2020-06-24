@@ -203,6 +203,17 @@ cdef CComposition hexnac_hex_composition(long hexnac, long hexose):
         return result.clone()
 
 
+cdef class StubFragmentGlycanCombination(object):
+    cdef:
+        public double mass
+        public CComposition composition
+        public bint is_extended
+        public int n_positions
+        public object glycosylation
+        public str glycosylation_key
+        public bint is_glycosylated
+
+
 cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
 
     """A fragmentation strategy that generates intact peptide + glycan Y fragments from
@@ -529,6 +540,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                     continue
             glycosylation = _prepare_glycan_composition_from_mapping(aggregate_glycosylation)
             name_key = str(glycosylation)
+            # May not need to do this second round of building.
             ptemp = PyDict_GetItem(_composition_name_cache, name_key)
             if ptemp == NULL:
                 name = build_name_from_composition(aggregate_glycosylation)
