@@ -53,6 +53,24 @@ class ModificationInstanceBase(ModificationBase):
     def __ne__(self, other):
         return not self == other
 
+    def is_tracked_for(self, category):
+        """Determine if :attr:`rule` is tracked by a particular
+        behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+        This relationship is distinct from :meth:`is_a` which merely observes that
+        the semantic relationship holds, not that any actual behavior is available.
+
+        Parameters
+        ----------
+        category : :class:`~.ModificationCategory`
+            The category to check
+
+        Returns
+        -------
+        bool
+        """
+        return self.rule.is_tracked_for(category)
+
 
 try:
     _has_c = True
@@ -189,24 +207,6 @@ class Modification(ModificationInstanceBase):
 
     def clone(self):
         return self.__class__(self.rule)
-
-    def is_tracked_for(self, category):
-        """Determine if :attr:`rule` is tracked by a particular
-        behavioral pattern associated with a :class:`~.ModificationCategory`.
-
-        This relationship is distinct from :meth:`is_a` which merely observes that
-        the semantic relationship holds, not that any actual behavior is available.
-
-        Parameters
-        ----------
-        category : :class:`~.ModificationCategory`
-            The category to check
-
-        Returns
-        -------
-        bool
-        """
-        return self.rule.is_tracked_for(category)
 
     def get_fragments(self, *args, **kwargs):
         return self.rule.get_fragments(*args, **kwargs)
