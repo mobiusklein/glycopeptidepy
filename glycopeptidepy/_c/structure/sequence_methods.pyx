@@ -19,16 +19,23 @@ from glypy.composition.ccomposition cimport CComposition
 from glycopeptidepy._c.structure.constants cimport Configuration
 
 from glycopeptidepy.structure.residue import AminoAcidResidue
-from glycopeptidepy.structure.modification import Modification, ModificationCategory
+from glycopeptidepy.structure.modification import Modification, ModificationCategory, SequenceLocation
 from glycopeptidepy.structure.glycan import GlycosylationManager
 from glycopeptidepy.structure import constants as _structure_constants
 
 
 
 cdef Configuration structure_constants = _structure_constants
+
 cdef object ModificationImpl = Modification
 cdef object AminoAcidResidueImpl = AminoAcidResidue
 cdef object GlycosylationManagerImpl = GlycosylationManager
+
+cdef object SequenceLocation_n_term = SequenceLocation.n_term
+cdef object SequenceLocation_c_term = SequenceLocation.c_term
+
+cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylation
+
 
 cdef dict terminal_group_cache = dict()
 
@@ -98,8 +105,6 @@ cdef ModificationBase _get_implicit_terminal(basestring terminal_name):
     return <ModificationBase>result
 
 # -------------------
-
-cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylation
 
 
 cdef CComposition _total_composition(_PeptideSequenceCore sequence):
@@ -588,3 +593,45 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             self.get_n_term().get_modification(),
             self.get_c_term().get_modification())
         return inst
+
+
+@cython.binding(True)
+cpdef add_modification(_PeptideSequenceCore self, position, modification_type):
+    '''
+    Add a modification by name to a specific residue. If the
+    position is the N-term or the C-term, the terminal modification will
+    be replaced.
+
+    Parameters
+    ----------
+    position: int
+        The position of the modification to add
+    modification_type: str or Modification
+        The modification to add
+    '''
+    cdef:
+        long position_
+        ModificationBase mod
+        SequencePosition pos
+    self._invalidate()
+
+    if isinstance(modification_type, Modification):
+        mod = modification_type
+    else:
+        mod = Modification(rule=modification_type)
+
+    if position is SequenceLocation_n_term:
+        self.n_term = self.n_term.modify(mod)
+    elif position is SequenceLocation_c_term:
+        self.c_term = self.c_term.modify(mod)
+    else:
+        position_ = PyInt_AsLong(position)
+        if (position_ == -1) or (position_ >= self.get_size()):
+            raise IndexError(
+                "Invalid modification position. %s, %s, %s" %
+                (position, str(self.sequence), modification_type))
+        pos = self.get(position_)
+        pos.add_modification(mod)
+        self._mass += mod.mass
+        if mod.is_tracked_for(ModificationCategory_glycosylation):
+            self._glycosylation_manager[position] = mod

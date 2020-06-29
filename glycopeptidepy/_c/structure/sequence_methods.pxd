@@ -39,3 +39,5 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
 
     cpdef CComposition peptide_composition(self)
     cpdef CComposition total_composition(self)
+
+cpdef add_modification(_PeptideSequenceCore self, position, modification_type)

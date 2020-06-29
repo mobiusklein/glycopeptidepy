@@ -143,3 +143,11 @@ class MutableSequenceMixin(object):
         self.sequence = sequence.sequence + self.sequence
         self.mass += sequence.mass - sequence.n_term.mass - sequence.c_term.mass
         self._retrack_sequence()
+
+
+try:
+    from glycopeptidepy._c.structure.sequence_methods import add_modification as _c_add_modification
+
+    MutableSequenceMixin.add_modification = _c_add_modification
+except ImportError:
+    pass
