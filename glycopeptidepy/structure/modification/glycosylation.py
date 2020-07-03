@@ -252,6 +252,13 @@ class Glycosylation(ModificationRule):
         return self.glycan.total_composition()
 
 
+try:
+    from glycopeptidepy._c.structure.modification.rule import is_tracked_for_glycosylation
+    Glycosylation.is_tracked_for = is_tracked_for_glycosylation
+except ImportError:
+    pass
+
+
 class CoreGlycosylation(Glycosylation):
     @property
     def is_composition(self):

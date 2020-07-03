@@ -1,3 +1,5 @@
+cimport cython
+from glycopeptidepy.structure.modification.descriptors import ModificationCategory
 
 cdef class ModificationRuleBase(ModificationBase):
     cpdef bint is_a(self, object category):
@@ -42,3 +44,26 @@ cdef class NeutralLossBase(object):
 
     def __hash__(self):
         return hash(self.label)
+
+
+cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylation
+
+
+@cython.binding(True)
+cpdef bint is_tracked_for_glycosylation(self, object category):
+    """Determine if this :class:`ModificationBase` is tracked by a particular
+    behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+    This relationship is distinct from :meth:`is_a` which merely observes that
+    the semantic relationship holds, not that any actual behavior is available.
+
+    Parameters
+    ----------
+    category : :class:`~.ModificationCategory`
+        The category to check
+
+    Returns
+    -------
+    bool
+    """
+    return category == ModificationCategory_glycosylation

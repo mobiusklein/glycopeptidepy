@@ -95,6 +95,24 @@ except ImportError:
         def __ne__(self, other):
             return not self == other
 
+        def is_tracked_for(self, category):
+            """Determine if this :class:`ModificationRule` is tracked by a particular
+            behavioral pattern associated with a :class:`~.ModificationCategory`.
+
+            This relationship is distinct from :meth:`is_a` which merely observes that
+            the semantic relationship holds, not that any actual behavior is available.
+
+            Parameters
+            ----------
+            category : :class:`~.ModificationCategory`
+                The category to check
+
+            Returns
+            -------
+            bool
+            """
+            return False
+
 
 def _ModificationRule_reconstructor(tp):
     return tp.__new__(tp)
@@ -525,24 +543,6 @@ class ModificationRule(ModificationRuleBase):
     @property
     def is_core(self):
         return True
-
-    def is_tracked_for(self, category):
-        """Determine if this :class:`ModificationRule` is tracked by a particular
-        behavioral pattern associated with a :class:`~.ModificationCategory`.
-
-        This relationship is distinct from :meth:`is_a` which merely observes that
-        the semantic relationship holds, not that any actual behavior is available.
-
-        Parameters
-        ----------
-        category : :class:`~.ModificationCategory`
-            The category to check
-
-        Returns
-        -------
-        bool
-        """
-        return False
 
 
 @ModificationRule.resolve.register

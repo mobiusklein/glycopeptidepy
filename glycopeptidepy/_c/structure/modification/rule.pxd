@@ -21,3 +21,5 @@ cdef class NeutralLossBase(object):
         public double mass
         public object label
 
+
+cpdef bint is_tracked_for_glycosylation(self, object category)
