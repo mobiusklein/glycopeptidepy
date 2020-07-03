@@ -12,6 +12,9 @@ from glycopeptidepy._c.structure.base cimport (
     SequencePosition, TerminalGroup, AminoAcidResidueBase,
     ModificationBase)
 
+from glycopeptidepy._c.structure.modification.source cimport ModificationTableBase
+from glycopeptidepy._c.structure.modification.modification cimport ModificationInstanceBase
+
 from glycopeptidepy._c.parser import sequence_tokenizer
 
 from glypy.composition.ccomposition cimport CComposition
@@ -35,6 +38,18 @@ cdef object SequenceLocation_n_term = SequenceLocation.n_term
 cdef object SequenceLocation_c_term = SequenceLocation.c_term
 
 cdef object ModificationCategory_glycosylation = ModificationCategory.glycosylation
+
+cdef ModificationTableBase modification_table = ModificationImpl.modification_table
+
+
+cpdef ModificationBase get_modification_by_name(basestring name):
+    cdef:
+        ModificationInstanceBase inst
+
+    rule = modification_table.resolve(name)
+    inst = <ModificationInstanceBase>ModificationImpl.__new__(ModificationImpl)
+    inst._init_from_rule(rule)
+    return inst
 
 
 cdef dict terminal_group_cache = dict()
@@ -165,7 +180,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             for j in range(m):
                 mod_str = <basestring>PyList_GET_ITEM(mod_strs, j)
                 if mod_str != '':
-                    mod = ModificationImpl(mod_str)
+                    mod = get_modification_by_name(mod_str)
                     if mod.is_tracked_for(ModificationCategory_glycosylation):
                         self._glycosylation_manager[i] = mod
                     mods.append(mod)
@@ -182,12 +197,12 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
 
         if isinstance(n_term, basestring):
             if n_term != structure_constants.N_TERM_DEFAULT:
-                n_term = ModificationImpl(n_term)
+                n_term = get_modification_by_name(n_term)
             else:
                 n_term = None
         if isinstance(c_term, basestring):
             if c_term != structure_constants.C_TERM_DEFAULT:
-                c_term = ModificationImpl(c_term)
+                c_term = get_modification_by_name(c_term)
             else:
                 c_term = None
         n_term_group = _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term)
