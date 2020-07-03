@@ -2,7 +2,7 @@ cimport cython
 
 from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
-from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM
+from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem
 from cpython.int cimport PyInt_AsLong
 from cpython.float cimport PyFloat_AsDouble
@@ -134,7 +134,7 @@ cdef CComposition _total_composition(_PeptideSequenceCore sequence):
     for i in range(n):
         position = sequence.get(i)
         total += position.amino_acid.composition
-        m = PyList_Size(position.modifications)
+        m = PyList_GET_SIZE(position.modifications)
         for j in range(m):
             mod = <ModificationBase>PyList_GetItem(position.modifications, j)
             if mod.is_tracked_for(ModificationCategory_glycosylation):
@@ -167,7 +167,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             bint has_glycan
 
         i = 0
-        n = PyList_Size(seq_list)
+        n = PyList_GET_SIZE(seq_list)
         self.sequence = sequence = PyList_New(n)
         mass = 0
         for i in range(n):
@@ -176,7 +176,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             mass += res.mass
             mods = []
             mod_strs = <list>PyList_GET_ITEM(item, 1)
-            m = PyList_Size(mod_strs)
+            m = PyList_GET_SIZE(mod_strs)
             for j in range(m):
                 mod_str = <basestring>PyList_GET_ITEM(mod_strs, j)
                 if mod_str != '':
@@ -254,17 +254,17 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             AminoAcidResidueBase res
 
         i = 0
-        n = PyList_Size(seq_list)
+        n = PyList_GET_SIZE(seq_list)
         self.sequence = sequence = PyList_New(n)
         mass = 0
 
         for i in range(n):
-            item = <SequencePosition>PyList_GetItem(seq_list, i)
+            item = <SequencePosition>PyList_GET_ITEM(seq_list, i)
             mass += item.amino_acid.mass
-            m = PyList_Size(item.modifications)
+            m = PyList_GET_SIZE(item.modifications)
             mods = PyList_New(m)
             for j in range(m):
-                mod = <ModificationBase>PyList_GetItem(item.modifications, j)
+                mod = <ModificationBase>PyList_GET_ITEM(item.modifications, j)
                 Py_INCREF(mod)
                 PyList_SetItem(mods, j, mod)
                 if mod.is_tracked_for(ModificationCategory_glycosylation):
