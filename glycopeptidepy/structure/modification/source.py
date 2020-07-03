@@ -186,8 +186,48 @@ class ModificationSource(object):
         return self.get_modification(key)
 
 
+try:
+    from glycopeptidepy._c.structure.modification.source import ModificationTableBase
+except ImportError as err:
 
-class ModificationTable(ModificationSource):
+    class ModificationTableBase(object):
+        '''A mixin class to provide implementation for :class:`ModificationSource`
+        methods for :class:`ModificationTable`
+        '''
+
+        def __getitem__(self, key):
+            try:
+                # First try the key in the custom mapping
+                if key in self._instance_custom_rules:
+                    return self._instance_custom_rules[key]
+                else:
+                    # Next try the normal store
+                    return self.store[key]
+            except KeyError:
+                try:
+                    # Clean the key in case it is decorated with extra target information
+                    name = title_cleaner.search(key).groupdict()["name"]
+                except (AttributeError):
+                    raise ModificationStringParseError(
+                        "Could not parse {0}".format(key))
+                try:
+                    return self.store[name]
+                except KeyError:
+                    try:
+                        return self._instance_custom_rules[name]
+                    except KeyError:
+                        raise ModificationStringParseError(
+                            "Could not resolve {0}".format(name))
+
+        def resolve(self, key):
+            try:
+                rule = self[key]
+            except ModificationStringParseError:
+                rule = ModificationRule.resolve(key)
+            return rule
+
+
+class ModificationTable(ModificationTableBase, ModificationSource):
     '''A :class:`~.Mapping` connecting modification names to :class:`~.ModificationRule`
     instances.
 
@@ -226,6 +266,8 @@ class ModificationTable(ModificationSource):
         if rules is None:
             rules = self._definitions_from_stream_default()
         self.store = dict()
+        # For
+        self._instance_custom_rules = self.__class__._custom_rules
 
         for rule in rules:
             if isinstance(rule, Mapping):
@@ -237,14 +279,14 @@ class ModificationTable(ModificationSource):
         self._include_other_rules()
 
     def __len__(self):
-        return len(self.store) + len(self._custom_rules) + len(self.other_modifications)
+        return len(self.store) + len(self._instance_custom_rules) + len(self.other_modifications)
 
     def __iter__(self):
         for key in iter(self.store):
             yield key
         for key in iter(self.other_modifications):
             yield key
-        for key in iter(self._custom_rules):
+        for key in iter(self._instance_custom_rules):
             yield key
 
     def _include_other_rules(self):
@@ -274,35 +316,6 @@ class ModificationTable(ModificationSource):
         set
         """
         return set(self.store.values()) | set(self._custom_rules.values())
-
-    def __getitem__(self, key):
-        try:
-            # First try the key in the custom mapping
-            if key in self._custom_rules:
-                return self._custom_rules[key]
-            else:
-                # Next try the normal store
-                return self.store[key]
-        except KeyError:
-            try:
-                # Clean the key in case it is decorated with extra target information
-                name = title_cleaner.search(key).groupdict()["name"]
-            except (AttributeError):
-                raise ModificationStringParseError("Could not parse {0}".format(key))
-            try:
-                return self.store[name]
-            except KeyError:
-                try:
-                    return self._custom_rules[name]
-                except KeyError:
-                    raise ModificationStringParseError("Could not resolve {0}".format(name))
-
-    def resolve(self, key):
-        try:
-            rule = self[key]
-        except ModificationStringParseError:
-            rule = ModificationRule.resolve(key)
-        return rule
 
     def add(self, rule):
         """Add a new :class:`~.ModificationRule` to this object.
