@@ -154,7 +154,8 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         if parser_function is None:
             parser_function = sequence_tokenizer
         self._initialize_fields()
-        self._init_from_string(sequence, parser_function)
+        if sequence is not None:
+            self._init_from_string(sequence, parser_function)
 
     cpdef _init_from_parsed_string(self, list seq_list, glycan=None, n_term=None, c_term=None):
         cdef:
@@ -221,7 +222,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         parser_function : :class:`Callable`
             The parsing function to use
         """
-        if sequence == "" or sequence is None:
+        if sequence is None or sequence == "":
             pass
         else:
             seq_list, modifications, glycan, n_term, c_term = <tuple>parser_function(
