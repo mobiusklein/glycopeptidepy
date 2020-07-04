@@ -26,7 +26,7 @@ from glycopeptidepy.structure.modification import Modification, ModificationCate
 from glycopeptidepy.structure.glycan import GlycosylationManager
 from glycopeptidepy.structure import constants as _structure_constants
 
-
+cdef CComposition WATER = CComposition("H2O")
 
 cdef Configuration structure_constants = _structure_constants
 
@@ -600,7 +600,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         cdef _PeptideSequenceCore inst = self.__class__()
         if self._glycosylation_manager.aggregate is not None:
             glycan = self._glycosylation_manager.aggregate.clone()
-            glycan.composition_offset = CComposition("H2O")
+            glycan.composition_offset = CComposition._create(WATER)
         else:
             glycan = None
         inst._init_from_components(
