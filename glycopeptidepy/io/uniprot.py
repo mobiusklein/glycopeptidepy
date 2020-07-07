@@ -163,6 +163,12 @@ class SpanBase(UniProtFeatureBase):
     def description(self):
         return self.name
 
+    def __repr__(self):
+        repr_str = super(SpanBase, self).__repr__()
+        prefix, suffix = repr_str.split("(", 1)
+        augmented = "%s(name=%r, %s" % (prefix, self.name, suffix)
+        return augmented
+
 
 class Domain(SpanBase):
     feature_type = 'domain'
@@ -367,8 +373,12 @@ def parse(tree, error=False):
         seq = seq.replace("\n", '')
     names = [el.text for el in entry.findall(
         ".//up:protein/*/up:fullName", nsmap)]
-    recommended_name_tag = entry.find(
-        ".//up:protein/*/up:recommendedName", nsmap)
+    recommended_name_tags = entry.findall(
+        ".//up:protein/up:recommendedName", nsmap) + entry.findall(".//up:protein/*/up:recommendedName", nsmap)
+    if recommended_name_tags:
+        recommended_name_tag = recommended_name_tags[0]
+    else:
+        recommended_name_tag = None
     if recommended_name_tag is not None:
         if recommended_name_tag.text.strip():
             recommended_name = recommended_name_tag.text.strip()
