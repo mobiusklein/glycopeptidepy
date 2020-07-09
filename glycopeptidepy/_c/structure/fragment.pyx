@@ -382,9 +382,11 @@ cdef class PeptideFragment(FragmentBase):
             self.bare_mass, list(self.flanking_amino_acids),
             self.glycosylation.copy() if self.glycosylation is not None else None,
             self._chemical_shift.clone() if self._chemical_shift is not None else None,
-            self.composition.clone())
+            self.composition.clone() if self.composition is not None else None)
 
     def total_composition(self):
+        if self.composition is None:
+            raise ValueError("Composition data is missing")
         composition = self.composition.clone()
         chemical_shift = self.chemical_shift
         if chemical_shift is not None:

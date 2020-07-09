@@ -32,7 +32,7 @@ hexose_mass = MonosaccharideResidue.from_iupac_lite("Hex").mass()
 
 
 def make_fragment(self, key):
-    for group in self.get_fragments(key[0]):
+    for group in self.get_fragments(key[0], compute_compositions=True):
         for frag in group:
             if frag.name == key:
                 return frag

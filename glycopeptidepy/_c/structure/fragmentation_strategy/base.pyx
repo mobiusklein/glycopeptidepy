@@ -32,8 +32,9 @@ glycosylation_type_to_core = {
 
 @cython.freelist(1000)
 cdef class FragmentationStrategyBase(object):
-    def __init__(self, peptide, *args, **kwargs):
+    def __init__(self, peptide, compute_compositions=False, *args, **kwargs):
         self.peptide = peptide
+        self.compute_compositions = compute_compositions
         super(FragmentationStrategyBase, self).__init__(*args, **kwargs)
 
     def __repr__(self):

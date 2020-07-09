@@ -45,10 +45,11 @@ water_loss = ChemicalShift("-H2O", -Composition({"O": 1, "H": 2}))
 
 class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
-    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, include_neutral_losses=False):
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, include_neutral_losses=False, **kwargs):
         if chemical_shifts is None:
             chemical_shifts = dict()
-        super(PeptideFragmentationStrategyBase, self).__init__(peptide)
+        super(PeptideFragmentationStrategyBase,
+              self).__init__(peptide, **kwargs)
         self.series = IonSeries(series)
         self.chemical_shift_rules = defaultdict(list, chemical_shifts)
         self.max_chemical_shifts = max_chemical_shifts
@@ -60,7 +61,10 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
         # Null Values
         self.running_mass = 0
-        self.running_composition = Composition()
+        if self.compute_compositions:
+            self.running_composition = Composition()
+        else:
+            self.running_composition = None
         self.index = None
         self.size = len(self.peptide)
         self.modification_index = ModificationIndex()
@@ -68,7 +72,8 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.amino_acids_counter = _AccumulatorBag()
 
         self.running_mass += self.series.mass_shift
-        self.running_composition += self.series.composition_shift
+        if self.compute_compositions:
+            self.running_composition += self.series.composition_shift
         self._initialize_start_terminal()
 
     def _get_viable_chemical_shift_combinations(self):
@@ -93,11 +98,13 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     def _initialize_start_terminal(self):
         if self.direction > 0:
             self.running_mass += self.peptide.n_term.mass
-            self.running_composition += self.peptide.n_term.composition
+            if self.compute_compositions:
+                self.running_composition += self.peptide.n_term.composition
             self.index = -1
         elif self.direction < 0:
             self.running_mass += self.peptide.c_term.mass
-            self.running_composition += self.peptide.c_term.composition
+            if self.compute_compositions:
+                self.running_composition += self.peptide.c_term.composition
             self.index = len(self.peptide)
         else:
             raise ValueError("Unknown direction %r" % (self.series.direction,))
@@ -146,9 +153,10 @@ class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             else:
                 self.modification_index[mod] += 1
         self.amino_acids_counter[residue] += 1
-        composition = self.composition_of(residue, modifications)
         self.running_mass += residue.mass
-        self.running_composition += composition
+        if self.compute_compositions:
+            composition = self.composition_of(residue, modifications)
+            self.running_composition += composition
 
     def _build_fragments(self):
         fragments_from_site = []
@@ -194,9 +202,9 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         k.name: k.composition for k in modifications_of_interest.values()
     }
 
-    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, include_neutral_losses=False):
+    def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, include_neutral_losses=False, **kwargs):
         super(HCDFragmentationStrategy, self).__init__(
-            peptide, series, chemical_shifts, max_chemical_shifts, include_neutral_losses)
+            peptide, series, chemical_shifts, max_chemical_shifts, include_neutral_losses, **kwargs)
         self._last_modification_set = None
         self._last_modification_variants = None
 
@@ -229,14 +237,18 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
 
     def _get_modifications_of_interest(self, fragment):
         modifications = fragment.modification_dict
-        delta_composition = Composition()
+        if self.compute_compositions:
+            delta_composition = Composition()
+        else:
+            delta_composition = None
         other_modifications = ModificationIndex()
         modifications_of_interest = ModificationIndex()
 
         for k, v in modifications.items():
             if k.name in self.modifications_of_interest:
                 modifications_of_interest[k] = v
-                delta_composition += self.modification_compositions[k.name] * v
+                if self.compute_compositions:
+                    delta_composition += self.modification_compositions[k.name] * v
             else:
                 other_modifications[k] = v
 
@@ -263,10 +275,10 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             for k, v in varied_modifications.items():
                 if v != 0:
                     updated_modifications[k] += v
-
-            extra_composition = Composition()
-            for mod, mod_count in varied_modifications.items():
-                extra_composition += self.modification_compositions[mod.name] * mod_count
+            if self.compute_compositions:
+                extra_composition = Composition()
+                for mod, mod_count in varied_modifications.items():
+                    extra_composition += self.modification_compositions[mod.name] * mod_count
             variants.append((updated_modifications, extra_composition))
         return variants
 
@@ -275,7 +287,10 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
          delta_composition,
          other_modifications) = self._get_modifications_of_interest(fragment)
 
-        base_composition = fragment.composition - delta_composition
+        if self.compute_compositions:
+            base_composition = fragment.composition - delta_composition
+        else:
+            base_composition = None
 
         self._replace_cores(modifications_of_interest)
 
@@ -293,7 +308,7 @@ class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 PeptideFragment(
                     series, fragment.position, updated_modifications, fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
-                    composition=base_composition + extra_composition))
+                    composition=(base_composition + extra_composition) if self.compute_compositions else None))
         return fragments
 
 
@@ -394,9 +409,9 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
     glycan_fragment_ladder = "Y"
 
     def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, max_glycan_cleavages=None,
-                 include_neutral_losses=False):
+                 include_neutral_losses=False, **kwargs):
         super(EXDFragmentationStrategy, self).__init__(
-            peptide, series, chemical_shifts, max_chemical_shifts, include_neutral_losses)
+            peptide, series, chemical_shifts, max_chemical_shifts, include_neutral_losses, **kwargs)
         if max_glycan_cleavages is None:
             max_glycan_cleavages = self._guess_max_glycan_cleavages()
         self.max_glycan_cleavages = max_glycan_cleavages
@@ -466,21 +481,27 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
 
         (glycosylations,
          stripped_modifications) = self._strip_glycosylation_from_modification_dict(base.modification_dict)
-        base_composition = base.composition
-        for _glycosylation_position, glycosylation in glycosylations:
-            base_composition -= glycosylation.composition
+        if self.compute_compositions:
+            base_composition = base.composition
+            for _glycosylation_position, glycosylation in glycosylations:
+                base_composition -= glycosylation.composition
+        else:
+            base_composition = None
         bare_fragment = PeptideFragment(
             fragment.series, fragment.position, ModificationIndex(stripped_modifications),
             fragment.bare_mass,
             flanking_amino_acids=fragment.flanking_amino_acids,
-            composition=base_composition.clone())
+            composition=base_composition.clone() if self.compute_compositions else None)
 
         wrapped_fragment_combinations = self._get_glycan_loss_combinations(
             glycosylations, glycan_fragment_ladder)
 
         results = []
         for fragment_set in wrapped_fragment_combinations:
-            delta_composition = Composition()
+            if self.compute_compositions:
+                delta_composition = Composition()
+            else:
+                delta_composition = None
             new_modifications = ModificationIndex(stripped_modifications)
             for subfragment in fragment_set:
                 new_modifications[subfragment] += 1
@@ -489,7 +510,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                 bare_fragment.series, bare_fragment.position, new_modifications,
                 bare_fragment.bare_mass,
                 flanking_amino_acids=bare_fragment.flanking_amino_acids,
-                composition=bare_fragment.composition + delta_composition)
+                composition=bare_fragment.composition + delta_composition if self.compute_compositions else None)
             results.append(extended_fragment)
         results.append(fragment)
         return results

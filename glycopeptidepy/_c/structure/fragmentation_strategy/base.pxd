@@ -28,6 +28,7 @@ cdef:
 cdef class FragmentationStrategyBase(object):
     cdef:
         public _PeptideSequenceCore peptide
+        public bint compute_compositions
 
     cpdef CComposition peptide_composition(self)
     cpdef CComposition total_composition(self)
