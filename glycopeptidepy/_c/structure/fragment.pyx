@@ -307,7 +307,8 @@ cdef class PeptideFragment(FragmentBase):
     @staticmethod
     cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
                                  list flanking_amino_acids=None, dict glycosylation=None,
-                                 ChemicalShiftBase chemical_shift=None, CComposition composition=None):
+                                 ChemicalShiftBase chemical_shift=None, CComposition composition=None,
+                                 double* delta_mass=NULL):
         cdef PeptideFragment self = PeptideFragment.__new__(PeptideFragment)
         self.kind = kind
         self.position = position
@@ -322,7 +323,10 @@ cdef class PeptideFragment(FragmentBase):
         self.glycosylation = glycosylation
         self.set_chemical_shift(chemical_shift)
 
-        self._update_mass_with_modifications()
+        if delta_mass == NULL:
+            self._update_mass_with_modifications()
+        else:
+            self.mass += delta_mass[0]
 
         self._name = None
         self._hash = -1
@@ -368,10 +372,6 @@ cdef class PeptideFragment(FragmentBase):
                 break
             mod = <ModificationBase>pkey
             self.mass += mod.mass * count
-
-        chemical_shift = self.get_chemical_shift()
-        if chemical_shift is not None:
-            self.mass += chemical_shift.mass
 
     cpdef IonSeriesBase get_series(self):
         return self.kind

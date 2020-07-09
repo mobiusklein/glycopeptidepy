@@ -434,6 +434,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             PyObject *key
             PyObject *value
             ModificationBase mod
+            double delta_mass
             long count
         variants = []
         variant_modification_list = descending_combination_counter(interesting_modifications)
@@ -445,6 +446,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 extra_composition = CComposition._create(None)
             else:
                 extra_composition = None
+            delta_mass = 0.0
             pos = 0
             j = 0
             it = CountTableIterator._create(varied_modifications)
@@ -456,9 +458,10 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 mod = <ModificationBase>key
                 if count != 0:
                     updated_modifications.increment(mod, count)
+                    delta_mass += mod.mass * count
                     if self.compute_compositions:
                         extra_composition.add_from(mod.composition * count)
-            variants.append((updated_modifications, extra_composition))
+            variants.append((updated_modifications, extra_composition, delta_mass))
         return variants
 
     cpdef list partial_loss(self, PeptideFragment fragment):
@@ -470,6 +473,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             tuple variant_pair
             CountTable updated_modifications
             PyObject* ptemp
+            double delta_mass
             size_t i, n
         mod_config = self._get_modifications_of_interest(fragment)
         if self.compute_compositions:
@@ -523,18 +527,20 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             # add the current fragment's uninteresting modifications back on top of the
             # varied modifications here.
             updated_modifications._add_from(mod_config.other_modifications)
-            extra_composition = <CComposition>PyTuple_GetItem(variant_pair, 1)
             if self.compute_compositions:
+                extra_composition = <CComposition>PyTuple_GetItem(variant_pair, 1)
                 new_composition = base_composition.clone()
                 new_composition.add_from(extra_composition)
             else:
                 new_composition = None
+            delta_mass = <object>PyTuple_GetItem(variant_pair, 2)
             fragments.append(
                 PeptideFragment._create(
                     series, fragment.position, updated_modifications, fragment.bare_mass,
                     flanking_amino_acids=fragment.flanking_amino_acids,
                     glycosylation=None,
                     chemical_shift=None,
-                    composition=new_composition
+                    composition=new_composition,
+                    delta_mass=&delta_mass
                 ))
         return fragments

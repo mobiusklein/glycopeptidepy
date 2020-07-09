@@ -95,7 +95,7 @@ cdef class PeptideFragment(FragmentBase):
     @staticmethod
     cdef PeptideFragment _create(IonSeriesBase kind, int position, CountTable modification_dict, double mass,
                                  list flanking_amino_acids=*, dict glycosylation=*,
-                                 ChemicalShiftBase chemical_shift=*, CComposition composition=?)
+                                 ChemicalShiftBase chemical_shift=*, CComposition composition=?, double* delta_mass=?)
 
     cpdef clone(self)
 
