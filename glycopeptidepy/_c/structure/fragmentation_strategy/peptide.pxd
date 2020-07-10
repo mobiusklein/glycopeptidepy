@@ -62,14 +62,22 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 @cython.freelist(1000)
 cdef class ModificationConfiguration(object):
     cdef:
+        # the modifications of interest to HCDFragmentationStrategy
         public CountTable modifications_of_interest
+        # the modifications not of interest to HCDFragmentationStrategy
         public CountTable other_modifications
+        # the composition shift associated with the interesting modifications
         public CComposition delta_composition
+        # the set of all modifications, both interesting and not interesting, used as
+        # an identity key for this configuration
         public CountTable modification_set
+        # the mass shift associated with the other modifications
+        public double other_modifications_mass
 
     @staticmethod
     cdef ModificationConfiguration _create(CountTable modifications_of_interest, CountTable other_modifications,
-                                           CComposition delta_composition, CountTable modification_set)
+                                           CComposition delta_composition, CountTable modification_set,
+                                           double other_modifications_mass)
 
     cdef bint equal_to(self, ModificationConfiguration other)
 

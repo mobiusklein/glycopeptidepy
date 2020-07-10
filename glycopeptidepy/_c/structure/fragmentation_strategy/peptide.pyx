@@ -280,19 +280,22 @@ cdef class ModificationConfiguration(object):
 
     @staticmethod
     cdef ModificationConfiguration _create(CountTable modifications_of_interest, CountTable other_modifications,
-                                           CComposition delta_composition, CountTable modification_set):
+                                           CComposition delta_composition, CountTable modification_set,
+                                           double other_modifications_mass):
         cdef ModificationConfiguration inst = ModificationConfiguration.__new__(ModificationConfiguration)
         inst.modifications_of_interest = modifications_of_interest
         inst.other_modifications = other_modifications
         inst.delta_composition = delta_composition
         inst.modification_set = modification_set
+        inst.other_modifications_mass = other_modifications_mass
         return inst
 
-    def __init__(self, modifications_of_interest, other_modifications, delta_composition, modification_set):
+    def __init__(self, modifications_of_interest, other_modifications, delta_composition, modification_set, other_modifications_mass):
         self.modifications_of_interest = modifications_of_interest
         self.other_modifications = other_modifications
         self.delta_composition = delta_composition
         self.modification_set = modification_set
+        self.other_modifications_mass = other_modifications_mass
 
     def __iter__(self):
         yield self.modifications_of_interest
@@ -380,6 +383,8 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             PyObject *key
             ModificationBase mod
             long count
+            double other_modifications_mass
+        other_modifications_mass = 0
         if self._last_modification_set is not None:
             if self._last_modification_set.modification_set == fragment.modification_dict:
                 return self._last_modification_set
@@ -402,9 +407,10 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                     delta_composition.add_from(mod.composition * count)
             else:
                 other_modifications.setitem(mod, count)
+                other_modifications_mass += mod.mass * count
         result = ModificationConfiguration._create(
             modifications_of_interest, other_modifications,
-            delta_composition, modifications)
+            delta_composition, modifications, other_modifications_mass)
         return result
 
     cpdef _replace_cores(self, CountTable modifications_of_interest):
@@ -533,7 +539,7 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 new_composition.add_from(extra_composition)
             else:
                 new_composition = None
-            delta_mass = <object>PyTuple_GetItem(variant_pair, 2)
+            delta_mass = <object>PyTuple_GetItem(variant_pair, 2) + mod_config.other_modifications_mass
             fragments.append(
                 PeptideFragment._create(
                     series, fragment.position, updated_modifications, fragment.bare_mass,

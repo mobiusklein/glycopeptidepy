@@ -323,11 +323,13 @@ cdef class PeptideFragment(FragmentBase):
         self.glycosylation = glycosylation
         self.set_chemical_shift(chemical_shift)
 
+        # self._update_mass_with_modifications()
         if delta_mass == NULL:
             self._update_mass_with_modifications()
         else:
             self.mass += delta_mass[0]
-
+        # if delta_mass != NULL:
+        #     assert abs((self.mass - self.bare_mass) - delta_mass[0]) < 1e-3, ((self.mass - self.bare_mass), delta_mass[0])
         self._name = None
         self._hash = -1
         return self
