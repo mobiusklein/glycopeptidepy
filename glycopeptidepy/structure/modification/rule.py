@@ -297,6 +297,11 @@ class ModificationRule(ModificationRuleBase):
 
         self.neutral_losses = neutral_losses
 
+    def clear_targets(self):
+        self._n_term_targets = None
+        self._c_term_targets = None
+        self.targets = set()
+
     def _configure_targets(self, amino_acid_specificity):
         self._n_term_targets = None
         self._c_term_targets = None

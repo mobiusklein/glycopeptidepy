@@ -383,6 +383,7 @@ class RestrictedModificationTable(ModificationTable):
             mod = deepcopy(self[name])
             try:
                 target = extract_targets_from_string(title_cleaner.search(name).groupdict()["target"])
+                mod.clear_targets()
                 mod.targets = {target}
             except Exception:
                 pass
