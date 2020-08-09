@@ -74,6 +74,9 @@ class Keyword(str):
         obj.id = idstr
         return obj
 
+    def __reduce__(self):
+        return self.__class__, (str(self), self.id)
+
 
 class PeptideBase(UniProtFeatureBase):
 
