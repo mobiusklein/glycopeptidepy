@@ -355,11 +355,11 @@ cpdef sequence_tokenizer(object sequence, object implicit_n_term=None, object im
     if PY_MAJOR_VERSION > 2:
         if isinstance(sequence, bytes):
             return _sequence_tokenizer[str](
-                (<bytes>sequence).decode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
+                (<bytes>sequence).decode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function)
     else:
         if isinstance(sequence, unicode):
             return _sequence_tokenizer[str](
-                (<unicode>sequence).encode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function) 
+                (<unicode>sequence).encode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function)
     return _sequence_tokenizer[object](sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
 
 
@@ -376,9 +376,11 @@ cpdef parse_simple(str sequence):
     csequence = PyStr_AsString(sequence)
     for i in range(n):
         next_char = csequence[i]
+        if next_char == '(' or next_char == '{':
+            raise ValueError("Cannot parse a modified peptide sequence with parse_simple!")
         current_aa = PyStr_FromStringAndSize(&next_char, 1)
         chunk = [current_aa, junk]
         Py_INCREF(chunk)
         PyList_SET_ITEM(chunks, i, chunk)
-    
+
     return chunks, [], None, structure_constants.N_TERM_DEFAULT, structure_constants.C_TERM_DEFAULT
