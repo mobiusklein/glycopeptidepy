@@ -515,6 +515,15 @@ class FastaFileReader(object):
                 self._generator = (self[k] for k in self.index)
         return next(self._generator)
 
+    def reset(self):
+        """Restart the iterator from the beginning of the sequence list.
+
+        Attempts to seek to the beginning of the file. If the input file
+        is not seekable, this will throw an exception.
+        """
+        self.handle.seek(0)
+        self._generator = None
+
     def next(self):
         return self.__next__()
 
