@@ -479,6 +479,12 @@ class FastaFileReader(object):
     def index(self):
         return self._index
 
+    def __len__(self):
+        if self.index is not None:
+            return len(self.index)
+        else:
+            raise TypeError("Cannot get the length of an un-indexed FASTA")
+
     def __getitem__(self, key):
         if self.index is not None:
             try:
