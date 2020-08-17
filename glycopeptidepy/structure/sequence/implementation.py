@@ -44,7 +44,8 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         :class:`PeptideSequence`
         """
         seq = cls()
-        iterable = list(iterable)
+        if not isinstance(iterable, list):
+            iterable = list(iterable)
         if text is None:
             try:
                 if isinstance(iterable[0][0], basestring):
@@ -54,10 +55,15 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         if text:
             seq._init_from_parsed_string(iterable, glycan_composition, n_term, c_term)
         else:
+            try:
+                if not isinstance(iterable[0], SequencePosition):
+                    # Coerce all pairs in the input to :class:`SequencePosition` because :meth:`_init_from_components`
+                    # assumes that its input is a strictly typed list.
+                    iterable = list(map(SequencePosition, iterable))
+            except (ValueError, AttributeError, TypeError):
+                iterable = list(map(SequencePosition, iterable))
             seq._init_from_components(
-                # Coerce all pairs in the input to :class:`SequencePosition` because :meth:`_init_from_components`
-                # assumes that its input is a strictly typed list.
-                list(map(SequencePosition, iterable)),
+                iterable,
                 glycan_composition, n_term, c_term, **kwargs)
         return seq
 
