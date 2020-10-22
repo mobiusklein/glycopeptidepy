@@ -4,15 +4,16 @@ from itertools import product, combinations, combinations_with_replacement
 from glypy.structure.glycan_composition import (
     FrozenMonosaccharideResidue,
     FrozenGlycanComposition,
-    MonosaccharideResidue)
+    MonosaccharideResidue,
+    SubstituentResidue,
+    HashableGlycanComposition)
 
 from glycopeptidepy.utils.collectiontools import descending_combination_counter, _AccumulatorBag
 from glycopeptidepy.structure.composition import (
     Composition)
 
 from glycopeptidepy.structure.glycan import (
-    GlycosylationType,
-    HashableGlycanComposition)
+    GlycosylationType,)
 
 from glycopeptidepy.structure.fragment import (
     IonSeries,
@@ -29,19 +30,43 @@ from six.moves import range
 
 oxonium_ion_series = IonSeries.oxonium_ion
 
+_substituent_residue_cache = {}
+labile_substituents = ('sulfate', 'phosphate')
+
 
 def remove_labile_modifications(residue):
     has_copied = False
+    labile_substituents_removed = None
     try:
         for position, substituent in residue.substituents():
-            if substituent.name in ("sulfate", "phosphate"):
+            if substituent.name in labile_substituents:
+                if labile_substituents_removed is None:
+                    labile_substituents_removed = []
+                try:
+                    substituent_residue = _substituent_residue_cache[substituent.name]
+                except KeyError:
+                    substituent_residue = _substituent_residue_cache[substituent.name] = SubstituentResidue(substituent.name)
+                labile_substituents_removed.append(substituent_residue)
                 if not has_copied:
                     residue = residue.clone(
                         monosaccharide_type=MonosaccharideResidue)
                 residue.drop_substituent(position, substituent)
     except AttributeError:
         pass
-    return residue
+    return residue, labile_substituents_removed
+
+
+def separate_labile_modifications(glycan_composition):
+    labile_modifications = []
+    new_counts = HashableGlycanComposition()
+    for residue, count in glycan_composition.items():
+        new_residue, separated_modifications = remove_labile_modifications(residue)
+        new_counts[new_residue] += count
+        if separated_modifications:
+            for mod in separated_modifications:
+                new_counts[mod] += 1
+            labile_modifications.extend(labile_modifications)
+    return new_counts, labile_modifications
 
 
 class _GlycanFragmentingStrategyBase(object):
@@ -864,6 +889,34 @@ try:
 except ImportError:
     _has_c = False
 
+
+_StubGlycopeptideStrategy = StubGlycopeptideStrategy
+
+
+class LabileAwareStubGlycopeptideStrategy(_StubGlycopeptideStrategy):
+    def __init__(self, peptide, extended=True, use_query=False, extended_fucosylation=False, detatch_substituents=False, **kwargs):
+        self.detatch_substituents = detatch_substituents
+        super(LabileAwareStubGlycopeptideStrategy,
+              self).__init__(peptide, use_query=use_query, extended=extended, extended_fucosylation=extended_fucosylation, **kwargs)
+
+    def modified_increment(self, modified, shift):
+        modified = modified.copy()
+        modified['key'] = modified['key'].copy()
+        modified['mass'] += shift.mass()
+        modified['composition'] = modified[
+            'composition'] + shift.total_composition()
+        modified['key'][shift] = 1
+        return modified
+
+    def glycan_composition(self):
+        gc = super(LabileAwareStubGlycopeptideStrategy, self).glycan_composition()
+        if self.detatch_substituents:
+            gc, self.labile_modifications = separate_labile_modifications(gc)
+            return gc
+        else:
+            return gc
+
+
 class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
 
     def __init__(self, peptide, use_query=False, oxonium=True, all_series=False, allow_ambiguous=False,
@@ -883,9 +936,11 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
     def _oxonium_fragments_get_monosaccharide_list(self, glycan):
         monosaccharides = dict(glycan)
         for mono, count in list(monosaccharides.items()):
-            dissociated = remove_labile_modifications(mono)
+            dissociated, lost_mods = remove_labile_modifications(mono)
             if dissociated != mono:
                 monosaccharides[dissociated] = count
+                for mod in lost_mods:
+                    pass
         return monosaccharides
 
     def _glycan_structural_dissociation(self, max_cleavages=2):
