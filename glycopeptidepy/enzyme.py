@@ -238,6 +238,7 @@ enzyme_rules = {
     'factor xa': '(?<=[AFGILTVM][DE]G)R',
     'formic acid': 'D',
     'glutamyl endopeptidase': 'E',
+    'glu-c': 'E',
     'granzyme b': '(?<=IEP)D',
     'hydroxylamine': 'N(?=G)',
     'iodosobenzoic acid': 'W',
@@ -269,6 +270,12 @@ enzyme_rules = {
 
 
 expasy_rules = enzyme_rules
+
+
+def register_enzyme(name, pattern):
+    if name in enzyme_rules and enzyme_rules[name] != pattern:
+        warnings.warn("Overriding {0} with rule {1} with {2}".format(name, enzyme_rules[name], pattern))
+    enzyme_rules[name] = pattern
 
 
 def merge_enzyme_rules(enzyme_patterns):
