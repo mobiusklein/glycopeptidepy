@@ -364,6 +364,9 @@ class ModificationTable(ModificationTableBase, ModificationSource):
 
 
 class RestrictedModificationTable(ModificationTable):
+
+    other_modifications = {}
+
     def __init__(self, rules=None, constant_modifications=None, variable_modifications=None):
         super(RestrictedModificationTable, self).__init__(rules)
         if constant_modifications is None:
