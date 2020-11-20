@@ -375,7 +375,8 @@ def parse(tree, error=False):
     if seq is not None:
         seq = seq.replace("\n", '')
     names = [el.text for el in entry.findall(
-        ".//up:protein/*/up:fullName", nsmap)]
+        ".//up:protein/*/up:fullName", nsmap)] + [el.text for el in entry.findall(
+            ".//up:protein/*/up:shortName", nsmap)]
     recommended_name_tags = entry.findall(
         ".//up:protein/up:recommendedName", nsmap) + entry.findall(".//up:protein/*/up:recommendedName", nsmap)
     if recommended_name_tags:
@@ -386,7 +387,7 @@ def parse(tree, error=False):
         if recommended_name_tag.text.strip():
             recommended_name = recommended_name_tag.text.strip()
         else:
-            recommended_name = ' '.join(c.text for c in recommended_name_tag)
+            recommended_name = (recommended_name_tag[0].text)
     else:
         try:
             recommended_name = names[0]
