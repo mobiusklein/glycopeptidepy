@@ -3,8 +3,8 @@ cimport cython
 from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
 from cpython.float cimport PyFloat_AsDouble
-from cpython.tuple cimport PyTuple_GetItem, PyTuple_Size
-from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New
+from cpython.tuple cimport PyTuple_GetItem, PyTuple_Size, PyTuple_GET_ITEM, PyTuple_GET_SIZE
+from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE
 from cpython.int cimport PyInt_AsLong
 from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
@@ -179,7 +179,9 @@ cdef class GlycanCompositionFragment(object):
 
     cpdef GlycanCompositionFragment copy(self):
         return GlycanCompositionFragment._create(
-            self.mass, self.composition.clone(), self.key.copy(), self.is_extended)
+            self.mass,
+            self.composition.clone() if self.composition is not None else None, self.key.copy(),
+            self.is_extended)
 
 
 cdef dict hexnac_hex_composition_cache = dict()
@@ -201,17 +203,6 @@ cdef CComposition hexnac_hex_composition(long hexnac, long hexose):
     else:
         result = <CComposition>ptemp
         return result.clone()
-
-
-cdef class StubFragmentGlycanCombination(object):
-    cdef:
-        public double mass
-        public CComposition composition
-        public bint is_extended
-        public int n_positions
-        public object glycosylation
-        public str glycosylation_key
-        public bint is_glycosylated
 
 
 cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
@@ -262,10 +253,6 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 if ov < v:
                     invalid = True
                     break
-            # for key, value in aggregate_glycosylation.items():
-            #     if glycan[key] < value:
-            #         invalid = True
-            #         break
         return invalid
 
     cpdef GlycanCompositionFragment fucosylate_increment(self, GlycanCompositionFragment shift):
@@ -488,57 +475,71 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                                     core_shifts.append(xylosylated)
         return core_shifts
 
-    def n_glycan_stub_fragments(self):
+    cpdef list _combinate_sites(self, list per_site_shifts, object glycan):
         cdef:
-            int core_count
-            list per_site_shifts
-            GlycanCompositionFragment site
-            CComposition base_composition, composition
-            double base_mass, mass
-            set seen
-            size_t i, n_positions
-            CountTable aggregate_glycosylation
-            bint is_extended, is_glycosylated
-            str name_key, name
-            object glycosylation
+            list result
+            list combos
+            Py_ssize_t i, n, j, m
             tuple positions
-            PyObject* ptemp
+            bint is_extended
+            CComposition composition
+            GlycanCompositionFragment intermediate, site
+            CountTable aggregate_glycosylation
+            object glycosylation
+            set seen
+            int core_count
+            double total_mass
+            double acc_mass
 
-        glycan = self.glycan_composition()
-        self._use_query = self._guess_query_mode(glycan)
-        core_count = self.count_glycosylation_type(GlycosylationType_n_linked)
-        per_site_shifts = []
-        base_composition = self.peptide_composition()
-        base_mass = base_composition.calc_mass()
+        result = []
         seen = set()
-        for i in range(core_count):
-            core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
-            per_site_shifts.append(core_shifts)
-        for _positions in product(*per_site_shifts):
-            positions = <tuple>_positions
-            mass = base_mass
-            composition = base_composition.clone()
-            is_extended = False
-            n_positions = PyTuple_Size(positions)
-            if n_positions > 1:
-                aggregate_glycosylation = CountTable._create()
+        core_count = PyList_Size(per_site_shifts)
+        combos = list(product(*per_site_shifts))
+        n = PyList_Size(combos)
+        total_mass = PyFloat_AsDouble(glycan.mass())
+        for i in range(n):
+            positions = <tuple>PyList_GET_ITEM(combos, i)
+            aggregate_glycosylation = None
+            composition = None
+            if core_count == 1:
+                intermediate = <GlycanCompositionFragment>PyTuple_GET_ITEM(positions, 0)
+                aggregate_glycosylation = intermediate.key
             else:
-                aggregate_glycosylation = None
-            for i in range(n_positions):
-                site = <GlycanCompositionFragment>PyTuple_GetItem(positions, i)
-                mass += site.mass
-                if n_positions > 1:
-                    aggregate_glycosylation._add_from(site.key)
-                else:
-                    aggregate_glycosylation = site.key
-                composition.add_from(site.composition)
-                is_extended |= site.is_extended
-            is_glycosylated = (mass != base_mass)
-            if n_positions > 1:
-                invalid = self._validate_glycan_composition(aggregate_glycosylation, glycan)
+                intermediate = <GlycanCompositionFragment>PyTuple_GET_ITEM(positions, 0)
+                acc_mass = intermediate.mass
+                m = core_count
+
+                # A quick pre-scan to skip all combinations that exceed the mass of the total
+                for j in range(1, m):
+                    site = <GlycanCompositionFragment>PyTuple_GET_ITEM(positions, j)
+                    acc_mass += site.mass
+                invalid = total_mass < acc_mass
                 if invalid:
                     continue
-            glycosylation = _prepare_glycan_composition_from_mapping(aggregate_glycosylation)
+
+                # Now do the expensive accumulation
+                aggregate_glycosylation = intermediate.key.copy()
+                if self.compute_compositions:
+                    composition = intermediate.composition.copy()
+                else:
+                    composition = None
+                is_extended = intermediate.is_extended
+                for j in range(1, m):
+                    site = <GlycanCompositionFragment>PyTuple_GET_ITEM(positions, j)
+                    aggregate_glycosylation._add_from(site.key)
+                    if self.compute_compositions:
+                        composition.add_from(site.composition)
+                    is_extended |= site.is_extended
+                invalid = self._validate_glycan_composition(
+                    aggregate_glycosylation, glycan)
+                if invalid:
+                    continue
+
+                intermediate = GlycanCompositionFragment._create(
+                    acc_mass, composition, aggregate_glycosylation, is_extended)
+
+            glycosylation = _prepare_glycan_composition_from_mapping(
+                aggregate_glycosylation)
             name_key = str(glycosylation)
             # May not need to do this second round of building.
             ptemp = PyDict_GetItem(_composition_name_cache, name_key)
@@ -547,19 +548,58 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 PyDict_SetItem(_composition_name_cache, name_key, name)
             else:
                 name = <str>ptemp
-
             if name in seen:
                 continue
             seen.add(name)
+            result.append((intermediate, name, glycosylation))
+        return result
+
+    def n_glycan_stub_fragments(self):
+        cdef:
+            int core_count
+            list per_site_shifts
+            GlycanCompositionFragment site
+            CComposition base_composition, composition
+            double base_mass
+            size_t i
+            size_t n_combos
+            bint is_extended, is_glycosylated
+            str name_key, name
+            object glycosylation
+
+            list combos
+            tuple result
+
+        glycan = self.glycan_composition()
+        self._use_query = self._guess_query_mode(glycan)
+        core_count = self.count_glycosylation_type(GlycosylationType_n_linked)
+        per_site_shifts = []
+        base_composition = self.peptide_composition()
+        base_mass = base_composition.calc_mass()
+        for i in range(core_count):
+            core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
+            per_site_shifts.append(core_shifts)
+        combos = self._combinate_sites(per_site_shifts, glycan)
+        n_combos = PyList_Size(combos)
+        for i in range(n_combos):
+            result = <tuple>PyList_GetItem(combos, i)
+            site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
+            name = <str>PyTuple_GetItem(result, 1)
+            glycosylation = <object>PyTuple_GetItem(result, 2)
+            is_glycosylated = (site.mass != 0)
+            composition = None
+            if self.compute_compositions:
+                composition = base_composition.clone()
+                composition.add_from(site.composition)
             yield StubFragment._create(
                 name=name,
-                mass=mass,
+                mass=base_mass + site.mass,
                 composition=composition,
                 is_glycosylated=is_glycosylated,
                 kind=IonSeries_stub_glycopeptide,
                 chemical_shift=None,
                 glycosylation=glycosylation,
-                is_extended=is_extended)
+                is_extended=site.is_extended)
 
     def o_glycan_stub_fragments(self):
         cdef:
@@ -585,40 +625,27 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         for i in range(core_count):
             core_shifts = self.o_glycan_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
-        seen = set()
-        for _positions in product(*per_site_shifts):
-            positions = <tuple>_positions
-            n_positions = PyTuple_Size(positions)
-            aggregate_glycosylation = CountTable._create()
-            mass = base_mass
-            composition = base_composition.clone()
-            is_extended = False
-            for i in range(n_positions):
-                site = <GlycanCompositionFragment>PyTuple_GetItem(positions, i)
-                mass += site.mass
-                aggregate_glycosylation._add_from(site.key)
+        combos = self._combinate_sites(per_site_shifts, glycan)
+        n_combos = PyList_Size(combos)
+        for i in range(n_combos):
+            result = <tuple>PyList_GetItem(combos, i)
+            site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
+            name = <str>PyTuple_GetItem(result, 1)
+            glycosylation = <object>PyTuple_GetItem(result, 2)
+            is_glycosylated = (site.mass != 0)
+            composition = None
+            if self.compute_compositions:
+                composition = base_composition.clone()
                 composition.add_from(site.composition)
-                is_extended |= site.is_extended
-            is_glycosylated = (mass != base_mass)
-            if n_positions > 1:
-                invalid = self._validate_glycan_composition(aggregate_glycosylation, glycan)
-                if invalid:
-                    continue
-            name = build_name_from_composition(aggregate_glycosylation)
-            if name in seen:
-                continue
-            seen.add(name)
-            glycosylation = _prepare_glycan_composition_from_mapping(
-                aggregate_glycosylation)
             yield StubFragment._create(
                 name=name,
-                mass=mass,
+                mass=base_mass + site.mass,
                 composition=composition,
-                chemical_shift=None,
                 is_glycosylated=is_glycosylated,
-                kind=IonSeries.stub_glycopeptide,
+                kind=IonSeries_stub_glycopeptide,
+                chemical_shift=None,
                 glycosylation=glycosylation,
-                is_extended=is_extended)
+                is_extended=site.is_extended)
 
     cpdef list o_glycan_composition_fragments(self, glycan, long core_count=1, long iteration_count=0):
         cdef:
@@ -748,38 +775,27 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         for i in range(core_count):
             core_shifts = self.gag_linker_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
-        seen = set()
-        for _positions in product(*per_site_shifts):
-            positions = <tuple>_positions
-            aggregate_glycosylation = CountTable._create()
-            mass = base_mass
-            composition = base_composition.clone()
-            n_positions = PyTuple_Size(positions)
-            for i in range(n_positions):
-                site = <GlycanCompositionFragment>PyTuple_GetItem(positions, i)
-                mass += site.mass
-                aggregate_glycosylation._add_from(site.key)
+        combos = self._combinate_sites(per_site_shifts, glycan)
+        n_combos = PyList_Size(combos)
+        for i in range(n_combos):
+            result = <tuple>PyList_GetItem(combos, i)
+            site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
+            name = <str>PyTuple_GetItem(result, 1)
+            glycosylation = <object>PyTuple_GetItem(result, 2)
+            is_glycosylated = (site.mass != 0)
+            composition = None
+            if self.compute_compositions:
+                composition = base_composition.clone()
                 composition.add_from(site.composition)
-            is_glycosylated = (mass != base_mass)
-            if n_positions > 1:
-                invalid = self._validate_glycan_composition(aggregate_glycosylation, glycan)
-                if invalid:
-                    continue
-            name = build_name_from_composition(aggregate_glycosylation)
-            if name in seen:
-                continue
-            seen.add(name)
-            glycosylation = _prepare_glycan_composition_from_mapping(
-                aggregate_glycosylation)
             yield StubFragment._create(
                 name=name,
-                mass=mass,
+                mass=base_mass + site.mass,
                 composition=composition,
-                chemical_shift=None,
                 is_glycosylated=is_glycosylated,
-                kind=IonSeries.stub_glycopeptide,
+                kind=IonSeries_stub_glycopeptide,
+                chemical_shift=None,
                 glycosylation=glycosylation,
-                is_extended=False)
+                is_extended=site.is_extended)
 
     cpdef list gag_linker_composition_fragments(self, glycan, long core_count=1, long iteration_count=0):
         cdef:
