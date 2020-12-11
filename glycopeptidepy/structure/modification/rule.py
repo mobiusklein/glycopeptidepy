@@ -643,10 +643,9 @@ class AminoAcidSubstitution(AnonymousModificationRule):
         if not isinstance(substitution_residue, AminoAcidResidue):
             substitution_residue = AminoAcidResidue(substitution_residue)
         self.common_name = "{0}->{1}".format(original_residue, substitution_residue)
-        self.mass = 0.0
         self.original = (original_residue)
         self.substitution = (substitution_residue)
-        self.delta = (self.substitution).mass - (self.original).mass
+        self.mass = (self.substitution).mass - (self.original).mass
         self.name = self.common_name
         self.names = {self.common_name}
         self.options = kwargs
@@ -657,8 +656,45 @@ class AminoAcidSubstitution(AnonymousModificationRule):
     def serialize(self):
         return "@" + self.name
 
+    @property
+    def neutral_losses(self):
+        return []
+
     def __repr__(self):
-        return "{name}:{delta}".format(name=self.name, delta=self.delta)
+        return "{name}:{delta}".format(name=self.name, delta=self.mass)
+
+    def __reduce__(self):
+        return _ModificationRule_reconstructor, (self.__class__, ), self.__getstate__()
+
+    def __getstate__(self):
+        state = {}
+        state['mass'] = self.mass
+        state['composition'] = self.composition
+        state['options'] = self.options
+        state['categories'] = self.categories
+        state['names'] = self.names
+        state['name'] = self.name
+        state['common_name'] = self.common_name
+        state['original'] = self.original
+        state['substitution'] = self.substitution
+        return state
+
+    def __setstate__(self, state):
+        self.mass = state['mass']
+        self.composition = state['composition']
+        self.options = state['options']
+        self.categories = state['categories']
+        self.names = state['names']
+        # defend against outdated pickles here
+        self.name = state.get(
+            'name', state.get(
+                'preferred_name', self._get_preferred_name(
+                    state.get('names', []))))
+        self.common_name = state['common_name']
+        self.original = state['original']
+        self.substitution = state['substitution']
+        self._hash = hash(self.name)
+
 
 
 TMT10plex = [
