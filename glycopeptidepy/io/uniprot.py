@@ -264,10 +264,14 @@ class SequenceVariant(UniProtFeatureBase):
 
     @classmethod
     def fromxml(cls, feature):
-        position = int(feature.find(
-            ".//up:position", nsmap).attrib['position']) - 1
-        original = feature.find(".//up:original", nsmap).text
-        variation = feature.find(".//up:variation", nsmap).text
+        position = feature.find(".//up:position", nsmap)
+        if position is None:
+            # Deletion mutations not supported
+            return None
+        else:
+            position = int(position.attrib['position']) - 1
+            original = feature.find(".//up:original", nsmap).text
+            variation = feature.find(".//up:variation", nsmap).text
         return cls(position, original, variation)
 
     @property
