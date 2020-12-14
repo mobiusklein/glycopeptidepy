@@ -195,3 +195,15 @@ class GlycosylatedSequenceMixin(object):
             strategy = StubGlycopeptideStrategy
         return strategy(
             self, extended, extended_fucosylation=extended_fucosylation, **kwargs)
+
+    def is_multiply_glycosylated(self):
+        return len(self.glycosylation_manager) > 1
+
+    def is_o_glycosylated(self):
+        return self.glycosylation_manager.count_glycosylation_type(GlycosylationType.o_linked)
+
+    def is_n_glycosylated(self):
+        return self.glycosylation_manager.count_glycosylation_type(GlycosylationType.n_linked)
+
+    def is_gag_linker_glycosylated(self):
+        return self.glycosylation_manager.count_glycosylation_type(GlycosylationType.glycosaminoglycan)
