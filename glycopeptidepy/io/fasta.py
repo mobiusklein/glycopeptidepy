@@ -646,6 +646,12 @@ class FastaFileWriter(object):
     def __init__(self, handle, encoding='utf8'):
         self.handle = handle
         self.encoding = encoding
+        try:
+            if 'b' not in self.handle.mode:
+                raise ValueError(
+                    "FASTA files writer must be opened in binary mode! Make sure to open the file with 'wb'.")
+        except (AttributeError, TypeError):
+            pass
 
     def write(self, defline, sequence):
         if isinstance(defline, FastaHeader):
