@@ -11,8 +11,10 @@ cdef class GlycanCompositionFragment(object):
         public CComposition composition
         public CountTable key
         public bint is_extended
+        public Py_hash_t _hash_key
 
     cpdef GlycanCompositionFragment copy(self)
+    cpdef _get_glycan_composition(self)
 
     @staticmethod
     cdef GlycanCompositionFragment _create(double mass, CComposition composition, CountTable key, bint is_extended)
@@ -35,6 +37,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
 
     cpdef GlycanCompositionFragment fucosylate_increment(self, GlycanCompositionFragment shift)
     cpdef GlycanCompositionFragment xylosylate_increment(self, GlycanCompositionFragment shift)
+    cpdef GlycanCompositionFragment modified_increment(self, GlycanCompositionFragment base, object shift)
     cpdef list fucosylate_extended(self, GlycanCompositionFragment shift, long fucose_count)
     cpdef bint _validate_glycan_composition(self, CountTable aggregate_glycosylation, glycan)
     cpdef list _combinate_sites(self, list per_site_shifts, object glycan)

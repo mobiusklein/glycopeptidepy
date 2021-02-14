@@ -128,8 +128,8 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
     cpdef long count_glycosylation_type(self, glycotype):
         return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
 
+
 @cython.freelist(10000)
-@cython.final
 cdef class GlycanCompositionFragment(object):
 
     def __init__(self, mass, composition, key, is_extended=False):
@@ -137,6 +137,18 @@ cdef class GlycanCompositionFragment(object):
         self.composition = composition
         self.key = key
         self.is_extended = is_extended
+        self._hash_key = -1
+
+    def __hash__(self):
+        if self._hash_key == -1:
+            self._hash_key = hash(self._get_glycan_composition())
+        return self._hash_key
+
+    cpdef _get_glycan_composition(self):
+        return _prepare_glycan_composition_from_mapping(self.key)
+
+    def __eq__(self, other):
+        return self.key == other.key and self.is_extended == other.is_extended
 
     @staticmethod
     cdef GlycanCompositionFragment _create(double mass, CComposition composition, CountTable key, bint is_extended):
@@ -147,6 +159,7 @@ cdef class GlycanCompositionFragment(object):
         self.composition = composition
         self.key = key
         self.is_extended = is_extended
+        self._hash_key = -1
         return self
 
     def __getitem__(self, key):
@@ -178,10 +191,14 @@ cdef class GlycanCompositionFragment(object):
         return template.format(self=self)
 
     cpdef GlycanCompositionFragment copy(self):
-        return GlycanCompositionFragment._create(
+        cdef:
+            GlycanCompositionFragment inst
+        inst = GlycanCompositionFragment._create(
             self.mass,
             self.composition.clone() if self.composition is not None else None, self.key.copy(),
             self.is_extended)
+        inst._hash_key = self._hash_key
+        return inst
 
 
 cdef dict hexnac_hex_composition_cache = dict()
@@ -260,7 +277,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             GlycanCompositionFragment fucosylated
         fucosylated = shift.copy()
         fucosylated.mass += _FUC_mass
-        fucosylated.composition.add_from(_FUC_composition)
+        if self.compute_compositions:
+            fucosylated.composition.add_from(_FUC_composition)
         fucosylated.key.increment(_FUC, 1)
         return fucosylated
 
@@ -269,7 +287,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             GlycanCompositionFragment xylosylated
         xylosylated = shift.copy()
         xylosylated.mass += _XYL_mass
-        xylosylated.composition.add_from(_XYL_composition)
+        if self.compute_compositions:
+            xylosylated.composition.add_from(_XYL_composition)
         xylosylated.key.increment(_XYL, 1)
         return xylosylated
 
@@ -282,10 +301,22 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         for i in range(1, fucose_count + 1):
             fucosylated = shift.copy()
             fucosylated.mass += _FUC_mass * i
-            fucosylated.composition.add_from(<CComposition>(i * _FUC_composition))
+            if self.compute_compositions:
+                fucosylated.composition.add_from(<CComposition>(i * _FUC_composition))
             fucosylated.key.increment(_FUC, i)
             result[i - 1] = fucosylated
         return result
+
+    cpdef GlycanCompositionFragment modified_increment(self, GlycanCompositionFragment base, object shift):
+        cdef:
+            GlycanCompositionFragment modified
+        modified = base.copy()
+
+        modified.mass += shift.mass()
+        if self.compute_compositions:
+            modified.composition.add_from(shift.total_composition())
+        modified.key.increment(shift, 1)
+        return modified
 
     cpdef list n_glycan_composition_fragments(self, object glycan, int core_count=1, int  iteration_count=0):
         """Generate theoretical N-glycan Y fragment compositions containing the core motif
@@ -408,7 +439,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
 
                     # After the core motif has been exhausted, speculatively add
                     # on the remaining core monosaccharides sequentially until
-                    # exhausted.
+                    # exhausted. This doesn't allow for one missing alpha-mannose while still
+                    # showing an extension on the other.
                     if hexose_count == 3 and hexnac_in_aggregate >= 2 * core_count and self.extended:
                         for extra_hexnac_count in range(0, hexnac_in_aggregate - hexnac_count + 1):
                             if extra_hexnac_count + hexnac_count > hexnac_in_aggregate:

@@ -259,13 +259,14 @@ _AHEX = FrozenMonosaccharideResidue.from_iupac_lite("aHex")
 
 
 class GlycanCompositionFragment(object):
-    __slots__ = ("mass", "composition", "key", "is_extended")
+    __slots__ = ("mass", "composition", "key", "is_extended", "_hash_key")
 
     def __init__(self, mass, composition, key, is_extended=False):
         self.mass = mass
         self.composition = composition
         self.key = key
         self.is_extended = is_extended
+        self._hash_key = -1
 
     def __getitem__(self, key):
         if key == "mass":
@@ -278,6 +279,17 @@ class GlycanCompositionFragment(object):
             return self.is_extended
         else:
             raise KeyError(key)
+
+    def __hash__(self):
+        if self._hash_key == -1:
+            self._hash_key = hash(self._get_glycan_composition())
+        return self._hash_key
+
+    def _get_glycan_composition(self):
+        return _prepare_glycan_composition_from_mapping(self.key)
+
+    def __eq__(self, other):
+        return self.key == other.key and self.is_extended == other.is_extended
 
 
 class _CompositionTree(object):
@@ -340,8 +352,9 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         fucosylated = shift.copy()
         fucosylated['key'] = fucosylated['key'].copy()
         fucosylated['mass'] += self.fucose.mass()
-        fucosylated['composition'] = fucosylated[
-            'composition'] + self.fucose.total_composition()
+        if self.compute_compositions:
+            fucosylated['composition'] = fucosylated[
+                'composition'] + self.fucose.total_composition()
         fucosylated['key'][_FUC] = 1
         return fucosylated
 
@@ -349,8 +362,9 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
         xylosylated = shift.copy()
         xylosylated['key'] = xylosylated['key'].copy()
         xylosylated['mass'] += self.xylose.mass()
-        xylosylated['composition'] = xylosylated[
-            'composition'] + self.xylose.total_composition()
+        if self.compute_compositions:
+            xylosylated['composition'] = xylosylated[
+                'composition'] + self.xylose.total_composition()
         xylosylated['key'][_XYL] = 1
         return xylosylated
 
@@ -360,11 +374,22 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
             fucosylated = shift.copy()
             fucosylated['key'] = fucosylated['key'].copy()
             fucosylated['mass'] += self.fucose.mass()
-            fucosylated['composition'] = fucosylated[
-                'composition'] + self.fucose.total_composition() * i
+            if self.compute_compositions:
+                fucosylated['composition'] = fucosylated[
+                    'composition'] + self.fucose.total_composition() * i
             fucosylated['key'][_FUC] = i
             result[i - 1] = fucosylated
         return result
+
+    def modified_increment(self, modified, shift):
+        modified = modified.copy()
+        modified['key'] = modified['key'].copy()
+        modified['mass'] += shift.mass()
+        if self.compute_compositions:
+            modified['composition'] = modified['composition'] + \
+                shift.total_composition()
+        modified['key'][shift] = 1
+        return modified
 
     def _validate_glycan_composition(self, aggregate_glycosylation, glycan):
         invalid = False
@@ -896,17 +921,9 @@ _StubGlycopeptideStrategy = StubGlycopeptideStrategy
 class LabileAwareStubGlycopeptideStrategy(_StubGlycopeptideStrategy):
     def __init__(self, peptide, extended=True, use_query=False, extended_fucosylation=False, detatch_substituents=False, **kwargs):
         self.detatch_substituents = detatch_substituents
+        self.labile_modifications = None
         super(LabileAwareStubGlycopeptideStrategy,
               self).__init__(peptide, use_query=use_query, extended=extended, extended_fucosylation=extended_fucosylation, **kwargs)
-
-    def modified_increment(self, modified, shift):
-        modified = modified.copy()
-        modified['key'] = modified['key'].copy()
-        modified['mass'] += shift.mass()
-        modified['composition'] = modified[
-            'composition'] + shift.total_composition()
-        modified['key'][shift] = 1
-        return modified
 
     def glycan_composition(self):
         gc = super(LabileAwareStubGlycopeptideStrategy, self).glycan_composition()
