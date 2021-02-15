@@ -236,6 +236,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         Whether to consider multiple ``Fuc`` residues per fragment rather than one per core
     """
 
+    _composition_tree = _composition_tree_root
+
     def __init__(self, peptide, extended=True, use_query=False, extended_fucosylation=False, **kwargs):
         self.extended = extended
         self.extended_fucosylation = extended_fucosylation
