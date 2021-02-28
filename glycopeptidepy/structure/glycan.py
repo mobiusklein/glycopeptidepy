@@ -318,10 +318,12 @@ class GlycosylationManager(dict):
         self._type_track = None
         if aggregate is not None:
             self.aggregate = aggregate
+        self._total_glycosylation_size = None
 
     def invalidate(self):
         self._proxy = None
         self._type_track = None
+        self._total_glycosylation_size = None
 
     @property
     def glycosylation_types(self):
@@ -453,4 +455,6 @@ class GlycosylationManager(dict):
         return self._proxy
 
     def total_glycosylation_size(self):
-        return sum(self.aggregate.values())
+        if self._total_glycosylation_size is None:
+            self._total_glycosylation_size = sum(self.aggregate.values())
+        return self._total_glycosylation_size

@@ -692,7 +692,8 @@ cdef basestring build_name_from_composition(mapping_types glycan_composition):
             name = "%s+%s" % (name, extended_key)
         return name
 
-
+# TODO: Add an unset attribute for holding the glycosylation_size value that
+# can either be pre-populated or computed dynamically.
 cdef class StubFragment(SimpleFragment):
 
     _name_cache = stub_fragment_name_cache
