@@ -6,6 +6,14 @@ from glycopeptidepy.utils.collectiontools import groupby
 from glypy import GlycanComposition, Glycan, MonosaccharideResidue
 
 
+class OxoniumIonStrategyTest(unittest.TestCase):
+    def test_no_multi_neuac(self):
+        gp2 = sequence.PeptideSequence(
+            'YLGN(#:glycosylation_type=N-Linked:{Hex:5; HexNAc:4; Neu5Ac:2})ATAIFFLPDEGK')
+        for oxonium_ion in gp2.glycan_fragments():
+            assert "Neu5AcNeu5Ac" not in oxonium_ion.name
+
+
 class StubGlycopeptideStrategyTest(unittest.TestCase):
     def test_equivalence(self):
         gp2 = sequence.PeptideSequence('YLGN(#:glycosylation_type=N-Linked:{Hex:5; HexNAc:4; Neu5Ac:1})ATAIFFLPDEGK')

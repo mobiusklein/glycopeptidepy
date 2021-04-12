@@ -934,6 +934,14 @@ class LabileAwareStubGlycopeptideStrategy(_StubGlycopeptideStrategy):
             return gc
 
 
+labile_monosaccharides_not_to_duplicate = {
+    FrozenMonosaccharideResidue.from_iupac_lite("NeuAc"),
+    FrozenMonosaccharideResidue.from_iupac_lite("NeuGc"),
+    FrozenMonosaccharideResidue.from_iupac_lite("Neu"),
+    FrozenMonosaccharideResidue.from_iupac_lite("Fuc"),
+    FrozenMonosaccharideResidue.from_iupac_lite("dHex"),
+}
+
 class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
 
     def __init__(self, peptide, use_query=False, oxonium=True, all_series=False, allow_ambiguous=False,
@@ -1009,6 +1017,9 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
                 invalid = False
                 for k, v in Counter(kk).items():
                     if monosaccharides[k] < v:
+                        invalid = True
+                        break
+                    elif k in labile_monosaccharides_not_to_duplicate and v > 1:
                         invalid = True
                         break
                 if invalid:
