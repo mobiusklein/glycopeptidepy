@@ -1,6 +1,6 @@
 import unittest
 
-from glycopeptidepy.structure.modification import Modification, ModificationTarget
+from glycopeptidepy.structure.modification import Modification, ModificationTarget, SequenceLocation
 from glycopeptidepy.structure import sequence
 from glycopeptidepy.algorithm import reverse_preserve_sequon, edit_distance, PeptidoformGenerator
 
@@ -57,10 +57,16 @@ class TestPeptidoformGenerator(unittest.TestCase):
         Deamidation = Modification("Deamidation").rule
         duplicate = Deamidation.clone()
         duplicate.targets = {ModificationTarget("N")}
-        generator = PeptidoformGenerator([], [duplicate])
+        oxidupe = Modification("Oxidation").rule.clone()
+        oxidupe.targets = {ModificationTarget(None, SequenceLocation.protein_c_term)}
+        generator = PeptidoformGenerator([], [duplicate, oxidupe])
         seq = sequence.PeptideSequence("PEPQSINIDE")
         results = list(generator(seq))
         self.assertEqual(len(results), 2)
+
+        seq = sequence.PeptideSequence("PEPQSINIDE")
+        results = list(generator(seq, protein_c_term=True))
+        self.assertEqual(len(results), 4)
 
 
 if __name__ == '__main__':

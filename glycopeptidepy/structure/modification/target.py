@@ -97,7 +97,7 @@ def extract_targets_from_rule_string(name):
     return extract_targets_from_string(title_cleaner.search(name).groupdict()["target"])
 
 
-def get_position_modifier_rules_dict(sequence):
+def get_position_modifier_rules_dict(sequence, protein_n_term=False, protein_c_term=False):
     '''Labels the start and end indices of the sequence
 
     A convenience dictionary initializer for ease-of-access in
@@ -105,16 +105,28 @@ def get_position_modifier_rules_dict(sequence):
 
     Parameters
     ----------
-    sequence: PeptideSequence
+    sequence : PeptideSequence
         The sequence for which to project labels
+    protein_n_term : bool
+        Whether the sequence includes a protein N-terminal
+    protein_c_term : bool
+        Whether the sequence includes a protein C-terminal
 
     Return
     ------
     defaultdict
     '''
+    if protein_n_term:
+        n_term = (SequenceLocation.n_term, SequenceLocation.protein_n_term)
+    else:
+        n_term = (SequenceLocation.n_term, )
+    if protein_c_term:
+        c_term = (SequenceLocation.c_term, SequenceLocation.protein_c_term)
+    else:
+        c_term = (SequenceLocation.c_term, )
     return defaultdict(lambda: SequenceLocation.anywhere, {
-        0: SequenceLocation.n_term,
-        (len(sequence) - 1): SequenceLocation.c_term
+        0: n_term,
+        (len(sequence) - 1): c_term
     })
 
 
@@ -144,8 +156,10 @@ class ModificationTarget(object):
         else:
             amino_acid = {AminoAcidResidue(amino_acid)}
         position_modifier = specificity["position"]
-        nterm = ("Protein N-term", "Any N-term", "N-term")
-        cterm = ("Protein C-term", "Any C-term", "C-term")
+        nterm = ("Any N-term", "N-term")
+        prot_nterm = ("Protein N-term", )
+        cterm = ("Any C-term", "C-term")
+        prot_cterm = ("Protein C-term", )
         site = specificity["site"]
         classification = ModificationCategory[specificity.get("classification")]
         if position_modifier == "Anywhere":
@@ -154,6 +168,10 @@ class ModificationTarget(object):
             position_modifier = SequenceLocation.n_term
         elif position_modifier in cterm or site in cterm:
             position_modifier = SequenceLocation.c_term
+        elif position_modifier in prot_nterm:
+            position_modifier = SequenceLocation.protein_n_term
+        elif position_modifier in prot_cterm:
+            position_modifier = SequenceLocation.protein_c_term
         else:
             warnings.warn("Could not find a location for %r" % (position_modifier,))
 
@@ -186,24 +204,28 @@ class ModificationTarget(object):
             otherwise it will default to SequenceLocation.anywhere
         '''
         valid = False
+        if not isinstance(position_modifier, (tuple, list)):
+            position_modifiers = (position_modifier, )
+        else:
+            position_modifiers = position_modifier
 
-        # Validate amino acid target target
-        valid = (self.amino_acid_targets is None) or (
-            amino_acid in self.amino_acid_targets)
-        valid = valid and ((self.position_modifier is SequenceLocation.anywhere) or
-                           (position_modifier == self.position_modifier))
+        for position_modifier in position_modifiers:
+            # Validate amino acid target
+            valid = (self.amino_acid_targets is None) or (
+                amino_acid in self.amino_acid_targets)
+            valid = valid and ((self.position_modifier == SequenceLocation.anywhere) or
+                            (position_modifier == self.position_modifier))
 
-        # If the rule includes a position modifier other than anywhere
-        if valid and (position_modifier is not SequenceLocation.anywhere) and (
-                self.position_modifier is not SequenceLocation.anywhere):
-            if position_modifier == self.position_modifier:
-                if self.amino_acid_targets is None:
-                    return valid, position_modifier
+            # If the rule includes a position modifier other than anywhere
+            if valid and (position_modifier != SequenceLocation.anywhere) and (
+                    self.position_modifier != SequenceLocation.anywhere):
+                if position_modifier == self.position_modifier:
+                    if self.amino_acid_targets is None:
+                        return valid, position_modifier
+                    else:
+                        return valid, SequenceLocation.anywhere
                 else:
-                    return valid, SequenceLocation.anywhere
-            else:
-                valid = False
-                return valid, SequenceLocation.anywhere
+                    valid = False
         return valid, SequenceLocation.anywhere
 
     def __repr__(self):
@@ -241,8 +263,12 @@ class ModificationTarget(object):
                 pass
             else:
                 parts.append("@")
-        if self.position_modifier in (SequenceLocation.protein_n_term, SequenceLocation.n_term):
+        if self.position_modifier == SequenceLocation.n_term:
             parts.append("N-term")
-        if self.position_modifier in (SequenceLocation.protein_c_term, SequenceLocation.c_term):
+        elif self.position_modifier == SequenceLocation.protein_n_term:
+            parts.append("Protein N-term")
+        elif self.position_modifier == SequenceLocation.c_term:
             parts.append("C-term")
+        elif self.position_modifier == SequenceLocation.protein_c_term:
+            parts.append("Protein C-term")
         return " ".join(parts)

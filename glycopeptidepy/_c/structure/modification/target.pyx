@@ -19,6 +19,8 @@ cpdef tuple valid_site(ModificationTargetBase self, amino_acid=None, EnumValue p
         bint valid
     valid = False
 
+    raise ValueError("Requires updating")
+
     # Validate amino acid target target
     valid = (self.amino_acid_targets is None) or (
         amino_acid in self.amino_acid_targets)

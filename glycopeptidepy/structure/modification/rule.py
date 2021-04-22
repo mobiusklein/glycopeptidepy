@@ -419,9 +419,10 @@ class ModificationRule(ModificationRuleBase):
         minimized_target = min(possible_targets, key=len)
         return minimized_target
 
-    def find_valid_sites(self, sequence):
+    def find_valid_sites(self, sequence, protein_n_term=False, protein_c_term=False):
         valid_indices = []
-        position_modifier_rules = get_position_modifier_rules_dict(sequence)
+        position_modifier_rules = get_position_modifier_rules_dict(
+            sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
         for index in range(len(sequence)):
             position = sequence[index]
             if len(position[1]) > 0:
@@ -526,7 +527,7 @@ class ModificationRule(ModificationRuleBase):
         if self._n_term_targets is None:
             solutions = []
             for target in self.targets:
-                if target.position_modifier == SequenceLocation.n_term:
+                if target.position_modifier == SequenceLocation.n_term or target.position_modifier == SequenceLocation.protein_n_term:
                     solutions.append(target)
             self._n_term_targets = solutions
         return self._n_term_targets
@@ -536,7 +537,7 @@ class ModificationRule(ModificationRuleBase):
         if self._c_term_targets is None:
             solutions = []
             for target in self.targets:
-                if target.position_modifier == SequenceLocation.c_term:
+                if target.position_modifier == SequenceLocation.c_term or target.position_modifier == SequenceLocation.protein_c_term:
                     solutions.append(target)
             self._c_term_targets = solutions
         return self._c_term_targets

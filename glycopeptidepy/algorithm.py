@@ -229,25 +229,28 @@ class PeptidoformGenerator(object):
             return PeptideSequence(str(sequence))
         return sequence
 
-    def terminal_modifications(self, sequence):
+    def terminal_modifications(self, sequence, protein_n_term=False, protein_c_term=False):
         n_term_modifications = [
-            mod for mod in self.n_term_modifications if mod.find_valid_sites(sequence)]
+            mod for mod in self.n_term_modifications if mod.find_valid_sites(
+                sequence, protein_n_term=protein_n_term)]
         c_term_modifications = [
-            mod for mod in self.c_term_modifications if mod.find_valid_sites(sequence)]
+            mod for mod in self.c_term_modifications if mod.find_valid_sites(
+                sequence, protein_c_term=protein_c_term)]
         # the case with unmodified termini
         n_term_modifications.append(None)
         c_term_modifications.append(None)
         return (n_term_modifications, c_term_modifications)
 
-    def apply_fixed_modifications(self, sequence):
+    def apply_fixed_modifications(self, sequence, protein_n_term=False, protein_c_term=False):
         has_fixed_n_term = False
         has_fixed_c_term = False
 
         for mod in self.constant_modifications:
-            for site in mod.find_valid_sites(sequence):
-                if site == SequenceLocation.n_term:
+            for site in mod.find_valid_sites(sequence, protein_n_term=protein_n_term,
+                                             protein_c_term=protein_c_term):
+                if site == SequenceLocation.n_term or site == SequenceLocation.protein_n_term:
                     has_fixed_n_term = True
-                elif site == SequenceLocation.c_term:
+                elif site == SequenceLocation.c_term or site == SequenceLocation.protein_c_term:
                     has_fixed_c_term = True
                 sequence.add_modification(site, mod.name)
         return has_fixed_n_term, has_fixed_c_term
@@ -274,16 +277,18 @@ class PeptidoformGenerator(object):
                 n_variable += 1
         return result, n_variable
 
-    def generate_peptidoforms(self, sequence):
+    def generate_peptidoforms(self, sequence, protein_n_term=False, protein_c_term=False):
         try:
             sequence = self.prepare_peptide(sequence)
         except UnknownAminoAcidException:
             return
         (n_term_modifications,
-         c_term_modifications) = self.terminal_modifications(sequence)
+         c_term_modifications) = self.terminal_modifications(
+             sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
 
         (has_fixed_n_term,
-         has_fixed_c_term) = self.apply_fixed_modifications(sequence)
+         has_fixed_c_term) = self.apply_fixed_modifications(
+             sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
 
         if has_fixed_n_term:
             n_term_modifications = [None]
@@ -299,8 +304,9 @@ class PeptidoformGenerator(object):
                 yield self.apply_variable_modifications(
                     sequence, assignments, n_term, c_term)
 
-    def __call__(self, peptide):
-        return self.generate_peptidoforms(peptide)
+    def __call__(self, peptide, protein_n_term=False, protein_c_term=False):
+        return self.generate_peptidoforms(
+            peptide, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
 
     @classmethod
     def peptidoforms(cls, sequence, constant_modifications, variable_modifications, max_variable_modifications=4):
