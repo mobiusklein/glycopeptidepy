@@ -23,7 +23,7 @@ is_mass_delta = re.compile(r"^Delta:")
 
 
 def extract_targets_from_string(target_string):
-    position_only = re.search(r"^([NnCc][-_][tT]erm)", target_string)
+    position_only = re.search(r"^((?:Protein )?[NnCc][-_][tT]erm)", target_string)
     if position_only:
         return ModificationTarget(None, SequenceLocation[position_only.groups()[0]])
     else:
@@ -31,6 +31,7 @@ def extract_targets_from_string(target_string):
         amino_acids = []
         position = []
 
+        protein_terminal_only = False
         i = 0
         n = len(target_string)
         while i < n:
@@ -41,6 +42,9 @@ def extract_targets_from_string(target_string):
                     state = "aa-space"
                 elif state == 'position-begin':
                     pass
+                elif state == 'protein':
+                    state = 'position-begin'
+                    protein_terminal_only = True
                 else:
                     raise ValueError(target_string)
             elif c == "@":
@@ -57,6 +61,8 @@ def extract_targets_from_string(target_string):
                     if c in "NC":
                         position.append(c)
                         state = 'position'
+                    elif c == "P":
+                        state = 'protein'
                 elif state == 'position':
                     if c == 'T':
                         position.append(c)
@@ -69,6 +75,13 @@ def extract_targets_from_string(target_string):
                     if c in 'nc':
                         position.append(c)
                         state = 'position'
+                    if c == 'p':
+                        state = 'protein'
+                elif state == "protein":
+                    if c in 'protein':
+                        pass
+                    else:
+                        raise ValueError("Invalid terminal speicification")
                 elif state == 'position':
                     position.append(c)
             elif c in '-_':
@@ -85,9 +98,15 @@ def extract_targets_from_string(target_string):
         if position == "":
             position = SequenceLocation.anywhere
         elif position == "n_term":
-            position = SequenceLocation.n_term
+            if not protein_terminal_only:
+                position = SequenceLocation.n_term
+            else:
+                position = SequenceLocation.protein_n_term
         elif position == "c_term":
-            position = SequenceLocation.c_term
+            if not protein_terminal_only:
+                position = SequenceLocation.c_term
+            else:
+                position = SequenceLocation.protein_c_term
         else:
             raise ValueError("Unrecognized position specification {}".format(position))
         return ModificationTarget(amino_acids, position)
