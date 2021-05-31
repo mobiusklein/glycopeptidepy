@@ -66,6 +66,8 @@ symbol_to_long = {
     "Y": "Tyrosine",
     "V": "Valine",
     "X": "Unknown",
+    "U": "Selenocysteine",
+    "O": "Pyrrolysine",
 }
 
 
@@ -93,8 +95,8 @@ residue_table = {
     'Trp': 'C11H10N2O1',
     'Tyr': 'C9H9N1O2',
     'Val': 'C5H9N1O1',
-    "Sec": "C3H7NO2Se",
-    "Pyl": "C12H21N3O3",
+    "Sec": "C3H5NO1Se",
+    "Pyl": "C12H19N3O2",
     "Unk": "",
 }
 
