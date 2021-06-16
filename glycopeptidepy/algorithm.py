@@ -376,3 +376,11 @@ class ProteinDigestor(object):
         for modified_peptide, n_variable_modifications in self.peptidoform_generator(peptide):
             modified_peptide.count_variable_modifications = n_variable_modifications
             yield modified_peptide
+
+
+try:
+    _ModificationSiteAssignmentCombinator = ModificationSiteAssignmentCombinator
+    has_c = True
+    from glycopeptidepy._c.algorithm import ModificationSiteAssignmentCombinator
+except ImportError:
+    has_c = False

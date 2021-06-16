@@ -68,6 +68,14 @@ class TestPeptidoformGenerator(unittest.TestCase):
         results = list(generator(seq, protein_c_term=True))
         self.assertEqual(len(results), 4)
 
+    def test_throughput(self):
+        Deamidation = Modification("Deamidation").rule
+        Oxidation = Modification("Oxidation").rule
+        generator = PeptidoformGenerator([], [Deamidation, Oxidation])
+        seq = sequence.PeptideSequence(heparanase[:24])
+        results = list(generator(seq))
+        self.assertEqual(len(results), 8898)
+
 
 if __name__ == '__main__':
     unittest.main()
