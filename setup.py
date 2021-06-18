@@ -47,6 +47,8 @@ def make_extensions():
             Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.pyx']),
             Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.pyx']),
             Extension("glycopeptidepy._c.structure.constants", sources=['glycopeptidepy/_c/structure/constants.pyx']),
+            Extension("glycopeptidepy._c.structure.glycan", sources=[
+                      'glycopeptidepy/_c/structure/glycan.pyx']),
             Extension("glycopeptidepy._c.structure.sequence_methods",
                       sources=['glycopeptidepy/_c/structure/sequence_methods.pyx']),
             Extension("glycopeptidepy._c.structure.modification.rule",
@@ -72,6 +74,8 @@ def make_extensions():
             Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.c']),
             Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.c']),
             Extension("glycopeptidepy._c.structure.constants", sources=['glycopeptidepy/_c/structure/constants.c']),
+            Extension("glycopeptidepy._c.structure.glycan", sources=[
+                      'glycopeptidepy/_c/structure/glycan.c']),
             Extension("glycopeptidepy._c.structure.sequence_methods",
                       sources=['glycopeptidepy/_c/structure/sequence_methods.c']),
             Extension("glycopeptidepy._c.structure.modification.rule",

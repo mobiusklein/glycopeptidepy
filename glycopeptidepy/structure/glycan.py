@@ -206,6 +206,7 @@ class GlycanCompositionProxy(Mapping):
     '''A mapping-like object that imitates the GlycanComposition interface in
     a read-only fashion.
     '''
+
     def __init__(self, glycan_composition):
         self.obj = glycan_composition
 
@@ -278,7 +279,17 @@ class GlycanCompositionProxy(Mapping):
         return len(self.obj)
 
 
-class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
+class _GlycanCompositionWithOffsetProxyBase(object):
+    __slots__ = ('composition_offset', )
+
+
+try:
+    from glycopeptidepy._c.structure.glycan import GlycanCompositionWithOffsetProxyBase as _GlycanCompositionWithOffsetProxyBase
+except ImportError:
+    pass
+
+
+class GlycanCompositionWithOffsetProxy(_GlycanCompositionWithOffsetProxyBase, GlycanCompositionProxy):
     """A :class:`GlycanCompositionProxy` that pretends to allow you to
     mutate the :attr:`composition_offset` attribute of the underlying
     composition, but instead stores that within the proxy, leaving the
@@ -289,6 +300,7 @@ class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
     this object is copied, the underlying GlycanComposition is not copied, only
     the proxy.
     """
+
     def __init__(self, obj, offset=None):
         if offset is None:
             offset = Composition()
@@ -309,16 +321,52 @@ class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
 
 WATER_OFFSET = Composition({"H": 2, "O": 1})
 
-
-class GlycosylationManager(dict):
+class GlycosylationManager(object):
     def __init__(self, parent, aggregate=None):
+        self.mapping = {}
         self.parent = parent
         self._aggregate = None
         self._proxy = None
         self._type_track = None
         if aggregate is not None:
-            self.aggregate = aggregate
+            self.set_aggregate(aggregate)
         self._total_glycosylation_size = None
+
+    def clear(self):
+        self.invalidate()
+        self.aggregate = None
+        self.mapping.clear()
+
+    def __setitem__(self, key, value):
+        self.invalidate()
+        self.mapping[key] = value
+
+    def __delitem__(self, key):
+        self.invalidate()
+        del self.mapping[key]
+
+    def pop(self, key, default=None):
+        self.invalidate()
+        self.mapping.pop(key, default)
+
+    def update(self, base):
+        self.invalidate()
+        self.mapping.update(base)
+
+    def keys(self):
+        return self.mapping.keys()
+
+    def values(self):
+        return self.mapping.values()
+
+    def items(self):
+        return self.mapping.items()
+
+    def __getitem__(self, key):
+        return self.mapping[key]
+
+    def __len__(self):
+        return len(self.mapping)
 
     def invalidate(self):
         self._proxy = None
@@ -341,27 +389,6 @@ class GlycosylationManager(dict):
             track[glycosylation.glycosylation_type].append((position, value))
         return track
 
-    def clear(self):
-        self.invalidate()
-        self.aggregate = None
-        dict.clear(self)
-
-    def __setitem__(self, key, value):
-        self.invalidate()
-        dict.__setitem__(self, key, value)
-
-    def __delitem__(self, key):
-        self.invalidate()
-        dict.__delitem__(self, key)
-
-    def pop(self, key, default=None):
-        self.invalidate()
-        dict.pop(self, key, default)
-
-    def update(self, base):
-        self.invalidate()
-        dict.update(self, base)
-
     setdefault = None
     popitem = None
 
@@ -371,9 +398,6 @@ class GlycosylationManager(dict):
             self.aggregate.clone() if self.aggregate is not None else None)
         inst.update(self)
         return inst
-
-    def clone(self):
-        return self.copy()
 
     @property
     def aggregate(self):
@@ -388,6 +412,20 @@ class GlycosylationManager(dict):
 
     def _patch_aggregate(self):
         self.aggregate.composition_offset -= WATER_OFFSET
+
+    @property
+    def glycan_composition(self):
+        if self._proxy is None:
+            self._proxy = self._make_glycan_composition_proxy()
+        return self._proxy
+
+    def total_glycosylation_size(self):
+        if self._total_glycosylation_size is None:
+            self._total_glycosylation_size = sum(self.aggregate.values())
+        return self._total_glycosylation_size
+
+    def clone(self):
+        return self.copy()
 
     def total_composition(self):
         total = Composition()
@@ -411,6 +449,17 @@ class GlycosylationManager(dict):
             total += self.aggregate.mass()
         return total
 
+    def is_fully_specified_topologies(self):
+        is_fully_specified = len(self) > 0
+        for key, value in self.items():
+            if value.rule.is_core:
+                is_fully_specified = False
+                break
+            elif value.rule.is_composition:
+                is_fully_specified = False
+                break
+        return is_fully_specified
+
     def _make_glycan_composition_proxy(self):
         if self.aggregate is not None:
             base = self.aggregate.clone()
@@ -420,7 +469,7 @@ class GlycosylationManager(dict):
             # and the first glycan. Subsequent glycans do not need
             # further chemical losses because of the dehyration built
             # directly into the Residue abstraction.
-            base.composition_offset -= Composition({"H": 2, "O": 1})
+            base.composition_offset -= WATER_OFFSET
         for key, value in self.items():
             if value.rule.is_core:
                 continue
@@ -433,28 +482,15 @@ class GlycosylationManager(dict):
                 # the composition by H2O. This H2O is lost when that bond is formed,
                 # but doesn't need to be explicitly included as the loss is tracked
                 # when initializing the base above.
-                gc = HashableGlycanComposition.from_glycan(value.rule._original)
+                gc = HashableGlycanComposition.from_glycan(
+                    value.rule._original)
                 base += gc
         return GlycanCompositionProxy(base)
 
-    def is_fully_specified_topologies(self):
-        is_fully_specified = len(self) > 0
-        for key, value in self.items():
-            if value.rule.is_core:
-                is_fully_specified = False
-                break
-            elif value.rule.is_composition:
-                is_fully_specified = False
-                break
-        return is_fully_specified
 
-    @property
-    def glycan_composition(self):
-        if self._proxy is None:
-            self._proxy = self._make_glycan_composition_proxy()
-        return self._proxy
-
-    def total_glycosylation_size(self):
-        if self._total_glycosylation_size is None:
-            self._total_glycosylation_size = sum(self.aggregate.values())
-        return self._total_glycosylation_size
+try:
+    from glycopeptidepy._c.structure.glycan import GlycosylationManager, set_glycan_composition_proxy_type
+    set_glycan_composition_proxy_type(GlycanCompositionProxy)
+    del set_glycan_composition_proxy_type
+except ImportError:
+    pass

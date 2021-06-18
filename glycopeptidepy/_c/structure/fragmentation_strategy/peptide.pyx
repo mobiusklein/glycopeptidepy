@@ -24,7 +24,6 @@ from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
 from glycopeptidepy._c.structure.base cimport ModificationBase, AminoAcidResidueBase, SequencePosition
 from glycopeptidepy._c.structure.modification.modification cimport ModificationInstanceBase
 
-from glycopeptidepy.structure.glycan import GlycosylationManager
 from glycopeptidepy.structure import constants as _structure_constants
 from glycopeptidepy.structure.modification import (
     ModificationCategory,

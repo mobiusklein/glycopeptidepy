@@ -17,7 +17,9 @@ from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator
 from glycopeptidepy._c.structure.fragment cimport (
     IonSeriesBase, StubFragment, _NameTree,
     build_name_from_composition)
+
 from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
+from glycopeptidepy._c.structure.glycan cimport GlycosylationManager
 
 from glycopeptidepy.structure.fragment import (
     ChemicalShift, IonSeries, format_negative_composition)
@@ -126,7 +128,7 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         return flag or self._use_query
 
     cpdef long count_glycosylation_type(self, glycotype):
-        return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
+        return (<GlycosylationManager>self.peptide.glycosylation_manager).count_glycosylation_type(glycotype)
 
 
 @cython.freelist(10000)
@@ -907,6 +909,6 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         elif gag_linker:
             return self.gag_linker_stub_fragments()
         else:
-            if len(self.peptide.glycosylation_manager) > 0:
+            if (<GlycosylationManager>self.peptide.glycosylation_manager).get_size() > 0:
                 raise ValueError("Unknown Glycan Class Detected")
         return (a for a in [])
