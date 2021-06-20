@@ -7,7 +7,7 @@ from glypy.composition.ccomposition cimport CComposition
 from glypy.structure.glycan_composition import HashableGlycanComposition
 
 from glycopeptidepy._c.structure.modification.modification cimport ModificationInstanceBase
-from glycopeptidepy._c.structure.modification.rule cimport ModificationRuleBase
+from glycopeptidepy._c.structure.modification.rule cimport ModificationRuleBase, GlycosylationBase
 
 @cython.freelist(10000)
 cdef class GlycanCompositionWithOffsetProxyBase(object):
@@ -135,12 +135,13 @@ cdef class GlycosylationManager(object):
             PyObject* pval
             PyObject* tmp
             list bucket
+            GlycosylationBase glycosylation
 
         track = dict()
         pos = 0
         while PyDict_Next(self.mapping, &pos, &pkey, &pval):
-            glycosylation = (<ModificationInstanceBase>pval).rule
-            glycosylation_type = glycosylation.glycosylation_type
+            glycosylation = <GlycosylationBase>(<ModificationInstanceBase>pval).rule
+            glycosylation_type = glycosylation.get_glycosylation_type()
             tmp = PyDict_GetItem(track, glycosylation_type)
             if tmp == NULL:
                 bucket = []
@@ -165,7 +166,7 @@ cdef class GlycosylationManager(object):
         pos = 0
         while PyDict_Next(self.mapping, &pos, &pkey, &pval):
             value = <ModificationInstanceBase>pval
-            if has_aggregate and value.rule.is_core:
+            if has_aggregate and (<GlycosylationBase>(value.rule)).is_core:
                 continue
             total.add_from(value.composition)
         if has_aggregate:
@@ -196,7 +197,7 @@ cdef class GlycosylationManager(object):
         pos = 0
         while PyDict_Next(self.mapping, &pos, &pkey, &pval):
             value = <ModificationInstanceBase>pval
-            if has_aggregate and value.rule.is_core:
+            if has_aggregate and (<GlycosylationBase>(value.rule)).is_core:
                 continue
             total += value.mass
         if has_aggregate:
@@ -215,15 +216,17 @@ cdef class GlycosylationManager(object):
             PyObject* pval
             Py_ssize_t pos
             ModificationInstanceBase value
+            GlycosylationBase rule
 
         is_fully_specified = self.get_size() > 0
         pos = 0
         while PyDict_Next(self.mapping, &pos, &pkey, &pval):
             value = <ModificationInstanceBase>pval
-            if value.rule.is_core:
+            rule = <GlycosylationBase>value.rule
+            if rule.is_core:
                 is_fully_specified = False
                 break
-            elif value.rule.is_composition:
+            elif rule.is_composition:
                 is_fully_specified = False
                 break
         return is_fully_specified
@@ -233,6 +236,7 @@ cdef class GlycosylationManager(object):
             object aggregate
             object base
             ModificationInstanceBase value
+            GlycosylationBase rule
             Py_ssize_t pos
             PyObject* pkey
             PyObject* pval
@@ -250,10 +254,11 @@ cdef class GlycosylationManager(object):
         pos = 0
         while PyDict_Next(self.mapping, &pos, &pkey, &pval):
             value = <ModificationInstanceBase>pval
-            if value.rule.is_core:
+            rule = <GlycosylationBase>(value.rule)
+            if rule.is_core:
                 continue
-            elif value.rule.is_composition:
-                base += value.rule.glycan
+            elif rule.is_composition:
+                base += rule.glycan
             else:
                 # Convert Glycan object into a composition, using the original
                 # detatched topology to omit the "aglycone" group which represents
@@ -261,7 +266,7 @@ cdef class GlycosylationManager(object):
                 # the composition by H2O. This H2O is lost when that bond is formed,
                 # but doesn't need to be explicitly included as the loss is tracked
                 # when initializing the base above.
-                gc = HashableGlycanComposition.from_glycan(value.rule._original)
+                gc = HashableGlycanComposition.from_glycan(rule._original)
                 base += gc
         return GlycanCompositionProxyType(base)
 

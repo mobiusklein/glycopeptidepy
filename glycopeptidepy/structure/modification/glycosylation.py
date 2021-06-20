@@ -92,8 +92,29 @@ def _Glycosylation_reconstructor(string):
     return Glycosylation.try_parse(string)
 
 
+class GlycosylationBase(ModificationRule):
+
+    @property
+    def glycosylation_type(self):
+        return self._glycosylation_type
+
+    @property
+    def is_composition(self):
+        return self._is_composition
+
+    @property
+    def is_core(self):
+        return self._is_core
+
+
+try:
+    from glycopeptidepy._c.structure.modification.rule import GlycosylationBase
+except ImportError:
+    pass
+
+
 @ModificationRule.resolve.register
-class Glycosylation(ModificationRule):
+class Glycosylation(GlycosylationBase):
     """
     Incubator Idea - Represent occupied glycosylation sites
     using the Modification interface.
@@ -157,6 +178,8 @@ class Glycosylation(ModificationRule):
         else:
             glycan = glycan.clone()
 
+        self._is_core = False
+
         if isinstance(glycan, Glycan):
             self._is_composition = False
             if encoding_format is None:
@@ -170,7 +193,7 @@ class Glycosylation(ModificationRule):
         self.metadata = metadata
         self.glycan = glycan
         try:
-            self.glycan.glycosylation_type = GlycosylationType[metadata['glycosylation_type']]
+            self._glycosylation_type = self.glycan.glycosylation_type = GlycosylationType[metadata['glycosylation_type']]
         except KeyError:
             pass
         self._original = glycan.clone()
@@ -215,18 +238,6 @@ class Glycosylation(ModificationRule):
             return template.format(
                 metadata, self.glycan.serialize(self.encoding_format))
 
-    @property
-    def glycosylation_type(self):
-        return self.glycan.glycosylation_type
-
-    @property
-    def is_composition(self):
-        return self._is_composition
-
-    @property
-    def is_core(self):
-        return False
-
     def _patch_dehydration(self):
         if self.is_composition:
             self.glycan.composition_offset = Composition()
@@ -252,22 +263,13 @@ class Glycosylation(ModificationRule):
         return self.glycan.total_composition()
 
 
-try:
-    from glycopeptidepy._c.structure.modification.rule import is_tracked_for_glycosylation
-    Glycosylation.is_tracked_for = is_tracked_for_glycosylation
-except ImportError:
-    pass
-
+# try:
+#     from glycopeptidepy._c.structure.modification.rule import is_tracked_for_glycosylation
+#     Glycosylation.is_tracked_for = is_tracked_for_glycosylation
+# except ImportError:
+#     pass
 
 class CoreGlycosylation(Glycosylation):
-    @property
-    def is_composition(self):
-        return True
-
-    @property
-    def is_core(self):
-        return True
-
     def get_fragments(self, *args, **kwargs):
         return []
 
@@ -280,6 +282,8 @@ class CoreGlycosylation(Glycosylation):
         self.neutral_losses = []
         self._n_term_targets = None
         self._c_term_targets = None
+        self._is_composition = True
+        self._is_core = True
         self.targets = set()
 
     def clone(self):
@@ -306,15 +310,8 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.name = self.unimod_name
         self.targets = [(ModificationTarget("N"))]
         self.composition = _hexnac.total_composition().clone()
+        self._glycosylation_type = GlycosylationType.n_linked
         self._common_init()
-
-    @property
-    def glycosylation_type(self):
-        return GlycosylationType.n_linked
-
-    def clone(self):
-        return self.__class__(self.mass)
-
 
 class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
     mass_ladder = {k: FrozenGlycanComposition.parse(k).total_composition() - Composition("H2O") for k in {
@@ -330,14 +327,8 @@ class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
         self.name = self.unimod_name
         self.targets = [ModificationTarget("S"), ModificationTarget("T")]
         self.composition = _hexnac.total_composition().clone()
+        self._glycosylation_type = GlycosylationType.o_linked
         self._common_init()
-
-    @property
-    def glycosylation_type(self):
-        return GlycosylationType.o_linked
-
-    def clone(self):
-        return self.__class__(self.mass)
 
 
 OGlycanCoreGlycosylation = MucinOGlycanCoreGlycosylation
@@ -359,15 +350,8 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
         self.name = self.unimod_name
         self.targets = [ModificationTarget("S")]
         self.composition = _hexnac.total_composition().clone()
+        self._glycosylation_type = GlycosylationType.glycosaminoglycan
         self._common_init()
-
-    @property
-    def glycosylation_type(self):
-        return GlycosylationType.glycosaminoglycan
-
-    def clone(self):
-        return self.__class__(self.mass)
-
 
 class OGlcNAcylation(CoreGlycosylation):
     mass_ladder = {
@@ -388,23 +372,12 @@ class OGlcNAcylation(CoreGlycosylation):
         for label_loss in self.mass_ladder.items():
             yield label_loss
 
-    def clone(self):
-        return self.__class__(self.mass)
-
 
 def _GlycanFragment_reconstructor():
     return GlycanFragment.__new__(GlycanFragment)
 
 
 class GlycanFragment(Glycosylation):
-    @property
-    def is_composition(self):
-        return True
-
-    @property
-    def is_core(self):
-        return False
-
     def get_fragments(self, *args, **kwargs):
         return []
 
@@ -417,6 +390,8 @@ class GlycanFragment(Glycosylation):
         self._set_defaults()
 
     def _set_defaults(self):
+        self._is_core = False
+        self._is_composition = True
         self.categories = [ModificationCategory.glycosylation]
         self.aliases = set()
         self.targets = set()

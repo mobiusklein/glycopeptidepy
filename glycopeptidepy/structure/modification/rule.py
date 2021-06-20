@@ -113,6 +113,27 @@ except ImportError:
             """
             return False
 
+        @property
+        def is_standard(self):
+            """Indicates whether the :class:`ModificationRule` describes a modification which
+            has been specified from a reference source, and may be fully reconstructed from
+            its name alone.
+
+            This property is not strictly enforced, and does not cover all aspects of the object's
+            state. It does however provide a general guide for whether or not a modification is able
+            to be translated from :mod:`glycopeptidepy`'s internal representation into something that
+            another program *should* be able to understand.
+
+            Returns
+            -------
+            bool
+            """
+            return True
+
+        def serialize(self):
+            '''A string representation for inclusion in sequences'''
+            return self.name
+
 
 def _ModificationRule_reconstructor(tp):
     return tp.__new__(tp)
@@ -361,23 +382,6 @@ class ModificationRule(ModificationRuleBase):
                 target.classification)
         self.categories = list(categories)
 
-    @property
-    def is_standard(self):
-        """Indicates whether the :class:`ModificationRule` describes a modification which
-        has been specified from a reference source, and may be fully reconstructed from
-        its name alone.
-
-        This property is not strictly enforced, and does not cover all aspects of the object's
-        state. It does however provide a general guide for whether or not a modification is able
-        to be translated from :mod:`glycopeptidepy`'s internal representation into something that
-        another program *should* be able to understand.
-
-        Returns
-        -------
-        bool
-        """
-        return True
-
     def clone(self, propagated_targets=None):
         if propagated_targets is None:
             propagated_targets = (self.targets)
@@ -438,9 +442,6 @@ class ModificationRule(ModificationRuleBase):
 
         return valid_indices
 
-    def serialize(self):
-        '''A string representation for inclusion in sequences'''
-        return self.name
 
     def __repr__(self):
         rep = "{name}:{mass}".format(
