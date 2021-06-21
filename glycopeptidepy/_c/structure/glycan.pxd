@@ -45,3 +45,7 @@ cdef class GlycosylationManager(object):
     cdef int total_glycosylation_size(self)
 
     cpdef int count_glycosylation_type(self, glycosylation_type)
+
+    cdef void _init(self)
+
+    cdef GlycosylationManager _create(parent, aggregate)

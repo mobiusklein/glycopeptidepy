@@ -20,10 +20,10 @@ from glycopeptidepy._c.parser import sequence_tokenizer
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.constants cimport Configuration
+from glycopeptidepy._c.structure.glycan cimport GlycosylationManager
 
 from glycopeptidepy.structure.residue import AminoAcidResidue
 from glycopeptidepy.structure.modification import Modification, ModificationCategory, SequenceLocation
-from glycopeptidepy.structure.glycan import GlycosylationManager
 from glycopeptidepy.structure import constants as _structure_constants
 
 cdef CComposition WATER = CComposition("H2O")
@@ -32,7 +32,6 @@ cdef Configuration structure_constants = _structure_constants
 
 cdef object ModificationImpl = Modification
 cdef object AminoAcidResidueImpl = AminoAcidResidue
-cdef object GlycosylationManagerImpl = GlycosylationManager
 
 cdef object SequenceLocation_n_term = SequenceLocation.n_term
 cdef object SequenceLocation_c_term = SequenceLocation.c_term
@@ -166,10 +165,12 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             AminoAcidResidueBase res
             SequencePosition position
             bint has_glycan
+            GlycosylationManager glycosylation_manager
 
         i = 0
         n = PyList_GET_SIZE(seq_list)
         self.sequence = sequence = PyList_New(n)
+        glycosylation_manager = <GlycosylationManager>self._glycosylation_manager
         mass = 0
         for i in range(n):
             item = <list>PyList_GET_ITEM(seq_list, i)
@@ -183,7 +184,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
                 if mod_str != '':
                     mod = get_modification_by_name(mod_str)
                     if mod.is_tracked_for(ModificationCategory_glycosylation):
-                        self._glycosylation_manager[i] = mod
+                        glycosylation_manager[i] = mod
                     mods.append(mod)
                     mass += mod.mass
 
@@ -194,7 +195,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         self._mass = mass
         has_glycan = glycan is not None
         if has_glycan:
-            self._glycosylation_manager.aggregate = glycan
+            glycosylation_manager.set_aggregate(glycan)
 
         if isinstance(n_term, basestring):
             if n_term != structure_constants.N_TERM_DEFAULT:
@@ -209,8 +210,8 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         n_term_group = _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term)
         c_term_group = _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term)
         self._init_termini(
-            _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term),
-            _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term))
+            n_term_group,
+            c_term_group)
 
     cpdef _init_from_string(self, sequence, parser_function):
         """Initialize a :class:`PeptideSequence` from a parse-able string.
@@ -253,12 +254,13 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             double mass
             ModificationBase mod
             AminoAcidResidueBase res
+            GlycosylationManager glycosylation_manager
 
         i = 0
         n = PyList_GET_SIZE(seq_list)
         self.sequence = sequence = PyList_New(n)
         mass = 0
-
+        glycosylation_manager = <GlycosylationManager>self._glycosylation_manager
         for i in range(n):
             item = <SequencePosition>PyList_GET_ITEM(seq_list, i)
             mass += item.amino_acid.mass
@@ -269,7 +271,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
                 Py_INCREF(mod)
                 PyList_SetItem(mods, j, mod)
                 if mod.is_tracked_for(ModificationCategory_glycosylation):
-                    self._glycosylation_manager[i] = mod
+                    glycosylation_manager[i] = mod
                 mass += mod.mass
             position = SequencePosition._create(item.amino_acid, mods)
             Py_INCREF(position)
@@ -277,7 +279,8 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
 
         self._mass = mass
         if glycan_composition is not None:
-            self._glycosylation_manager.aggregate = glycan_composition.clone()
+            glycosylation_manager.set_aggregate(glycan_composition.clone())
+
         self._init_termini(
             _make_terminal_group(structure_constants.N_TERM_DEFAULT, n_term),
             _make_terminal_group(structure_constants.C_TERM_DEFAULT, c_term))
@@ -296,7 +299,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         self._mass = 0.0
         self.sequence = []
 
-        self._glycosylation_manager = GlycosylationManagerImpl(self)
+        self._glycosylation_manager = GlycosylationManager(self)
 
         self._n_term = None
         self._c_term = None

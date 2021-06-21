@@ -4,6 +4,7 @@ from cpython.list cimport PyList_Append, PyList_Size
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem, PyDict_Next, PyDict_Size
 
 from glypy.composition.ccomposition cimport CComposition
+from glypy._c.structure.glycan_composition cimport _CompositionBase
 from glypy.structure.glycan_composition import HashableGlycanComposition
 
 from glycopeptidepy._c.structure.modification.modification cimport ModificationInstanceBase
@@ -11,7 +12,12 @@ from glycopeptidepy._c.structure.modification.rule cimport ModificationRuleBase,
 
 @cython.freelist(10000)
 cdef class GlycanCompositionWithOffsetProxyBase(object):
-    pass
+    def __init__(self, obj, offset=None):
+        if offset is None:
+            offset = CComposition._create(None)
+        self.obj = obj
+        self.composition_offset = offset
+
 
 
 cdef CComposition WATER_OFFSET = CComposition({"H": 2, "O": 1})
@@ -29,13 +35,25 @@ def set_glycan_composition_proxy_type(tp):
 @cython.freelist(10000)
 cdef class GlycosylationManager(object):
     def __init__(self, parent, aggregate=None):
-        self.mapping = {}
+        self._init()
         self.parent = parent
+        if aggregate is not None:
+            self.set_aggregate(aggregate)
+
+    @staticmethod
+    cdef GlycosylationManager _create(object parent, object aggregate):
+        cdef GlycosylationManager self = GlycosylationManager.__new__(GlycosylationManager)
+        self.parent = parent
+        if aggregate is not None:
+            self.set_aggregate(aggregate)
+        print(self)
+        return self
+
+    cdef void _init(self):
+        self.mapping = {}
         self._aggregate = None
         self._proxy = None
         self._type_track = None
-        if aggregate is not None:
-            self.set_aggregate(aggregate)
         self._total_glycosylation_size = -1
 
     def __getitem__(self, key):
@@ -96,8 +114,17 @@ cdef class GlycosylationManager(object):
         return self.copy()
 
     cpdef object _patch_aggregate(self):
-        cdef object aggregate = self.get_aggregate()
-        aggregate.composition_offset -= WATER_OFFSET
+        cdef:
+            object aggregate
+            CComposition offset
+        aggregate = self.get_aggregate()
+        if isinstance(aggregate, GlycanCompositionWithOffsetProxyBase):
+            offset = (<GlycanCompositionWithOffsetProxyBase>aggregate).composition_offset
+        elif isinstance(aggregate, _CompositionBase):
+            offset = (<_CompositionBase>aggregate)._composition_offset
+        else:
+            offset = <CComposition>(aggregate).composition_offset
+        offset.subtract_from(WATER_OFFSET)
 
     cpdef object invalidate(self):
         self._proxy = None

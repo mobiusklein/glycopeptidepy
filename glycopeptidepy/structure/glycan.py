@@ -288,6 +288,12 @@ class GlycanCompositionProxy(Mapping):
 class _GlycanCompositionWithOffsetProxyBase(object):
     __slots__ = ('composition_offset', )
 
+    def __init__(self, obj, offset=None):
+        if offset is None:
+            offset = Composition()
+        self.obj = obj
+        self.composition_offset = offset
+
 
 try:
     from glycopeptidepy._c.structure.glycan import GlycanCompositionWithOffsetProxyBase as _GlycanCompositionWithOffsetProxyBase
@@ -306,12 +312,6 @@ class GlycanCompositionWithOffsetProxy(_GlycanCompositionWithOffsetProxyBase, Gl
     this object is copied, the underlying GlycanComposition is not copied, only
     the proxy.
     """
-
-    def __init__(self, obj, offset=None):
-        if offset is None:
-            offset = Composition()
-        self.obj = obj
-        self.composition_offset = offset
 
     def clone(self, *args, **kwargs):
         return self.__class__(self.obj, self.composition_offset.copy())
