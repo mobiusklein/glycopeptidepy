@@ -63,6 +63,12 @@ class TypedGlycanComposition(HashableGlycanComposition):
         self.glycosylation_type = GlycosylationType[glycosylation_type]
         super(TypedGlycanComposition, self).__init__(*args, **kwargs)
 
+    @classmethod
+    def _empty(cls):
+        inst = super(cls, cls)._empty()
+        inst.glycosylation_type = None
+        return inst
+
     def clone(self, propogate_composition_offset=True):
         dup = self.__class__(self.glycosylation_type, self)
         if not propogate_composition_offset:
