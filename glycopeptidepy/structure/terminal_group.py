@@ -4,6 +4,8 @@ from .base import MoleculeBase
 from .modification import Modification
 from .composition import Composition, formula
 
+from six import string_types as basestring
+
 
 class TerminalGroup(MoleculeBase):
     __slots__ = ("base_composition", "mass", "_modification")
