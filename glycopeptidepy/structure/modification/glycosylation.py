@@ -262,12 +262,14 @@ class Glycosylation(GlycosylationBase):
     def total_composition(self):
         return self.glycan.total_composition()
 
+    @staticmethod
+    def modification_tp(*args, **kwargs):
+        from .modification import Modification
+        return Modification(*args, **kwargs)
 
-# try:
-#     from glycopeptidepy._c.structure.modification.rule import is_tracked_for_glycosylation
-#     Glycosylation.is_tracked_for = is_tracked_for_glycosylation
-# except ImportError:
-#     pass
+    def __call__(self, **kwargs):
+        return self.modification_tp(self, **kwargs)
+
 
 class CoreGlycosylation(Glycosylation):
     def get_fragments(self, *args, **kwargs):
