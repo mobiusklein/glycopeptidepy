@@ -203,7 +203,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             else:
                 self.modification_index.increment(mod, 1)
                 self.running_delta_mass += mod.mass
-        self.amino_acids_counter.increment(position.amino_acid, 1)
+        # self.amino_acids_counter.increment(position.amino_acid, 1)
         self.running_mass += position.amino_acid.mass
         if self.compute_compositions:
             composition = self.composition_of(position)

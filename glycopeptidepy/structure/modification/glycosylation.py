@@ -106,6 +106,9 @@ class GlycosylationBase(ModificationRule):
     def is_core(self):
         return self._is_core
 
+    def is_tracked_for(self, category):
+        return category == ModificationCategory.glycosylation
+
 
 try:
     from glycopeptidepy._c.structure.modification.rule import GlycosylationBase
@@ -249,9 +252,6 @@ class Glycosylation(GlycosylationBase):
     def clone(self):
         return self.__class__(
             self._original, self.encoding_format, self.metadata)
-
-    def is_tracked_for(self, category):
-        return category == ModificationCategory.glycosylation
 
     def get_fragments(self, *args, **kwargs):
         if self.is_composition:
