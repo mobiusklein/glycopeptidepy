@@ -35,6 +35,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         public bint include_neutral_losses
 
         public double running_mass
+        public double running_delta_mass
         public CComposition running_composition
         public long index
         public long size

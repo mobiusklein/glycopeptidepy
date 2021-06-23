@@ -321,9 +321,9 @@ cdef class PeptideFragment(FragmentBase):
 
         self.flanking_amino_acids = flanking_amino_acids
         self.glycosylation = glycosylation
-        self.set_chemical_shift(chemical_shift)
+        if chemical_shift is not None:
+            self.set_chemical_shift(chemical_shift)
 
-        # self._update_mass_with_modifications()
         if delta_mass == NULL:
             self._update_mass_with_modifications()
         else:
@@ -357,7 +357,6 @@ cdef class PeptideFragment(FragmentBase):
 
     cdef void _update_mass_with_modifications(self):
         cdef:
-            ChemicalShiftBase chemical_shift
             ModificationBase mod
             CountTable modification_dict
             CountTableIterator modification_iterator

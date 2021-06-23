@@ -77,6 +77,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
 
         # Null Values
         self.running_mass = 0
+        self.running_delta_mass = 0
         if self.compute_compositions:
             self.running_composition = CComposition()
         else:
@@ -185,6 +186,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     cpdef track_glycosylation(self, long index, glycosylation):
         self.glycosylation_manager[self.index] = glycosylation
         self.modification_index.increment(glycosylation, 1)
+        self.running_delta_mass += glycosylation.mass
 
     cpdef _update_state(self):
         cdef:
@@ -200,6 +202,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
                 self.track_glycosylation(self.index, mod)
             else:
                 self.modification_index.increment(mod, 1)
+                self.running_delta_mass += mod.mass
         self.amino_acids_counter.increment(position.amino_acid, 1)
         self.running_mass += position.amino_acid.mass
         if self.compute_compositions:
@@ -221,7 +224,8 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             flanking_amino_acids=self.flanking_residues(),
             glycosylation=self.glycosylation_manager.copy() if self.glycosylation_manager else None,
             chemical_shift=None,
-            composition=self.running_composition)
+            composition=self.running_composition,
+            delta_mass=&self.running_delta_mass)
         shifts = self._get_viable_chemical_shift_combinations()
         partial_loss_fragments = self.partial_loss(frag)
 
@@ -362,14 +366,15 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
         return composition
 
     cpdef track_glycosylation(self, long index, glycosylation):
-        # HCD strategy does not track intact topologies
-        try:
-            glycosylation = self._get_core_for(glycosylation)
-        except KeyError:
-            raise ValueError("Cannot determine which core to use for {}".format(
-                glycosylation.rule.glycosylation_type))
-        self.glycosylation_manager[self.index] = glycosylation
-        self.modification_index.increment(glycosylation, 1)
+        cdef:
+            ModificationBase glycosylation_core
+
+        # HCD strategy does not track intact topologies or compositions, just cores
+        glycosylation_core = self._get_core_for(glycosylation)
+
+        self.glycosylation_manager[self.index] = glycosylation_core
+        self.modification_index.increment(glycosylation_core, 1)
+        self.running_delta_mass += glycosylation_core.mass
 
     cpdef ModificationConfiguration _get_modifications_of_interest(self, PeptideFragment fragment):
         cdef:
@@ -524,8 +529,12 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                 variants = self._last_modification_variants = <list>ptemp
 
         series = self.series
-        fragments = []
+
         n = PyList_Size(variants)
+        # If there is only one variant, it must be the unaltered form, so just return that
+        if n == 1:
+            return [fragment]
+        fragments = []
         for i in range(n):
             variant_pair = <tuple>PyList_GetItem(variants, i)
             updated_modifications = CountTable._create_from(<CountTable>PyTuple_GetItem(variant_pair, 0))

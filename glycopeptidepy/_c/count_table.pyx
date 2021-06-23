@@ -170,7 +170,7 @@ cdef int count_table_bin_find(count_table_bin* bin, PyObject* query, Py_ssize_t*
 
 cdef count_table* make_count_table(size_t table_size, size_t bin_size):
     cdef:
-        size_t i, j
+        size_t i
         count_table* table
     table = <count_table*>PyMem_Malloc(sizeof(count_table))
     if table == NULL:
