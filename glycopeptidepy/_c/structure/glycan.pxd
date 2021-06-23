@@ -1,5 +1,7 @@
 from glypy.composition.ccomposition cimport CComposition
 
+from glycopeptidepy._c.structure.base cimport PeptideSequenceBase
+
 cdef class GlycanCompositionWithOffsetProxyBase(object):
     cdef:
         public object obj
@@ -48,4 +50,5 @@ cdef class GlycosylationManager(object):
 
     cdef void _init(self)
 
-    cdef GlycosylationManager _create(parent, aggregate)
+    @staticmethod
+    cdef GlycosylationManager _create(PeptideSequenceBase parent, aggregate)

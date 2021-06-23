@@ -9,6 +9,7 @@ from glypy.structure.glycan_composition import HashableGlycanComposition
 
 from glycopeptidepy._c.structure.modification.modification cimport ModificationInstanceBase
 from glycopeptidepy._c.structure.modification.rule cimport ModificationRuleBase, GlycosylationBase
+from glycopeptidepy._c.structure.base cimport PeptideSequenceBase
 
 @cython.freelist(10000)
 cdef class GlycanCompositionWithOffsetProxyBase(object):
@@ -41,12 +42,14 @@ cdef class GlycosylationManager(object):
             self.set_aggregate(aggregate)
 
     @staticmethod
-    cdef GlycosylationManager _create(object parent, object aggregate):
-        cdef GlycosylationManager self = GlycosylationManager.__new__(GlycosylationManager)
+    cdef GlycosylationManager _create(PeptideSequenceBase parent, object aggregate):
+        cdef:
+            GlycosylationManager self
+        self = GlycosylationManager.__new__(GlycosylationManager)
+        self._init()
         self.parent = parent
         if aggregate is not None:
             self.set_aggregate(aggregate)
-        print(self)
         return self
 
     cdef void _init(self):
@@ -104,7 +107,7 @@ cdef class GlycosylationManager(object):
             object aggregate
         aggregate = self.get_aggregate()
 
-        inst = self.__class__(
+        inst = GlycosylationManager._create(
             self.parent,
             aggregate.clone() if aggregate is not None else None)
         inst.update(self)
@@ -309,4 +312,4 @@ cdef class GlycosylationManager(object):
             return PyList_Size(<list>tmp)
 
     def __repr__(self):
-        return "{self.__class__}({self.mapping})".format(self=self)
+        return "{self.__class__.__name__}({self.mapping})".format(self=self)

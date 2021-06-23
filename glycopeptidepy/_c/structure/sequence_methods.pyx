@@ -299,7 +299,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         self._mass = 0.0
         self.sequence = []
 
-        self._glycosylation_manager = GlycosylationManager(self)
+        self._glycosylation_manager = GlycosylationManager._create(self, None)
 
         self._n_term = None
         self._c_term = None
