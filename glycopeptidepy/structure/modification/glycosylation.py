@@ -83,7 +83,10 @@ glycan_resolvers['iupaclite'] = TypedGlycanComposition.parse
 def parse_glycan(glycan_format, encoded_string):
     try:
         parser = glycan_resolvers[glycan_format]
-        return parser(encoded_string)
+        result = parser(encoded_string)
+        if not result:
+            raise KeyError(encoded_string)
+        return result
     except KeyError:
         raise KeyError("Could not resolve glycan parser for %r (%r)" % (glycan_format, encoded_string))
 
@@ -159,6 +162,7 @@ class Glycosylation(GlycosylationBase):
                 glycan_definition = match.group(2)
             else:
                 raise ValueError("Cannot recognize glycan format %r" % (rule_string,))
+
         return parse_glycan(format_type, glycan_definition), format_type, metadata
 
     @classmethod
