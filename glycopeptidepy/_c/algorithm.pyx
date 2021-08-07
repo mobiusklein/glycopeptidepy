@@ -96,7 +96,6 @@ cdef class ModificationSiteAssignmentCombinator(object):
             else:
                 selected = <tuple>tmp
                 yield self._remove_empty_sites(sites, selected)
-                # Py_DECREF(selected)
 
         # for selected in product(*choices):
         #     yield self._remove_empty_sites(sites, selected)
