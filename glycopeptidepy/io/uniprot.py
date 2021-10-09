@@ -23,6 +23,7 @@ from glypy.io.glyspace import UniprotRDFClient
 from six import add_metaclass, string_types as basestring
 
 uri_template = "https://www.uniprot.org/uniprot/{accession}.xml"
+batch_uri = "https://www.uniprot.org/uploadlists/"
 nsmap = {"up": "http://uniprot.org/uniprot"}
 
 
@@ -88,16 +89,23 @@ class PeptideBase(UniProtFeatureBase):
     @classmethod
     def fromxml(cls, feature):
         known = True
+
         try:
             begin = int(feature.find(".//{http://uniprot.org/uniprot}begin", nsmap).attrib['position']) - 1
-        except KeyError:
+        except (KeyError, AttributeError):
             begin = 0
             known = False
         try:
             end = int(feature.find(".//{http://uniprot.org/uniprot}end", nsmap).attrib['position'])
-        except KeyError:
+        except (KeyError, AttributeError):
             end = float('inf')
             known = False
+        if not known:
+            if begin == 0 and end == float('inf'):
+                begin = int(feature.find(
+                    ".//{http://uniprot.org/uniprot}location", nsmap).attrib['position']) - 1
+                end = begin + 1
+                known = True
         return cls(begin, end, known)
 
 
@@ -270,8 +278,12 @@ class SequenceVariant(UniProtFeatureBase):
             return None
         else:
             position = int(position.attrib['position']) - 1
-            original = feature.find(".//up:original", nsmap).text
-            variation = feature.find(".//up:variation", nsmap).text
+            original = feature.find(".//up:original", nsmap)
+            if original is not None:
+                original = original.text
+            variation = feature.find(".//up:variation", nsmap)
+            if variation is not None:
+                variation = variation.text
         return cls(position, original, variation)
 
     @property
@@ -459,13 +471,34 @@ def get_features_for(accession, error=False):
     return parse(tree, error)
 
 
+def get_features_for_many(accessions, error=False):
+    query_to_doc = dict()
+    r = requests.post(batch_uri, params={
+        "format": "xml",
+        "from": "ACC+ID",
+        "to": "ACC",
+        "query": " ".join(accessions)
+    })
+    tree = etree.fromstring(r.content)
+    for doc in parse_all(tree, error=error):
+        for acc in doc.accessions:
+            query_to_doc[acc] = doc
+    results = []
+    for acc in accessions:
+        if acc in query_to_doc:
+            results.append((acc, query_to_doc[acc]))
+        else:
+            results.append((acc, None))
+    return results
+
+
 def get(accessions):
     if accessions is None:
         raise TypeError("accessions cannot be `None`")
     if isinstance(accessions, basestring):
         return get_features_for(accessions)
     elif len(accessions) < 5:
-        return list(map(get_features_for, accessions))
+        return [b for a, b in get_features_for_many(accessions) if b is not None]
     else:
         chunk_size = min(len(accessions) // 5, 15)
         return ProteinDownloader.download(accessions, chunk_size)
