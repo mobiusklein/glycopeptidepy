@@ -1,5 +1,7 @@
 import unittest
 
+from glycopeptidepy.structure.sequence.implementation import PeptideSequence
+
 try:
     from StringIO import StringIO
 except ImportError:
@@ -42,8 +44,13 @@ class TestProtease(unittest.TestCase):
     def test_digest(self):
         trypsin = enzyme.Protease("trypsin")
         example_found = False
-        for peptide, start, stop, missed in trypsin.cleave(heparanase, 2):
+        result = trypsin.cleave(heparanase, 2)
+        seq = str(heparanase)
+        assert len(result) == 177
+        for peptide, start, stop, missed in result:
             assert missed < 3
+            assert missed == trypsin.missed_cleavages(peptide)
+            assert seq[start:stop] == peptide
             if peptide == "KFKNSTYSR":
                 example_found = True
         if not example_found:
@@ -53,8 +60,13 @@ class TestProtease(unittest.TestCase):
         trypsin = enzyme.Protease("trypsin")
         c_term_example = False
         n_term_example = False
-        for peptide, start, end, missed in trypsin.cleave(agp1, semispecific=True):
+        seq = str(agp1)
+        result = trypsin.cleave(agp1, semispecific=True, missed_cleavages=2)
+        assert len(result) == 1037
+        for peptide, start, end, missed in result:
             assert missed < 3
+            assert missed == trypsin.missed_cleavages(peptide)
+            assert seq[start:end] == peptide
             if peptide == "LVPVPITNATLDQITGK":
                 c_term_example = True
             if peptide == 'ENGT':

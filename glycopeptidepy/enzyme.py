@@ -77,13 +77,11 @@ class Protease(object):
 
         all_sites = [0] + list(self._find_sites(sequence))
         for ix, i in enumerate(all_sites):
-            # Add the new site to the backtrack list
+            # Update the cleavage sites to step through
             cleavage_sites = all_sites[ix:ix + missed_cleavages + 2]
-            # Step back through previous cleavage sites before
-            # this one
+            # Step through the next cleavage sites up to the missed cleavage tolerance
             for j in range(1, len(cleavage_sites)):
-                # Get the sequence between the the jth previous site
-                # and the most recent cleavage site
+                # Get the sequence between this site and the jth next site
                 seq = sequence[cleavage_sites[0]:cleavage_sites[j]]
                 # Only deal with this if the sequence is non-empty
                 if seq:
@@ -105,85 +103,92 @@ class Protease(object):
         if isinstance(sequence, PeptideSequence):
             sequence = str(sequence)
 
-        cleavage_sites = deque([0], maxlen=missed_cleavages + 2)
-        all_sites = list(self._find_sites(sequence))
+        all_sites = [0] + list(self._find_sites(sequence))
         all_sites[-1] = sequence_length(sequence)
         n_sites = len(all_sites)
 
-        n_seq = sequence_length(sequence)
+        sequence_size = sequence_length(sequence)
 
         # See the large comment in Protease.cleave for a descrption of this first
         # pair of for-loops
-        for i in all_sites:
+        seen = dict()
+        for ix, i in enumerate(all_sites):
             # Add the new site to the backtrack list
-            cleavage_sites.append(i)
+            cleavage_sites = all_sites[ix:ix + missed_cleavages + 2]
+
             for j in range(1, len(cleavage_sites)):
-                # Get the sequence between the the jth previous site
-                # and the most recent cleavage site
                 seq = sequence[cleavage_sites[0]:cleavage_sites[j]]
                 # Only deal with this if the sequence is non-empty
                 if seq:
                     seq_size = sequence_length(seq)
-                    if (min_length is None or seq_size >= min_length) and (
-                            max_length is None or seq_size <= max_length):
+                    if min_length is None or seq_size >= min_length:
                         # Get parent sequence coordinates
                         start_position = cleavage_sites[0]
                         end_position = cleavage_sites[j]
                         if end_position is None:
-                            end_position = sequence_length(sequence)
+                            end_position = sequence_size
                         # Store the sequence, start position, end position, and # of missed cleavages
                         peptides.append((seq, start_position, end_position, j - 1))
 
             # C-terminus is enzyme-specific
             # Let the N-terminus be any position between the least recent proteolytic site
             # (cleavage_sites[0]) and the C-terminal site (i).
-            j = cleavage_sites[0]
-            if i is None:
-                i = n_seq
-            for k in range(j, i):
+            i = cleavage_sites[0]
+            for j in cleavage_sites[1:]:
+                for k in range(i, j):
+                    if k in cleavage_sites:
+                        continue
+
+                    if (k, j) in seen:
+                        continue
+                    seen[(k, j)] = (k, j, 'c-term')
+                    seq = sequence[k:j]
+                    # Only deal with this if the sequence is non-empty
+                    if seq:
+                        seq_size = sequence_length(seq)
+                        if (min_length is None or seq_size >= min_length) and (
+                                max_length is None or seq_size <= max_length):
+                            # Get parent sequence coordinates
+                            start_position = k
+                            end_position = j
+                            if end_position is None:
+                                end_position = sequence_size
+                            n_missed = 0
+                            for site in cleavage_sites:
+                                if k < site < j:
+                                    n_missed += 1
+                            assert n_missed == self.missed_cleavages(seq)
+                            # Store the sequence, start position, end position, and # of missed cleavages
+                            peptides.append(
+                                (seq, start_position, end_position, n_missed))
+            # N-terminus is enzyme-specific
+            # Let the C-terminus be any position between the least recent proteolytic site
+            i = cleavage_sites[0]
+            j = cleavage_sites[min(missed_cleavages + 2, len(cleavage_sites) - 1)]
+            for k in range(j, i, -1):
                 if k in cleavage_sites:
                     continue
-                seq = sequence[k:i]
-                # Only deal with this if the sequence is non-empty
+                if (i, k) in seen:
+                    continue
+                seen[k, i] = (k, i, 'n-term')
+                seq = sequence[i:k]
                 if seq:
                     seq_size = sequence_length(seq)
                     if (min_length is None or seq_size >= min_length) and (
                             max_length is None or seq_size <= max_length):
                         # Get parent sequence coordinates
-                        start_position = k
-                        end_position = cleavage_sites[-1]
-                        if end_position is None:
-                            end_position = n_seq
-                        n_missed = 0
-                        for site in cleavage_sites:
-                            if k < site < i:
-                                n_missed += 1
-                        # Store the sequence, start position, end position, and # of missed cleavages
-                        peptides.append((seq, start_position, end_position, n_missed))
-
-        # N-terminus is enzyme-specific
-        for ix, j in enumerate(all_sites):
-            terminal_ix = min(ix + missed_cleavages + 1, n_sites - 1)
-            terminal_site = all_sites[terminal_ix]
-            sites_between = all_sites[ix:terminal_ix]
-            for k in range(j + 1, terminal_site):
-                seq = sequence[j:k]
-                if seq:
-                    seq_size = sequence_length(seq)
-                    if (min_length is None or seq_size >= min_length) and (
-                            max_length is None or seq_size <= max_length):
-                        # Get parent sequence coordinates
-                        start_position = j
+                        start_position = i
                         end_position = k
                         if end_position is None:
-                            end_position = n_seq
+                            end_position = sequence_size
                         n_missed = 0
-                        for site in sites_between:
-                            if j < site < k:
+                        for site in cleavage_sites:
+                            if i < site < k:
                                 n_missed += 1
+                        assert n_missed == self.missed_cleavages(seq)
                         # Store the sequence, start position, end position, and # of missed cleavages
-                        peptides.append((seq, start_position, end_position, n_missed))
-
+                        peptides.append(
+                            (seq, start_position, end_position, n_missed))
         return sorted(set(peptides), key=_get12)
 
     @classmethod
