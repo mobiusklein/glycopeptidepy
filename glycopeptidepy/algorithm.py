@@ -134,10 +134,62 @@ def reverse_sequence(sequence, prefix_len=0, suffix_len=1, peptide_type=None, kn
     return rev_sequence
 
 
+class LimitedCrossproduct(object):
+    def __init__(self, collections, max_depth=4):
+        self.collections = collections
+        self.max_depth = max_depth
+        self.size = len(collections)
+
+        self.precomputed = self.compose_iterative()
+        self.iterator = iter(self.precomputed)
+
+    def compose(self):
+        i = 0
+        current = []
+        depth = 0
+        for res in self.compose_inner(i, current, depth):
+            yield res
+
+    def compose_inner(self, layer_index, current, depth):
+        if layer_index == self.size:
+            yield current, depth
+            return
+        layer = self.collections[layer_index]
+        for val in layer:
+            new_depth = depth + (val is not None)
+            if new_depth <= self.max_depth:
+                for res in self.compose_inner(layer_index + 1, current + [val], new_depth):
+                    yield res
+            else:
+                continue
+
+    def compose_iterative(self):
+        previous = [([], 0)]
+        layer_index = 0
+        for layer in self.collections:
+            current = []
+            for rec, depth in previous:
+                for val in layer:
+                    new_depth = depth + (val is not None)
+                    if new_depth <= self.max_depth:
+                        current.append((rec + [val], new_depth))
+            previous = current
+        return previous
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self.iterator)
+
+
+
+
 class ModificationSiteAssignmentCombinator(object):
-    def __init__(self, variable_site_map):
+    def __init__(self, variable_site_map, max_modifications=4):
         self.modification_to_site = variable_site_map
         self.site_to_modification = self.transpose_sites()
+        self.max_modifications = max_modifications
 
     def transpose_sites(self):
         """Given a dictionary mapping between modification names and
@@ -162,9 +214,12 @@ class ModificationSiteAssignmentCombinator(object):
     def assign(self):
         sites = list(self.site_to_modification.keys())
         choices = list(self.site_to_modification.values())
-        for selected in itertools.product(*choices):
+        for selected in LimitedCrossproduct(choices, max_depth=self.max_modifications):
             site_mod_pairs = zip(sites, selected)
-            yield self._remove_empty_sites(site_mod_pairs)
+            assignment = self._remove_empty_sites(site_mod_pairs)
+            if assignment > self.max_modifications:
+                continue
+            yield assignment
 
     def __iter__(self):
         return self.assign()
@@ -381,6 +436,6 @@ class ProteinDigestor(object):
 try:
     _ModificationSiteAssignmentCombinator = ModificationSiteAssignmentCombinator
     has_c = True
-    from glycopeptidepy._c.algorithm import ModificationSiteAssignmentCombinator
+    from glycopeptidepy._c.algorithm import ModificationSiteAssignmentCombinator, LimitedCrossproduct
 except ImportError:
     has_c = False
