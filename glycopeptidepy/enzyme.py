@@ -157,7 +157,7 @@ class Protease(object):
                             for site in cleavage_sites:
                                 if k < site < j:
                                     n_missed += 1
-                            assert n_missed == self.missed_cleavages(seq)
+
                             # Store the sequence, start position, end position, and # of missed cleavages
                             peptides.append(
                                 (seq, start_position, end_position, n_missed))
@@ -185,7 +185,7 @@ class Protease(object):
                         for site in cleavage_sites:
                             if i < site < k:
                                 n_missed += 1
-                        assert n_missed == self.missed_cleavages(seq)
+
                         # Store the sequence, start position, end position, and # of missed cleavages
                         peptides.append(
                             (seq, start_position, end_position, n_missed))
