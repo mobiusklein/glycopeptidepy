@@ -730,9 +730,9 @@ cdef class StubFragment(SimpleFragment):
         self.is_extended = is_extended
 
     cpdef clone(self):
-        dup = super(StubFragment, self).clone()
-        dup.glycosylation = self.glycosylation
-        dup.is_extended = self.is_extended
+        cdef StubFragment dup = StubFragment._create(
+            self.name, self.mass, self.kind, self.composition, self.get_chemical_shift(),
+            self.is_glycosylated, self.glycosylation, self.is_extended)
         return dup
 
     @property
