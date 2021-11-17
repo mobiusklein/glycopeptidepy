@@ -646,7 +646,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 chemical_shift=None,
                 glycosylation=glycosylation,
                 is_extended=site.is_extended,
-                glycosylation_size=site.total())
+                glycosylation_size=site.get_glycosylation_size())
 
     def o_glycan_stub_fragments(self):
         cdef:
@@ -693,7 +693,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 chemical_shift=None,
                 glycosylation=glycosylation,
                 is_extended=site.is_extended,
-                glycosylation_size=site.total())
+                glycosylation_size=site.get_glycosylation_size())
 
     cpdef list o_glycan_composition_fragments(self, glycan, long core_count=1, long iteration_count=0):
         cdef:
@@ -844,7 +844,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 chemical_shift=None,
                 glycosylation=glycosylation,
                 is_extended=site.is_extended,
-                glycosylation_size=site.total())
+                glycosylation_size=site.get_glycosylation_size())
 
     cpdef list gag_linker_composition_fragments(self, glycan, long core_count=1, long iteration_count=0):
         cdef:
