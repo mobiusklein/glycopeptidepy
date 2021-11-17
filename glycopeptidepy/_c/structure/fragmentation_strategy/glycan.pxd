@@ -12,9 +12,11 @@ cdef class GlycanCompositionFragment(object):
         public CountTable key
         public bint is_extended
         public Py_hash_t _hash_key
+        int _glycosylation_size
 
     cpdef GlycanCompositionFragment copy(self)
     cpdef _get_glycan_composition(self)
+    cdef int get_glycosylation_size(self)
 
     @staticmethod
     cdef GlycanCompositionFragment _create(double mass, CComposition composition, CountTable key, bint is_extended)

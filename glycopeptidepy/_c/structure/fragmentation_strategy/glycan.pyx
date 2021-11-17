@@ -140,6 +140,7 @@ cdef class GlycanCompositionFragment(object):
         self.key = key
         self.is_extended = is_extended
         self._hash_key = -1
+        self._glycosylation_size = -1
 
     def __hash__(self):
         if self._hash_key == -1:
@@ -201,6 +202,15 @@ cdef class GlycanCompositionFragment(object):
             self.is_extended)
         inst._hash_key = self._hash_key
         return inst
+
+    cdef int get_glycosylation_size(self):
+        if self._glycosylation_size == -1:
+            self._glycosylation_size = self.key.total()
+        return self._glycosylation_size
+
+    @property
+    def glycosylation_size(self):
+        return self.get_glycosylation_size()
 
 
 cdef dict hexnac_hex_composition_cache = dict()

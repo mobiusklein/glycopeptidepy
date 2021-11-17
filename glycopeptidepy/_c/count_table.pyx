@@ -7,9 +7,9 @@ from cpython.int cimport PyInt_AsLong, PyInt_FromLong
 from cpython.dict cimport PyDict_Next, PyDict_SetItem
 
 try:
-    from collections import Mapping, MutableMapping
-except ImportError:
     from collections.abc import Mapping, MutableMapping
+except ImportError:
+    from collections import Mapping, MutableMapping
 
 
 DEF USE_FREELIST = 0
@@ -325,6 +325,18 @@ cdef Py_ssize_t count_table_count(count_table* table):
     for i in range(table.size):
         for j in range(table.bins[i].used):
             count += table.bins[i].cells[j].key != NULL
+    return count
+
+
+cdef long count_table_total(count_table* table):
+    cdef:
+        long count
+        size_t i, j
+    count = 0
+    for i in range(table.size):
+        for j in range(table.bins[i].used):
+            if table.bins[i].cells[j].key != NULL:
+                count += table.bins[i].cells[j].value
     return count
 
 
@@ -916,6 +928,9 @@ cdef class CountTable(object):
 
     def get_count(self):
         return self.table.count
+
+    cpdef long total(self):
+        return count_table_total(self.table)
 
 
 Mapping.register(CountTable)

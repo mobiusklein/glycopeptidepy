@@ -32,6 +32,7 @@ cdef int count_table_increment(count_table* table, PyObject* key, long value)
 cdef int count_table_decrement(count_table* table, PyObject* key, long value)
 
 cdef Py_ssize_t count_table_count(count_table* table)
+cdef long count_table_total(count_table* table)
 
 cdef list count_table_keys(count_table* table)
 cdef list count_table_values(count_table* table)
@@ -104,3 +105,4 @@ cdef class CountTable(object):
     cdef long getitem(self, object key) except *
     cdef int setitem(self, object key, long value) except 1
     cdef long delitem(self, object key) except *
+    cpdef long total(self)
