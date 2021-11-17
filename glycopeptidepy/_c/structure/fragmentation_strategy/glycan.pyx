@@ -10,6 +10,7 @@ from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
 
 from glypy.composition.ccomposition cimport CComposition
+from glypy._c.structure.glycan_composition cimport _CompositionBase
 
 from glycopeptidepy._c.structure.fragmentation_strategy.base cimport FragmentationStrategyBase
 
@@ -59,14 +60,15 @@ cdef class _CompositionTree(object):
         cdef:
             tuple item
             int i, n
+            _CompositionBase value
         # n = PyList_Size(pair_sequence)
         node = self.root.traverse(pair_sequence)
         if node.name is None:
             # modify the hashable glycan composition before calculating
             # its hash value
-            node.name = HashableGlycanComposition()
+            value = node.name = <_CompositionBase>HashableGlycanComposition()
             for k, v in pair_sequence:
-                node.name._setitem_fast(k, v)
+                value._setitem_fast(k, v)
             # Force the population of the _mass and _str caches
             node.name.mass()
             str(node.name)
@@ -600,7 +602,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             result.append((intermediate, name, glycosylation))
         return result
 
-    def n_glycan_stub_fragments(self):
+    cpdef list n_glycan_stub_fragments(self):
         cdef:
             int core_count
             list per_site_shifts
@@ -612,7 +614,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             bint is_extended, is_glycosylated
             str name_key, name
             object glycosylation
-
+            list accumulator
             list combos
             tuple result
 
@@ -627,6 +629,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             per_site_shifts.append(core_shifts)
         combos = self._combinate_sites(per_site_shifts, glycan)
         n_combos = PyList_Size(combos)
+        accumulator = []
         for i in range(n_combos):
             result = <tuple>PyList_GetItem(combos, i)
             site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
@@ -637,7 +640,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             if self.compute_compositions:
                 composition = base_composition.clone()
                 composition.add_from(site.composition)
-            yield StubFragment._create(
+
+            accumulator.append(StubFragment._create(
                 name=name,
                 mass=base_mass + site.mass,
                 composition=composition,
@@ -646,7 +650,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 chemical_shift=None,
                 glycosylation=glycosylation,
                 is_extended=site.is_extended,
-                glycosylation_size=site.get_glycosylation_size())
+                glycosylation_size=site.get_glycosylation_size()))
+        return accumulator
 
     def o_glycan_stub_fragments(self):
         cdef:
@@ -916,7 +921,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             raise ValueError(
                 "Does not support mixed-type glycan fragmentation (yet)")
         if n_glycan:
-            return self.n_glycan_stub_fragments()
+            return iter(self.n_glycan_stub_fragments())
         elif o_glycan:
             return self.o_glycan_stub_fragments()
         elif gag_linker:
