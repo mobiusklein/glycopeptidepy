@@ -700,7 +700,7 @@ cdef class StubFragment(SimpleFragment):
     @staticmethod
     cdef StubFragment _create(str name, double mass, IonSeriesBase kind, CComposition composition,
                               ChemicalShiftBase chemical_shift, bint is_glycosylated, object glycosylation,
-                              bint is_extended):
+                              bint is_extended, int glycosylation_size=-1):
         cdef:
             StubFragment self
 
@@ -708,6 +708,7 @@ cdef class StubFragment(SimpleFragment):
         self._name = name
         self._hash = hash(self._name)
         self._chemical_shift = None
+        self._glycosylation_size = glycosylation_size
 
         self.mass = mass
         self.kind = kind
@@ -732,12 +733,18 @@ cdef class StubFragment(SimpleFragment):
     cpdef clone(self):
         cdef StubFragment dup = StubFragment._create(
             self.name, self.mass, self.kind, self.composition, self.get_chemical_shift(),
-            self.is_glycosylated, self.glycosylation, self.is_extended)
+            self.is_glycosylated, self.glycosylation, self.is_extended,
+            self._glycosylation_size)
         return dup
+
+    cdef int get_glycosylation_size(self):
+        if self._glycosylation_size == -1:
+            self._glycosylation_size = sum(self.glycosylation.values())
+        return self._glycosylation_size
 
     @property
     def glycosylation_size(self):
-        return sum(self.glycosylation.values())
+        return self.get_glycosylation_size()
 
     cpdef str base_name(self):
         """Simply return the base fragment's name, omitting any chemical modification,

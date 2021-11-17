@@ -70,11 +70,15 @@ cdef class StubFragment(SimpleFragment):
     cdef:
         public object glycosylation
         public bint is_extended
+        int _glycosylation_size
 
     @staticmethod
     cdef StubFragment _create(str name, double mass, IonSeriesBase kind, CComposition composition,
                               ChemicalShiftBase chemical_shift, bint is_glycosylated, object glycosylation,
-                              bint is_extended)
+                              bint is_extended, int glycosylation_size=*)
+
+    cdef int get_glycosylation_size(self)
+
 
 ctypedef fused mapping_types:
         CountTable
