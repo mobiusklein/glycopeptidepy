@@ -117,6 +117,7 @@ ctypedef fused list_or_iterable:
 cdef class _NameTree(object):
     cdef:
         public object name
+        public object value
         public dict children
 
     @staticmethod

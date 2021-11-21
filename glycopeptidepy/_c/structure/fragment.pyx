@@ -613,6 +613,7 @@ cdef class _NameTree(object):
     cdef _NameTree _create():
         cdef _NameTree self = _NameTree.__new__(_NameTree)
         self.name = None
+        self.value = None
         self.children = dict()
         return self
 
@@ -620,6 +621,7 @@ cdef class _NameTree(object):
         if children is None:
             children = dict()
         self.name = name
+        self.value = None
         self.children = children
 
     def __getitem__(self, key):

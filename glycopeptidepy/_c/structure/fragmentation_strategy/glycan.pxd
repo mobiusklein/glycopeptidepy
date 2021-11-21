@@ -1,9 +1,11 @@
 from glypy.composition.ccomposition cimport CComposition
 
+from glypy._c.structure.glycan_composition cimport _CompositionBase
+
 from glycopeptidepy._c.count_table cimport CountTable
 
 from glycopeptidepy._c.structure.fragmentation_strategy.base cimport FragmentationStrategyBase
-
+from glycopeptidepy._c.structure.fragment cimport _NameTree
 
 cdef class GlycanCompositionFragment(object):
     cdef:
@@ -15,7 +17,7 @@ cdef class GlycanCompositionFragment(object):
         int _glycosylation_size
 
     cpdef GlycanCompositionFragment copy(self)
-    cpdef _get_glycan_composition(self)
+    cpdef _NameTree _get_glycan_composition(self)
     cdef int get_glycosylation_size(self)
 
     @staticmethod

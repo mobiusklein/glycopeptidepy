@@ -56,30 +56,34 @@ cdef class _CompositionTree(object):
     def __getitem__(self, key):
         return self.root[key]
 
-    cpdef object build(self, list pair_sequence):
+    cpdef _NameTree build(self, list pair_sequence):
         cdef:
             tuple item
             int i, n
             _CompositionBase value
-        # n = PyList_Size(pair_sequence)
+            _NameTree node
         node = self.root.traverse(pair_sequence)
         if node.name is None:
             # modify the hashable glycan composition before calculating
             # its hash value
             value = node.name = <_CompositionBase>HashableGlycanComposition()
-            for k, v in pair_sequence:
+            n = PyList_Size(pair_sequence)
+            for i in range(n):
+                item = <tuple>PyList_GET_ITEM(pair_sequence, i)
+                k = <object>PyTuple_GET_ITEM(item, 0)
+                v = <object>PyTuple_GET_ITEM(item, 1)
                 value._setitem_fast(k, v)
             # Force the population of the _mass and _str caches
             node.name.mass()
-            str(node.name)
-        return node.name
+            node.value = str(node.name)
+        return node
 
 
 cdef _CompositionTree _composition_tree_root = _CompositionTree()
 cdef dict _composition_name_cache = dict()
 
 
-cdef _prepare_glycan_composition_from_mapping(CountTable mapping):
+cdef _NameTree _prepare_glycan_composition_from_mapping(CountTable mapping):
     pair_sequence = mapping.items()
     return _composition_tree_root.build(pair_sequence)
 
@@ -145,11 +149,13 @@ cdef class GlycanCompositionFragment(object):
         self._glycosylation_size = -1
 
     def __hash__(self):
+        cdef _NameTree node
         if self._hash_key == -1:
-            self._hash_key = hash(self._get_glycan_composition())
+            node = self._get_glycan_composition()
+            self._hash_key = hash(node.name)
         return self._hash_key
 
-    cpdef _get_glycan_composition(self):
+    cpdef _NameTree _get_glycan_composition(self):
         return _prepare_glycan_composition_from_mapping(self.key)
 
     def __eq__(self, other):
@@ -529,11 +535,11 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             list combos
             Py_ssize_t i, n, j, m
             tuple positions
-            bint is_extended
+            bint is_extended, invalid
             CComposition composition
             GlycanCompositionFragment intermediate, site
             CountTable aggregate_glycosylation
-            object glycosylation
+            _NameTree glycosylation
             set seen
             int core_count
             double total_mass
@@ -588,7 +594,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
 
             glycosylation = _prepare_glycan_composition_from_mapping(
                 aggregate_glycosylation)
-            name_key = str(glycosylation)
+            name_key = glycosylation.value
             # May not need to do this second round of building.
             ptemp = PyDict_GetItem(_composition_name_cache, name_key)
             if ptemp == NULL:
@@ -599,7 +605,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             if name in seen:
                 continue
             seen.add(name)
-            result.append((intermediate, name, glycosylation))
+            result.append((intermediate, name, glycosylation.name))
         return result
 
     cpdef list n_glycan_stub_fragments(self):
