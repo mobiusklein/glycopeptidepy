@@ -121,7 +121,10 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         # method to look up monosaccharides.
         self._use_query = use_query
         self._generator = None
-        self.glycosylation_manager = self.peptide.glycosylation_manager
+        if self.peptide is not None:
+            self.glycosylation_manager = self.peptide.glycosylation_manager
+        else:
+            self.glycosylation_manager = None
 
     cpdef glycan_composition(self):
         return self.peptide.glycan_composition.obj
@@ -148,7 +151,7 @@ cdef class GlycanCompositionFragment(object):
         self.is_extended = is_extended
         self._hash_key = -1
         self._glycosylation_size = -1
-        self.name = None
+        self.cache = None
 
     def __hash__(self):
         cdef _NameTree node
@@ -344,7 +347,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         modified.key.increment(shift, 1)
         return modified
 
-    cpdef list n_glycan_composition_fragments(self, _CompositionBase glycan, int core_count=1, int  iteration_count=0):
+    cpdef list n_glycan_composition_fragments(self, object glycan, int core_count=1, int  iteration_count=0):
         """Generate theoretical N-glycan Y fragment compositions containing the core motif
         plus a portion of the extended branches if :attr:`extended` is used. Unless :attr:`extend
 
@@ -379,10 +382,10 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             hexnac_in_aggregate = glycan.query('HexNAc')
             hexose_in_aggregate = glycan.query('Hex')
         else:
-            fucose_count = glycan._getitem_fast(_FUC) + glycan._getitem_fast(_DHEX)
-            xylose_count = glycan._getitem_fast(_XYL)
-            hexnac_in_aggregate = glycan._getitem_fast(_HEXNAC)
-            hexose_in_aggregate = glycan._getitem_fast(_HEX)
+            fucose_count = glycan[_FUC] + glycan[_DHEX]
+            xylose_count = glycan[_XYL]
+            hexnac_in_aggregate = glycan[_HEXNAC]
+            hexose_in_aggregate = glycan[_HEX]
 
         core_shifts = []
         base_hexnac = min(hexnac_in_aggregate + 1, 3)

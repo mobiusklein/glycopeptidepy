@@ -51,7 +51,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
     cpdef bint _validate_glycan_composition(self, CountTable aggregate_glycosylation, glycan)
     cpdef list _combinate_sites(self, list per_site_shifts, object glycan)
 
-    cpdef list n_glycan_composition_fragments(self, _CompositionBase glycan, int core_count=*, int iteration_count=*)
+    cpdef list n_glycan_composition_fragments(self, object glycan, int core_count=*, int iteration_count=*)
     cpdef list o_glycan_composition_fragments(self, glycan, long core_count=*, long iteration_count=*)
     cpdef list gag_linker_composition_fragments(self, glycan, long core_count=*, long iteration_count=*)
 
