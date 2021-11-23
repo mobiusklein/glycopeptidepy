@@ -20,7 +20,7 @@ from glycopeptidepy._c.parser import sequence_tokenizer
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.constants cimport Configuration
-from glycopeptidepy._c.structure.glycan cimport GlycosylationManager
+from glycopeptidepy._c.structure.glycan cimport GlycosylationManager, GlycanCompositionWithOffsetProxyBase
 
 from glycopeptidepy.structure.residue import AminoAcidResidue
 from glycopeptidepy.structure.modification import Modification, ModificationCategory, SequenceLocation
@@ -604,7 +604,10 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         cdef _PeptideSequenceCore inst = self.__class__()
         if self._glycosylation_manager.aggregate is not None:
             glycan = self._glycosylation_manager.aggregate.clone()
-            glycan.composition_offset = CComposition._create(WATER)
+            if isinstance(glycan, GlycanCompositionWithOffsetProxyBase):
+                glycan.composition_offset = CComposition._create(None)
+            else:
+                glycan.composition_offset = CComposition._create(WATER)
         else:
             glycan = None
         inst._init_from_components(
