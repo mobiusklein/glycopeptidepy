@@ -401,12 +401,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     def mass(self, value):
         self._mass = value
 
-    @property
-    def peptide_backbone_mass(self):
-        return self.peptide_composition().mass
-
-    @property
-    def total_mass(self):
+    cdef double get_peptide_backbone_mass(self):
         cdef:
             double total
             size_t i, j, m, n
@@ -427,10 +422,24 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
 
         total += self._n_term.mass
         total += self._c_term.mass
+        return total
+
+    @property
+    def peptide_backbone_mass(self):
+        return self.get_peptide_backbone_mass()
+
+    cdef double get_total_mass(self):
+        cdef:
+            double total
+        total = self.get_peptide_backbone_mass()
         gc = self.glycan_composition
         if gc:
             total += PyFloat_AsDouble(gc.mass())
         return total
+
+    @property
+    def total_mass(self):
+        return self.get_total_mass()
 
     cpdef CComposition peptide_composition(self):
         if self._peptide_composition is None:

@@ -592,7 +592,8 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         if core_count == 1:
             # Fast path that doesn't need to use itertools.product or any of the extra
             # unpacking and validation
-            return self._combinate_sites_single(<list>PyList_GET_ITEM(per_site_shifts, 0), glycan)
+            combos = <list>PyList_GET_ITEM(per_site_shifts, 0)
+            return self._combinate_sites_single(combos, glycan)
         combos = list(product(*per_site_shifts))
         result = []
         seen = set()
@@ -676,8 +677,12 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         self._use_query = self._guess_query_mode(glycan)
         core_count = self.count_glycosylation_type(GlycosylationType_n_linked)
         per_site_shifts = []
-        base_composition = self.peptide_composition()
-        base_mass = base_composition.calc_mass()
+        base_composition = None
+        if self.compute_compositions:
+            base_composition = self.peptide_composition()
+            base_mass = base_composition.calc_mass()
+        else:
+            base_mass = self.peptide.get_peptide_backbone_mass()
         for i in range(core_count):
             core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)
@@ -726,8 +731,12 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         core_count = self.count_glycosylation_type(GlycosylationType_o_linked)
         per_site_shifts = []
 
-        base_composition = self.peptide_composition()
-        base_mass = base_composition.calc_mass()
+        base_composition = None
+        if self.compute_compositions:
+            base_composition = self.peptide_composition()
+            base_mass = base_composition.calc_mass()
+        else:
+            base_mass = self.peptide.get_peptide_backbone_mass()
 
         for i in range(core_count):
             core_shifts = self.o_glycan_composition_fragments(glycan, core_count, i)
@@ -880,7 +889,9 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
         base_composition = None
         if self.compute_compositions:
             base_composition = self.peptide_composition()
-        base_mass = base_composition.calc_mass()
+            base_mass = base_composition.calc_mass()
+        else:
+            base_mass = self.peptide.get_peptide_backbone_mass()
         for i in range(core_count):
             core_shifts = self.gag_linker_composition_fragments(glycan, core_count, i)
             per_site_shifts.append(core_shifts)

@@ -40,4 +40,7 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
     cpdef CComposition peptide_composition(self)
     cpdef CComposition total_composition(self)
 
+    cdef double get_peptide_backbone_mass(self)
+    cdef double get_total_mass(self)
+
 cpdef add_modification(_PeptideSequenceCore self, position, modification_type)
