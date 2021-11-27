@@ -224,7 +224,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             flanking_amino_acids=self.flanking_residues(),
             glycosylation=self.glycosylation_manager.copy() if self.glycosylation_manager else None,
             chemical_shift=None,
-            composition=self.running_composition,
+            composition=self.running_composition.clone() if self.compute_compositions else None,
             delta_mass=&self.running_delta_mass)
         shifts = self._get_viable_chemical_shift_combinations()
         partial_loss_fragments = self.partial_loss(frag)
