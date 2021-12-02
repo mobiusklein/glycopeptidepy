@@ -1012,7 +1012,7 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
                 mass=mass - water_plus_two_side_chains_plus_carbon.mass,
                 composition=composition - water_plus_two_side_chains_plus_carbon,
                 kind=oxonium_ion_series)
-        for i in range(2, 4):
+        for i in range(2, self.maximum_fragment_size + 1):
             for kk in combinations_with_replacement(sorted(monosaccharides, key=str), i):
                 invalid = False
                 for k, v in Counter(kk).items():

@@ -734,7 +734,7 @@ cdef class StubFragment(SimpleFragment):
 
     cpdef clone(self):
         cdef StubFragment dup = StubFragment._create(
-            self.name, self.mass, self.kind, self.composition, self.get_chemical_shift(),
+            self.name, self.mass, self.kind, self.composition, self._chemical_shift,
             self.is_glycosylated, self.glycosylation, self.is_extended,
             self._glycosylation_size)
         return dup
@@ -755,7 +755,7 @@ cdef class StubFragment(SimpleFragment):
         # If the chemical shift is :const:`None`, there was no change to :attr:`_name`,
         # so just return it, otherwise we need to recompute the name from scratch using
         # :attr:`glycosylation` and :meth:`build_name_from_composition`
-        if self.get_chemical_shift() is None:
+        if self._chemical_shift is None:
             return self._name
         else:
             return self.build_name_from_composition(self.glycosylation)
