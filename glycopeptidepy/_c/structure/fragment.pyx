@@ -265,11 +265,14 @@ cdef class FragmentBase(object):
         """Simply return string like b2, y3 with no modification information."""
         return self._name
 
-    @property
-    def name(self):
+    cdef str get_name(self):
         if self._name is None:
             self._name = self.get_fragment_name()
         return self._name
+
+    @property
+    def name(self):
+        return self.get_name()
 
     @name.setter
     def name(self, name):

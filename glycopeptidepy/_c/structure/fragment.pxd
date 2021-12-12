@@ -55,6 +55,8 @@ cdef class FragmentBase(object):
     cpdef str get_fragment_name(self)
     cdef void _update_hash_name(self)
 
+    cdef str get_name(self)
+
 
 
 cdef class SimpleFragment(FragmentBase):
