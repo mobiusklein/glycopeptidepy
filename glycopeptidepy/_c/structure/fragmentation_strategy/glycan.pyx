@@ -4,7 +4,7 @@ from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem, PyTuple_Size, PyTuple_GET_ITEM, PyTuple_GET_SIZE
-from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE, PyList_Append
+from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE, PyList_Append, PyList_SET_ITEM
 from cpython.int cimport PyInt_AsLong
 from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
@@ -688,7 +688,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             per_site_shifts.append(core_shifts)
         combos = self._combinate_sites(per_site_shifts, glycan)
         n_combos = PyList_Size(combos)
-        accumulator = []
+        accumulator = PyList_New(n_combos)
         for i in range(n_combos):
             result = <tuple>PyList_GetItem(combos, i)
             site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
@@ -701,7 +701,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 composition = base_composition.clone()
                 composition.add_from(site.composition)
 
-            accumulator.append(StubFragment._create(
+            frag = StubFragment._create(
                 name=name,
                 mass=base_mass + site.mass,
                 composition=composition,
@@ -710,7 +710,9 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                 chemical_shift=None,
                 glycosylation=glycosylation,
                 is_extended=site.is_extended,
-                glycosylation_size=site.get_glycosylation_size()))
+                glycosylation_size=site.get_glycosylation_size())
+            Py_INCREF(frag)
+            PyList_SET_ITEM(accumulator, i, frag)
         return accumulator
 
     cpdef list o_glycan_stub_fragments(self):
@@ -744,7 +746,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             per_site_shifts.append(core_shifts)
         combos = self._combinate_sites(per_site_shifts, glycan)
         n_combos = PyList_Size(combos)
-        accumulator = []
+        accumulator = PyList_New(n_combos)
         for i in range(n_combos):
             result = <tuple>PyList_GetItem(combos, i)
             site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
@@ -755,17 +757,19 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             if self.compute_compositions:
                 composition = base_composition.clone()
                 composition.add_from(site.composition)
-            accumulator.append(
-                StubFragment._create(
-                    name=name,
-                    mass=base_mass + site.mass,
-                    composition=composition,
-                    is_glycosylated=is_glycosylated,
-                    kind=IonSeries_stub_glycopeptide,
-                    chemical_shift=None,
-                    glycosylation=glycosylation,
-                    is_extended=site.is_extended,
-                    glycosylation_size=site.get_glycosylation_size()))
+
+            frag = StubFragment._create(
+                name=name,
+                mass=base_mass + site.mass,
+                composition=composition,
+                is_glycosylated=is_glycosylated,
+                kind=IonSeries_stub_glycopeptide,
+                chemical_shift=None,
+                glycosylation=glycosylation,
+                is_extended=site.is_extended,
+                glycosylation_size=site.get_glycosylation_size())
+            Py_INCREF(frag)
+            PyList_SET_ITEM(accumulator, i, frag)
         return accumulator
 
     cpdef list o_glycan_composition_fragments(self, glycan, long core_count=1, long iteration_count=0):
