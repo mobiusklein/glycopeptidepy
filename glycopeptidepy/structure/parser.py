@@ -208,7 +208,7 @@ def strip_modifications(sequence):
     '''
     if isinstance(sequence, PeptideSequenceBase):
         sequence = str(sequence)
-    chunks, modifications, glycan, n_term, c_term = sequence_tokenizer(sequence)
+    chunks, _, glycan, n_term, c_term = sequence_tokenizer(sequence)
     return ''.join([residue for residue, mod in chunks])
 
 
@@ -221,13 +221,13 @@ def sequence_tokenizer_respect_sequons(sequence, known_sites=None):
     '''
     if known_sites is None:
         known_sites = tuple()
-    chunks, modifications, glycan, n_term, c_term = sequence_tokenizer(sequence)
+    chunks, _, glycan, n_term, c_term = sequence_tokenizer(sequence)
     positions = []
     i = 0
     sequence_length = len(chunks)
     while(i < sequence_length):
         cur_pos = chunks[i]
-        if (cur_pos[0] == "N" and _n_glycan_core in cur_pos[1]) or (i in known_sites):
+        if (cur_pos[0] == "N" and cur_pos[1] and _n_glycan_core in cur_pos[1]) or (i in known_sites):
             positions.append(chunks[i:(i + 3)])
             i += 2
         else:
@@ -244,7 +244,7 @@ def parse_simple(sequence):
         sequence = sequence.decode("utf8")
 
     chunks = [[a, []] for a in sequence]
-    mods = []
+    mods = None
     glycan = None
     n_term = structure_constants.N_TERM_DEFAULT
     c_term = structure_constants.C_TERM_DEFAULT

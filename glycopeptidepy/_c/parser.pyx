@@ -37,7 +37,7 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
         char next_char
         char* csequence
         object glycan
-        list mods, chunks, current_mods
+        list chunks, current_mods
         int paren_level
         size_t i, n
         Py_ssize_t mod_start, mod_end
@@ -55,12 +55,11 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
         c_term = structure_constants.C_TERM_DEFAULT
     else:
         c_term = implicit_c_term
-    mods = []
     chunks = []
     glycan = ""
     current_aa = ""
     current_mod = ""
-    current_mods = []
+    current_mods = None
     paren_level = 0
     i = 0
     mod_start = -1
@@ -101,7 +100,10 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
                     current_mod = PyStr_FromStringAndSize(&csequence[mod_start], mod_end - mod_start)
                     mod_start = -1
                     mod_end = -1
-                    current_mods.append(current_mod)
+                    if current_mods is None:
+                        current_mods = [current_mod]
+                    else:
+                        current_mods.append(current_mod)
                     if state == ParserState.mod:
                         state = ParserState.aa
                         # If we encounter multiple modifications in separate parentheses
@@ -124,7 +126,7 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
                         # Only one modification on termini
                         c_term = current_mod
 
-                    current_mods = []
+                    current_mods = None
                     current_mod = ""
                     current_aa = ""
                     mod_start = -1
@@ -138,7 +140,10 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
             else:
                 mod_end = i
                 current_mod = PyStr_FromStringAndSize(&csequence[mod_start], mod_end - mod_start)
-                current_mods.append(current_mod)
+                if current_mods is None:
+                    current_mods = [current_mod]
+                else:
+                    current_mods.append(current_mod)
                 mod_start = i + 1
                 mod_end = -1
                 current_mod = ""
@@ -156,7 +161,7 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
                 if(current_aa != ""):
                     chunks.append([current_aa, current_mods])
                     current_mod = ""
-                    current_mods = []
+                    current_mods = None
                     current_aa = ""
             else:
                 pass
@@ -169,7 +174,7 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
                 chunks.append([current_aa, current_mods])
                 current_mod = ""
                 current_aa = ""
-                current_mods = []
+                current_mods = None
             current_aa = PyStr_FromStringAndSize(&next_char, 1)
         elif state in {ParserState.n_term, ParserState.mod, ParserState.c_term}:
             mod_end = i
@@ -188,7 +193,7 @@ cdef object _cstring_sequence_tokenizer(str sequence, object implicit_n_term=Non
     else:
         glycan = None
 
-    return chunks, mods, glycan, n_term, c_term
+    return chunks, None, glycan, n_term, c_term
 
 cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     '''A simple stateful sequence parser implementing a formally context-free language
@@ -207,7 +212,7 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
         ParserState state
         sequence_encoded_t current_aa, current_mod, next_char
         object glycan
-        list mods, chunks, current_mods
+        list chunks, current_mods
         int paren_level, i, n
 
     if glycan_parser_function is None:
@@ -225,12 +230,11 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
         c_term = structure_constants.C_TERM_DEFAULT
     else:
         c_term = implicit_c_term
-    mods = []
     chunks = []
     glycan = ""
     current_aa = ""
     current_mod = ""
-    current_mods = []
+    current_mods = None
     paren_level = 0
     i = 0
     n = len(sequence)
@@ -262,7 +266,10 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
             else:
                 paren_level -= 1
                 if paren_level == 0:
-                    current_mods.append(current_mod)
+                    if current_mods is None:
+                        current_mods = [current_mod]
+                    else:
+                        current_mods.append(current_mod)
                     if state == ParserState.mod:
                         state = ParserState.aa
                         # If we encounter multiple modifications in separate parentheses
@@ -285,7 +292,7 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
                         # Only one modification on termini
                         c_term = current_mod
 
-                    current_mods = []
+                    current_mods = None
                     current_mod = ""
                     current_aa = ""
                 else:
@@ -295,7 +302,10 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
             if state == ParserState.aa:
                 raise Exception("Invalid Sequence. | found outside of modification")
             else:
-                current_mods.append(current_mod)
+                if current_mods is None:
+                    current_mods = [current_mod]
+                else:
+                    current_mods.append(current_mod)
                 current_mod = ""
 
         elif next_char == "{":
@@ -309,10 +319,13 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
             if state == ParserState.aa:
                 state = ParserState.c_term
                 if(current_aa != ""):
-                    current_mods.append(current_mod)
+                    if current_mods is None:
+                        current_mods = [current_mod]
+                    else:
+                        current_mods.append(current_mod)
                     chunks.append([current_aa, current_mods])
                     current_mod = ""
-                    current_mods = []
+                    current_mods = None
                     current_aa = ""
             else:
                 current_mod += next_char
@@ -322,10 +335,13 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
             current_aa = next_char
         elif state == ParserState.aa:
             if(current_aa != ""):
-                current_mods.append(current_mod)
+                if current_mods is None:
+                    current_mods = [current_mod]
+                else:
+                    current_mods.append(current_mod)
                 chunks.append([current_aa, current_mods])
                 current_mod = ""
-                current_mods = []
+                current_mods = None
                 current_aa = ""
             current_aa = next_char
         elif state in {ParserState.n_term, ParserState.mod, ParserState.c_term}:
@@ -335,7 +351,6 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
                 "Unknown Tokenizer State", current_aa, current_mod, i, next_char)
         i += 1
     if current_aa != "":
-        current_mods.append("")
         chunks.append([current_aa, current_mods])
 
     if glycan != "":
@@ -346,7 +361,7 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
     else:
         glycan = None
 
-    return chunks, mods, glycan, n_term, c_term
+    return chunks, None, glycan, n_term, c_term
 
 
 cpdef sequence_tokenizer(object sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):

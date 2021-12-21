@@ -1,4 +1,9 @@
-from collections import Mapping, defaultdict
+from collections import defaultdict
+
+try:
+    from collections.abc import Mapping
+except ImportError:
+    from collections import Mapping
 
 from glycopeptidepy.utils.collectiontools import decoratordict
 
