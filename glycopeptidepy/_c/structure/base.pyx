@@ -2,7 +2,7 @@ cimport cython
 from glypy.composition.ccomposition cimport CComposition
 from glypy.composition import formula as _formula
 
-from cpython.list cimport PyList_GetItem, PyList_GET_ITEM, PyList_Size
+from cpython.list cimport PyList_GetItem, PyList_GET_ITEM, PyList_Size, PyList_GET_SIZE
 from cpython.sequence cimport PySequence_GetItem
 
 
@@ -221,6 +221,7 @@ cdef class ModificationBase(object):
         return False
 
 
+@cython.final
 @cython.freelist(10000000)
 cdef class SequencePosition(object):
 
@@ -276,7 +277,7 @@ cdef class SequencePosition(object):
         inst.modifications = modifications
         return inst
 
-    cdef double get_mass(self):
+    cdef inline double get_mass(self):
         cdef:
             double mass
             size_t i, n
@@ -284,9 +285,9 @@ cdef class SequencePosition(object):
 
         mass = 0
         mass += self.amino_acid.mass
-        n = PyList_Size(self.modifications)
+        n = self.get_modification_count()
         for i in range(n):
-            mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
+            mod = self.get_modification(i)
             mass += mod.mass
         return mass
 
@@ -295,18 +296,21 @@ cdef class SequencePosition(object):
             size_t i, n
             ModificationBase mod
 
-        n = PyList_Size(self.modifications)
+        n = self.get_modification_count()
         for i in range(n):
-            mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
+            mod = self.get_modification(i)
             if modification == mod:
                 return True
         return False
 
     cpdef bint is_modified(self):
-        return PyList_Size(self.modifications) > 0
+        return self.get_modification_count() > 0
 
     cpdef add_modification(self, modification):
-        self.modifications.append(modification)
+        if self.modifications is None:
+            self.modifications = [modification]
+        else:
+            self.modifications.append(modification)
 
     cpdef drop_modification(self, modification):
         cdef:
@@ -314,7 +318,7 @@ cdef class SequencePosition(object):
             int index
             ModificationBase mod
 
-        n = PyList_Size(self.modifications)
+        n = self.get_modification_count()
         index = -1
         for i in range(n):
             mod = <ModificationBase>PyList_GET_ITEM(self.modifications, i)
@@ -328,3 +332,11 @@ cdef class SequencePosition(object):
     @property
     def mass(self):
         return self.get_mass()
+
+    cdef inline size_t get_modification_count(self):
+        if self.modifications is None:
+            return 0
+        return PyList_GET_SIZE(self.modifications)
+
+    cdef inline ModificationBase get_modification(self, size_t i):
+        return <ModificationBase>PyList_GET_ITEM(self.modifications, i)

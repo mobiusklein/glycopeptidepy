@@ -133,9 +133,9 @@ cdef CComposition _total_composition(_PeptideSequenceCore sequence):
     for i in range(n):
         position = sequence.get(i)
         total += position.amino_acid.composition
-        m = PyList_GET_SIZE(position.modifications)
+        m = SequencePosition.get_modification_count(position)
         for j in range(m):
-            mod = <ModificationBase>PyList_GetItem(position.modifications, j)
+            mod = SequencePosition.get_modification(position, j)
             if mod.is_tracked_for(ModificationCategory_glycosylation):
                 continue
             total += mod.composition
@@ -177,8 +177,9 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             res = _parse_residue(<basestring>PyList_GET_ITEM(item, 0))
             mass += res.mass
             mod_strs = <list>PyList_GET_ITEM(item, 1)
-            mods = []
+            mods = None
             if mod_strs is not None:
+                mods = []
                 m = PyList_GET_SIZE(mod_strs)
                 for j in range(m):
                     mod_str = <basestring>PyList_GET_ITEM(mod_strs, j)
@@ -266,17 +267,17 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
             item = <SequencePosition>PyList_GET_ITEM(seq_list, i)
             mass += item.amino_acid.mass
             if item.modifications is not None:
-                m = PyList_GET_SIZE(item.modifications)
+                m = SequencePosition.get_modification_count(item)
                 mods = PyList_New(m)
                 for j in range(m):
-                    mod = <ModificationBase>PyList_GET_ITEM(item.modifications, j)
+                    mod = SequencePosition.get_modification(item, j)
                     Py_INCREF(mod)
                     PyList_SetItem(mods, j, mod)
                     if mod.is_tracked_for(ModificationCategory_glycosylation):
                         glycosylation_manager[i] = mod
                     mass += mod.mass
             else:
-                mods = []
+                mods = None
 
             position = SequencePosition._create(item.amino_acid, mods)
             Py_INCREF(position)
@@ -418,9 +419,9 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         for i in range(n):
             position = self.get(i)
             total += position.amino_acid.mass
-            m = PyList_Size(position.modifications)
+            m = SequencePosition.get_modification_count(position)
             for j in range(m):
-                mod = <ModificationBase>PyList_GetItem(position.modifications, j)
+                mod = SequencePosition.get_modification(position, j)
                 if mod.is_tracked_for(ModificationCategory_glycosylation):
                     continue
                 total += mod.mass
@@ -570,15 +571,15 @@ cdef class _PeptideSequenceCore(PeptideSequenceBase):
         n = self.get_size()
         for i in range(n):
             position = self.get(i)
-            m = PyList_Size(position.modifications)
+            m = SequencePosition.get_modification_count(position)
             if m > 0:
                 if m == 1:
-                    mod = <ModificationBase>PyList_GetItem(position.modifications, 0)
+                    mod = SequencePosition.get_modification(position, 0)
                     mod_str = "(%s)" % mod.serialize()
                 else:
                     mod_strs = []
                     for j in range(m):
-                        mod = <ModificationBase>PyList_GetItem(position.modifications, j)
+                        mod = SequencePosition.get_modification(position, j)
                         mod_strs.append(mod.serialize())
                     mod_str = '|'.join(mod_strs)
                     mod_str = "(%s)" % mod_str

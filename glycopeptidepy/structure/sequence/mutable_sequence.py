@@ -89,9 +89,10 @@ class MutableSequenceMixin(object):
     def _retrack_sequence(self):
         self._glycosylation_manager.clear()
         for i, position in enumerate(self):
-            for mod in position[1]:
-                if mod.is_tracked_for(ModificationCategory.glycosylation):
-                    self._glycosylation_manager[i] = mod
+            if position.modifications:
+                for mod in position.modifications:
+                    if mod.is_tracked_for(ModificationCategory.glycosylation):
+                        self._glycosylation_manager[i] = mod
 
     def insert(self, position, residue, modifications=None):
         if modifications is None:
@@ -108,8 +109,9 @@ class MutableSequenceMixin(object):
         self._invalidate()
         residue, mods = self.sequence.pop(position)
         self.mass -= residue.mass
-        for mod in mods:
-            self.mass -= mod.mass
+        if mods:
+            for mod in mods:
+                self.mass -= mod.mass
         self._retrack_sequence()
 
     def substitute(self, position, residue):

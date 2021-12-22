@@ -95,7 +95,7 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
             return self.n_term == modification_type
         elif position is SequenceLocation.c_term:
             return self.c_term == modification_type
-        return modification_type in self.sequence[position].modifications
+        return self.sequence[position].has_modification(modification_type)
 
 
     def strip_modifications(self):

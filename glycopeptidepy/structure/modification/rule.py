@@ -429,7 +429,7 @@ class ModificationRule(ModificationRuleBase):
             sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
         for index in range(len(sequence)):
             position = sequence[index]
-            if len(position[1]) > 0:
+            if position.modifications:
                 continue
             amino_acid = position[0].name
             position_modifiers = position_modifier_rules.get(index)

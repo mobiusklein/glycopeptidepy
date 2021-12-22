@@ -138,10 +138,10 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             CComposition composition
             ModificationBase mod
 
-        n = PyList_Size(position.modifications)
+        n = SequencePosition.get_modification_count(position)
         composition = position.amino_acid.composition.clone()
         for i in range(n):
-            mod = <ModificationBase>PyList_GetItem(position.modifications, i)
+            mod = SequencePosition.get_modification(position.modifications, i)
             composition.add_from(mod.composition)
         return composition
 
@@ -195,9 +195,9 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             size_t i, n
         self.index += self.direction
         position = self.peptide[self.index]
-        n = PyList_Size(position.modifications)
+        n = SequencePosition.get_modification_count(position)
         for i in range(n):
-            mod = <ModificationBase>PyList_GetItem(position.modifications, i)
+            mod =  SequencePosition.get_modification(position, i)
             if mod.is_tracked_for(ModificationCategory_glycosylation):
                 self.track_glycosylation(self.index, mod)
             else:
@@ -357,9 +357,9 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
             ModificationInstanceBase mod
             size_t i, n
         composition = position.amino_acid.composition.clone()
-        n = PyList_Size(position.modifications)
+        n = SequencePosition.get_modification_count(position)
         for i in range(n):
-            mod = <ModificationInstanceBase>PyList_GetItem(position.modifications, i)
+            mod = <ModificationInstanceBase>SequencePosition.get_modification(position, i)
             if mod.is_tracked_for(ModificationCategory_glycosylation):
                 mod = self._get_core_for(mod)
             composition.add_from(mod.composition)

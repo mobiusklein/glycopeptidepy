@@ -27,7 +27,7 @@ def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
 
     for i, position in enumerate(sequence):
         if position[0] in site_set:
-            if ((len(position[1]) == 0) or position[1][0] in allow_modified) and not (
+            if (not position.modifications or position.modifications[0] in allow_modified) and not (
                     i - 2 >= 0 and sequence[i - 2][0] == asn):
                 positions.append(i)
     return positions
@@ -57,19 +57,19 @@ def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
         if state == "seek":
             # A sequon starts with an Asn residue without modifications, or for counting
             # purposes one that has already been glycosylated
-            if next_pos[0] == asn:
-                if ((len(next_pos[1]) == 0) or next_pos[1][0] in allow_modified):
+            if next_pos.amino_acid == asn:
+                if (not next_pos.modifications or next_pos.modifications[0] in allow_modified):
                     n_pos = i
                     state = "n"
         elif state == "n":
-            if next_pos[0] != pro:
+            if next_pos.amino_acid != pro:
                 state = "^p"
             else:
                 state = "seek"
                 i = n_pos
                 n_pos = None
         elif state == "^p":
-            if next_pos[0] in {ser, thr}:
+            if next_pos.amino_acid in {ser, thr}:
                 positions.append(n_pos)
             i = n_pos
             n_pos = None
@@ -98,8 +98,8 @@ def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()):
     while(i < len(sequence)):
         next_pos = sequence[i]
         if state == "seek":
-            if next_pos[0] == ser:
-                if ((len(next_pos[1]) == 0) or next_pos[1][0] in allow_modified):
+            if next_pos.amino_acid == ser:
+                if (not next_pos.modifications or next_pos.modifications[0] in allow_modified):
                     positions.append(i)
         i += 1
     return positions
@@ -156,10 +156,11 @@ class GlycosylatedSequenceMixin(object):
         self._invalidate()
         _glycosylation_enum = ModificationCategory.glycosylation
         for i, pos in enumerate(self):
-            mods = [mod.name for mod in pos[1] if mod.is_a(
-                _glycosylation_enum)]
-            for mod in mods:
-                self.drop_modification(i, mod)
+            if pos.modifications:
+                mods = [mod.name for mod in pos.modifications if mod.is_a(
+                    _glycosylation_enum)]
+                for mod in mods:
+                    self.drop_modification(i, mod)
         self._glycosylation_manager.clear()
         # This line is a no-op.
         # self.glycan = None

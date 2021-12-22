@@ -74,10 +74,12 @@ cdef class SequencePosition(object):
     @staticmethod
     cdef SequencePosition _create(AminoAcidResidueBase amino_acid, list modifications)
 
-    cdef double get_mass(self)
+    cdef inline double get_mass(self)
 
     cpdef bint has_modification(self, modification)
     cpdef bint is_modified(self)
-
     cpdef drop_modification(self, modification)
     cpdef add_modification(self, modification)
+
+    cdef inline size_t get_modification_count(self)
+    cdef inline ModificationBase get_modification(self, size_t i)
