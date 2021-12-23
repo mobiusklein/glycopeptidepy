@@ -252,11 +252,19 @@ cdef class SequencePosition(object):
     def __eq__(self, other):
         cdef:
             SequencePosition other_t
+            size_t n, i
         if isinstance(other, SequencePosition):
             other_t = other
-            return self.amino_acid.equal_to(other_t.amino_acid) and self.modifications == other_t.modifications
+            if not self.amino_acid.equal_to(other_t.amino_acid):
+                return False
+            n = self.get_modification_count()
+            if n != other_t.get_modification_count():
+                return False
+            if self.modifications != other_t.modifications:
+                return False
+            return True
         else:
-            return self.amino_acid == other.amino_acid and self.modifications == other.modifications
+            return self.amino_acid == other.amino_acid and (self.modifications == other.modifications)
 
     def __ne__(self, other):
         return not (self == other)
@@ -268,7 +276,11 @@ cdef class SequencePosition(object):
         return 2
 
     def __repr__(self):
-        return "[%r, %r]" % (self.amino_acid, self.modifications)
+        if self.modifications is None:
+            modifications = '-'
+        else:
+            modifications = "%r" % self.modifications
+        return "[%r, %s]" % (self.amino_acid, modifications)
 
     @staticmethod
     cdef SequencePosition _create(AminoAcidResidueBase amino_acid, list modifications):
@@ -333,10 +345,10 @@ cdef class SequencePosition(object):
     def mass(self):
         return self.get_mass()
 
-    cdef inline size_t get_modification_count(self):
+    cdef size_t get_modification_count(self):
         if self.modifications is None:
             return 0
         return PyList_GET_SIZE(self.modifications)
 
-    cdef inline ModificationBase get_modification(self, size_t i):
+    cdef ModificationBase get_modification(self, size_t i):
         return <ModificationBase>PyList_GET_ITEM(self.modifications, i)
