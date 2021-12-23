@@ -698,7 +698,7 @@ cdef basestring build_name_from_composition(mapping_types glycan_composition):
 
 # TODO: Add an unset attribute for holding the glycosylation_size value that
 # can either be pre-populated or computed dynamically.
-cdef class StubFragment(SimpleFragment):
+cdef class StubFragment(FragmentBase):
 
     _name_cache = stub_fragment_name_cache
 
@@ -729,8 +729,17 @@ cdef class StubFragment(SimpleFragment):
 
     def __init__(self, name, mass, kind, composition, chemical_shift=None, is_glycosylated=False,
                  glycosylation=None, is_extended=False):
-        super(StubFragment, self).__init__(
-            name, mass, kind, composition, chemical_shift, is_glycosylated)
+        self._name = name
+        self._hash = hash(self._name)
+        self._chemical_shift = None
+
+        self.mass = mass
+        self.kind = kind
+        self.composition = composition
+
+        self.set_chemical_shift(chemical_shift)
+        self.is_glycosylated = is_glycosylated
+
         self.glycosylation = glycosylation
         self.is_extended = is_extended
         self._glycosylation_size = -1
@@ -768,6 +777,16 @@ cdef class StubFragment(SimpleFragment):
         return build_name_from_composition(glycan_composition)
 
     def __reduce__(self):
-        proto = list(super(StubFragment, self).__reduce__())
-        proto[1] = proto[1] + (self.glycosylation, self.is_extended)
-        return tuple(proto)
+        corrected_mass = self.mass
+        if self._chemical_shift is not None:
+            corrected_mass -= self.chemical_shift.mass
+        return self.__class__, (self.name, corrected_mass, self.kind, self.composition,
+                                self.chemical_shift, self.is_glycosylated, self.glycosylation,
+                                self.is_extended)
+
+    def __repr__(self):
+        return ("{self.__class__.__name__}(name={self.name}, "
+                "mass={self.mass:.04f}, series={self.kind})").format(self=self)
+
+    cpdef IonSeriesBase get_series(self):
+        return self.kind

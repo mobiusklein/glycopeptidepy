@@ -68,11 +68,16 @@ cdef class SimpleFragment(FragmentBase):
     cpdef clone(self)
 
 
-cdef class StubFragment(SimpleFragment):
+cdef class StubFragment(FragmentBase):
     cdef:
+        public IonSeriesBase kind
+        public bint is_glycosylated
+        public CComposition composition
         public object glycosylation
         public bint is_extended
         int _glycosylation_size
+
+    cpdef clone(self)
 
     @staticmethod
     cdef StubFragment _create(str name, double mass, IonSeriesBase kind, CComposition composition,
