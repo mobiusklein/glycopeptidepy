@@ -539,7 +539,7 @@ try:
 except ImportError:
     class _IonSeriesBase(object):
         __slots__ = ('name', 'direction', 'includes_peptide', 'mass_shift', 'regex', 'composition_shift',
-                     '_hash')
+                     '_hash', 'int_code')
 
         def __eq__(self, other):
             try:
@@ -608,6 +608,7 @@ class IonSeries(_IonSeriesBase):
         else:
             self.composition_shift = composition_shift
         self._hash = hash(self.name)
+        self.int_code = -1
 
     def __reduce__(self):
         return self.__class__, (self.name, self.direction, self.includes_peptide, self.mass_shift,
@@ -665,7 +666,12 @@ IonSeries.c = IonSeries("c")
 IonSeries.z = IonSeries("z")
 IonSeries.zp = IonSeries("zp")
 IonSeries.z1 = IonSeries.zp
+
 IonSeries.precursor = IonSeries("precursor")
 IonSeries.oxonium_ion = IonSeries("oxonium_ion", includes_peptide=False)
 IonSeries.stub_glycopeptide = IonSeries("stub_glycopeptide")
 IonSeries.other = IonSeries('other')
+
+for i, series in enumerate((IonSeries.b, IonSeries.y, IonSeries.c, IonSeries.z, IonSeries.zp, IonSeries.precursor,
+                            IonSeries.oxonium_ion, IonSeries.stub_glycopeptide), 1):
+    series.int_code = i
