@@ -20,6 +20,7 @@ cdef class IonSeriesBase(object):
         public double mass_shift
         public CComposition composition_shift
         public Py_hash_t _hash
+        public int int_code
 
 
 cdef class FragmentBase(object):
