@@ -717,10 +717,10 @@ cdef class StubFragment(FragmentBase):
         self.mass = mass
         self.kind = kind
         self.composition = composition
+        if chemical_shift is not None:
+            StubFragment.set_chemical_shift(self, chemical_shift)
 
-        self.set_chemical_shift(chemical_shift)
         self.is_glycosylated = is_glycosylated
-
         self.glycosylation = glycosylation
         self.is_extended = is_extended
 
