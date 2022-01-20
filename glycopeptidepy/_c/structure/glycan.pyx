@@ -234,10 +234,13 @@ cdef class GlycosylationManager(object):
             total += aggregate.mass()
         return total
 
-    cdef int total_glycosylation_size(self):
+    cdef int get_total_glycosylation_size(self):
         if self._total_glycosylation_size == -1:
             self._total_glycosylation_size = sum(self.get_aggregate().values())
         return self._total_glycosylation_size
+
+    cpdef int total_glycosylation_size(self):
+        return self.get_total_glycosylation_size()
 
     cpdef bint is_fully_specified_topologies(self):
         cdef:

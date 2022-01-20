@@ -44,7 +44,8 @@ cdef class GlycosylationManager(object):
 
     cdef object get_glycan_composition(self)
     cdef object _make_glycan_composition_proxy(self)
-    cdef int total_glycosylation_size(self)
+    cdef int get_total_glycosylation_size(self)
+    cpdef int total_glycosylation_size(self)
 
     cpdef int count_glycosylation_type(self, glycosylation_type)
 
