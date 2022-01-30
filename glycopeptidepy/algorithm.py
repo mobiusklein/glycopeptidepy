@@ -1,6 +1,8 @@
 import itertools
 from collections import defaultdict
 
+from six import string_types as basestring
+
 from glycopeptidepy.enzyme import Protease
 from glycopeptidepy.structure.residue import UnknownAminoAcidException
 from glycopeptidepy.structure.modification import SequenceLocation
