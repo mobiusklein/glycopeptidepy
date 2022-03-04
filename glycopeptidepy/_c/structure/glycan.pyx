@@ -236,7 +236,11 @@ cdef class GlycosylationManager(object):
 
     cdef int get_total_glycosylation_size(self):
         if self._total_glycosylation_size == -1:
-            self._total_glycosylation_size = sum(self.get_aggregate().values())
+            aggregate = self.get_aggregate()
+            if aggregate is None:
+                self._total_glycosylation_size = 0
+            else:
+                self._total_glycosylation_size = sum(self.get_aggregate().values())
         return self._total_glycosylation_size
 
     cpdef int total_glycosylation_size(self):
