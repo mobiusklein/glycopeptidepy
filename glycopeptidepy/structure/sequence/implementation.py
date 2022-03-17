@@ -167,19 +167,19 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
                 include_neutral_losses=include_neutral_losses, **kwargs)
 
 
-def list_to_sequence(seq_list, wrap=True):
+def list_to_sequence(seq_list, wrap=True, peptide_type=PeptideSequence):
     flat_chunks = []
     for chunk in seq_list:
         if(isinstance(chunk[0], list)):
             flat_chunks.extend(chunk)
         else:
             flat_chunks.append(chunk)
-    seq = PeptideSequence.from_iterable(flat_chunks) if wrap else flat_chunks
+    seq = peptide_type.from_iterable(flat_chunks) if wrap else flat_chunks
     return seq
 
 
 Sequence = PeptideSequence
-parse = Sequence
+# parse = Sequence
 
 
 class NamedSequence(PeptideSequence):
