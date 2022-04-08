@@ -60,7 +60,14 @@ class Protease(object):
     def missed_cleavages(self, sequence):
         if isinstance(sequence, PeptideSequence):
             sequence = str(sequence)
-        return len(self.regex.findall(sequence))
+        return len(
+            list(
+                filter(
+                    lambda x: x.end() != len(sequence),
+                    self.regex.finditer(sequence)
+                )
+            )
+        )
 
     def _find_sites(self, sequence):
         return itertools.chain(
