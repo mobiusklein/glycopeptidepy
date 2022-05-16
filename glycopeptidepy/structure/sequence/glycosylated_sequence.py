@@ -34,7 +34,7 @@ def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
 
 
 @glycosylation_site_detectors(GlycosylationType.n_linked)
-def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
+def find_n_glycosylation_sequons(sequence, allow_modified=frozenset(), include_cysteine: bool=False):
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification(
@@ -48,6 +48,12 @@ def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
     pro = Residue("Pro")
     ser = Residue("Ser")
     thr = Residue("Thr")
+    cys = Residue("Cys")
+
+    if include_cysteine:
+        p3 = {ser, thr, cys}
+    else:
+        p3 = {ser, thr}
 
     i = 0
     positions = []
@@ -69,7 +75,7 @@ def find_n_glycosylation_sequons(sequence, allow_modified=frozenset()):
                 i = n_pos
                 n_pos = None
         elif state == "^p":
-            if next_pos.amino_acid in {ser, thr}:
+            if next_pos.amino_acid in p3:
                 positions.append(n_pos)
             i = n_pos
             n_pos = None
