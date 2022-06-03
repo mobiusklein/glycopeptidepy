@@ -8,7 +8,7 @@ cimport cython
 from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
 from cpython.tuple cimport PyTuple_GetItem
-from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New
+from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE
 from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
 
@@ -65,9 +65,11 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
                  compute_compositions=False, **kwargs):
         if chemical_shifts is None:
             chemical_shifts = dict()
+        elif not isinstance(chemical_shifts, dict):
+            chemical_shifts = dict(chemical_shifts)
         super(PeptideFragmentationStrategyBase, self).__init__(peptide, compute_compositions, **kwargs)
         self.series = IonSeries(series)
-        self.chemical_shift_rules = defaultdict(list, chemical_shifts)
+        self.chemical_shift_rules = chemical_shifts
         self.max_chemical_shifts = max_chemical_shifts
         self.include_neutral_losses = include_neutral_losses
         self._initialize_fields()
@@ -98,6 +100,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         cdef:
             bint has_neutral_loss_rules
             list shifts
+            PyObject* ptmp
 
         shifts = []
         if self.include_neutral_losses:
@@ -107,10 +110,14 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             return shifts
 
         for residue, count in self.amino_acids_counter.items():
-            loss_composition = self.chemical_shift_rules[residue]
-            if loss_composition:
-                for i in range(count):
-                    shifts.append(loss_composition + [CComposition()])
+            ptmp = PyDict_GetItem(self.chemical_shift_rules, residue)
+            if ptmp == NULL:
+                pass
+            else:
+                loss_composition = <list?>ptmp
+                if PyList_GET_SIZE(loss_composition):
+                    for i in range(count):
+                        shifts.append(loss_composition + [CComposition()])
         loss_composition_combinations = {}
         for comb in combinations(shifts, self.max_chemical_shifts):
             for prod in product(*comb):
@@ -213,6 +220,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         cdef:
             list fragments_from_site
             list partial_loss_fragments
+            list shifts
             PeptideFragment fragment, f
             size_t i, n, j, m, k
 
@@ -226,20 +234,26 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             chemical_shift=None,
             composition=self.running_composition.clone() if self.compute_compositions else None,
             delta_mass=&self.running_delta_mass)
-        shifts = self._get_viable_chemical_shift_combinations()
-        partial_loss_fragments = self.partial_loss(frag)
 
-        n = PyList_Size(partial_loss_fragments)
-        m = PyList_Size(shifts)
+        shifts = None
+        m = 0
+        if PyDict_Size(self.chemical_shift_rules) or self.include_neutral_losses:
+            shifts = self._get_viable_chemical_shift_combinations()
+            m = PyList_GET_SIZE(shifts)
+
+        partial_loss_fragments = self.partial_loss(frag)
+        if not m:
+            return partial_loss_fragments
+        n = PyList_GET_SIZE(partial_loss_fragments)
         fragments_from_site = PyList_New(n * (m + 1))
         k = 0
         for i in range(n):
-            fragment = <PeptideFragment>PyList_GetItem(partial_loss_fragments, i)
+            fragment = <PeptideFragment>PyList_GET_ITEM(partial_loss_fragments, i)
             Py_INCREF(fragment)
             PyList_SetItem(fragments_from_site, k, fragment)
             k += 1
             for j in range(m):
-                shift = <ChemicalShiftBase>PyList_GetItem(shifts, j)
+                shift = <ChemicalShiftBase>PyList_GET_ITEM(shifts, j)
                 f = fragment.clone()
                 f.chemical_shift = shift
                 Py_INCREF(f)

@@ -964,4 +964,4 @@ def main():
     assert len(pytable) == 2
     del pytable
     pytable = CountTable._create()
-    print pytable
+    print(pytable)

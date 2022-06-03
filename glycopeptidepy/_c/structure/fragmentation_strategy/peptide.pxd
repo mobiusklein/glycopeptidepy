@@ -28,7 +28,7 @@ cdef:
 cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     cdef:
         public IonSeriesBase series
-        public object chemical_shift_rules
+        public dict chemical_shift_rules
         public int max_chemical_shifts
         public int direction
 
