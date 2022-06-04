@@ -1,10 +1,23 @@
 from glypy.composition.ccomposition cimport CComposition
+from glypy._c.structure.glycan_composition cimport _CompositionBase
 
 from glycopeptidepy._c.structure.base cimport PeptideSequenceBase
 
-cdef class GlycanCompositionWithOffsetProxyBase(object):
+cdef class GlycanCompositionProxy(object):
+    '''A mapping-like object that imitates the GlycanComposition interface in
+    a read-only fashion.
+    '''
+
     cdef:
-        public object obj
+        public _CompositionBase obj
+
+    cpdef object _getitem_fast(self, key)
+
+    cpdef str serialize(self)
+
+
+cdef class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
+    cdef:
         public CComposition composition_offset
 
 

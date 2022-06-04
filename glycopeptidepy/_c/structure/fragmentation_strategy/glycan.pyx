@@ -1,3 +1,5 @@
+# cython: embedsignature=True
+# cython: profile=True
 cimport cython
 
 from cpython.ref cimport Py_INCREF

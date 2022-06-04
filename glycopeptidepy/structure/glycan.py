@@ -1,9 +1,9 @@
+# pylint: disable=unsubscriptable-object
+
 from collections import defaultdict
 
-try:
-    from collections.abc import Mapping
-except ImportError:
-    from collections import Mapping
+from collections.abc import Mapping
+
 
 from glycopeptidepy.utils.collectiontools import decoratordict
 
@@ -12,7 +12,7 @@ from glypy.utils import Enum
 from glypy.structure.glycan import NamedGlycan
 from glypy.structure.glycan_composition import (
     FrozenMonosaccharideResidue,
-    FrozenGlycanComposition, GlycanComposition, HashableGlycanComposition)
+    GlycanComposition, HashableGlycanComposition)
 from glypy import Composition
 
 
@@ -290,23 +290,7 @@ class GlycanCompositionProxy(Mapping):
         return len(self.obj)
 
 
-class _GlycanCompositionWithOffsetProxyBase(object):
-    __slots__ = ('composition_offset', )
-
-    def __init__(self, obj, offset=None):
-        if offset is None:
-            offset = Composition()
-        self.obj = obj
-        self.composition_offset = offset
-
-
-try:
-    from glycopeptidepy._c.structure.glycan import GlycanCompositionWithOffsetProxyBase as _GlycanCompositionWithOffsetProxyBase
-except ImportError:
-    pass
-
-
-class GlycanCompositionWithOffsetProxy(_GlycanCompositionWithOffsetProxyBase, GlycanCompositionProxy):
+class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
     """A :class:`GlycanCompositionProxy` that pretends to allow you to
     mutate the :attr:`composition_offset` attribute of the underlying
     composition, but instead stores that within the proxy, leaving the
@@ -317,6 +301,11 @@ class GlycanCompositionWithOffsetProxy(_GlycanCompositionWithOffsetProxyBase, Gl
     this object is copied, the underlying GlycanComposition is not copied, only
     the proxy.
     """
+    def __init__(self, obj, offset=None):
+        if offset is None:
+            offset = Composition()
+        self.obj = obj
+        self.composition_offset = offset
 
     def clone(self, *args, **kwargs):
         return self.__class__(self.obj, self.composition_offset.copy())
@@ -328,6 +317,12 @@ class GlycanCompositionWithOffsetProxy(_GlycanCompositionWithOffsetProxyBase, Gl
     def total_composition(self):
         comp = self.obj.total_composition()
         return comp + self.composition_offset
+
+
+try:
+    from glycopeptidepy._c.structure.glycan import GlycanCompositionWithOffsetProxy as GlycanCompositionWithOffsetProxy
+except ImportError:
+    pass
 
 
 WATER_OFFSET = Composition({"H": 2, "O": 1})

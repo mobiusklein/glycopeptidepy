@@ -11,14 +11,102 @@ from glycopeptidepy._c.structure.modification.modification cimport ModificationI
 from glycopeptidepy._c.structure.modification.rule cimport ModificationRuleBase, GlycosylationBase
 from glycopeptidepy._c.structure.base cimport PeptideSequenceBase
 
+
 @cython.freelist(10000)
-cdef class GlycanCompositionWithOffsetProxyBase(object):
+cdef class GlycanCompositionProxy(object):
+    '''A mapping-like object that imitates the GlycanComposition interface in
+    a read-only fashion.
+    '''
+
+    def mass(self, *args, **kwargs):
+        return self.obj.mass(*args, **kwargs)
+
+    def total_composition(self, *args, **kwargs):
+        return self.obj.total_composition(*args, **kwargs)
+
+    def __iter__(self):
+        return iter(self.obj)
+
+    def __getitem__(self, key):
+        return self.obj[key]
+
+    cpdef object _getitem_fast(self, key):
+        return self.obj._getitem_fast(key)
+
+    def __contains__(self, key):
+        return key in self.obj
+
+    def keys(self):
+        return self.obj.keys()
+
+    def values(self):
+        return self.obj.values()
+
+    def items(self):
+        return self.obj.items()
+
+    def clone(self, *args, **kwargs):
+        return self.obj.clone(*args, **kwargs)
+
+    def query(self, query, exact=True, **kwargs):
+        return self.obj.query(query, exact=exact, **kwargs)
+
+    cpdef str serialize(self):
+        return self.obj.serialize()
+
+    def __repr__(self):
+        return repr(self.obj)
+
+    def __str__(self):
+        return str(self.obj)
+
+    def __hash__(self):
+        return hash(self.obj)
+
+    def __eq__(self, other):
+        try:
+            other = other.obj
+        except AttributeError:
+            pass
+        return self.obj == other
+
+    def __ne__(self, other):
+        try:
+            other = other.obj
+        except AttributeError:
+            pass
+        return (self.obj != other)
+
+    def __add__(self, other):
+        return self.obj + other
+
+    def __sub__(self, other):
+        return self.obj - other
+
+    def __mul__(self, other):
+        return self.obj * other
+
+    def __len__(self):
+        return len(self.obj)
+
+
+cdef class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
     def __init__(self, obj, offset=None):
         if offset is None:
             offset = CComposition._create(None)
         self.obj = obj
         self.composition_offset = offset
 
+    def clone(self, *args, **kwargs):
+        return self.__class__(self.obj, self.composition_offset.copy())
+
+    def mass(self, *args, **kwargs):
+        mass = self.obj.mass(*args, **kwargs)
+        return mass + self.composition_offset.mass
+
+    def total_composition(self):
+        comp = self.obj.total_composition()
+        return comp + self.composition_offset
 
 
 cdef CComposition WATER_OFFSET = CComposition({"H": 2, "O": 1})
@@ -121,8 +209,8 @@ cdef class GlycosylationManager(object):
             object aggregate
             CComposition offset
         aggregate = self.get_aggregate()
-        if isinstance(aggregate, GlycanCompositionWithOffsetProxyBase):
-            offset = (<GlycanCompositionWithOffsetProxyBase>aggregate).composition_offset
+        if isinstance(aggregate, GlycanCompositionWithOffsetProxy):
+            offset = (<GlycanCompositionWithOffsetProxy>aggregate).composition_offset
         elif isinstance(aggregate, _CompositionBase):
             offset = (<_CompositionBase>aggregate)._composition_offset
         else:
