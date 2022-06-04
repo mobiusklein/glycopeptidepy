@@ -3,7 +3,7 @@ from glypy.composition.ccomposition cimport CComposition
 from glypy._c.structure.glycan_composition cimport _CompositionBase
 
 from glycopeptidepy._c.count_table cimport CountTable
-
+from glycopeptidepy._c.structure.glycan cimport GlycanCompositionProxy, glycan_composition_type
 from glycopeptidepy._c.structure.fragmentation_strategy.base cimport FragmentationStrategyBase
 from glycopeptidepy._c.structure.fragment cimport _NameTree
 
@@ -34,8 +34,8 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         public object _generator
         public GlycosylationManager glycosylation_manager
 
-    cpdef glycan_composition(self)
-    cpdef bint _guess_query_mode(self, glycan_composition)
+    cpdef GlycanCompositionProxy glycan_composition(self)
+    cpdef bint _guess_query_mode(self, glycan_composition_type glycan_composition)
     cpdef long count_glycosylation_type(self, glycotype)
 
 

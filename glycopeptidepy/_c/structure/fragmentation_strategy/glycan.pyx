@@ -1,3 +1,4 @@
+# cython: embedsignature=True
 cimport cython
 
 from cpython.ref cimport Py_INCREF
@@ -20,7 +21,7 @@ from glycopeptidepy._c.structure.fragment cimport (
     build_name_from_composition)
 
 from glycopeptidepy._c.structure.sequence_methods cimport _PeptideSequenceCore
-from glycopeptidepy._c.structure.glycan cimport GlycosylationManager
+from glycopeptidepy._c.structure.glycan cimport GlycosylationManager, GlycanCompositionProxy, glycan_composition_type
 
 from glycopeptidepy.structure.fragment import (
     ChemicalShift, IonSeries, format_negative_composition)
@@ -122,23 +123,23 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         self._use_query = use_query
         self._generator = None
         if self.peptide is not None:
-            self.glycosylation_manager = self.peptide.glycosylation_manager
+            self.glycosylation_manager = self.peptide._glycosylation_manager
         else:
             self.glycosylation_manager = None
 
-    cpdef glycan_composition(self):
-        return self.peptide.glycan_composition.obj
+    cpdef GlycanCompositionProxy glycan_composition(self):
+        return self.glycosylation_manager.get_glycan_composition()
 
-    cpdef bint _guess_query_mode(self, glycan_composition):
+    cpdef bint _guess_query_mode(self, glycan_composition_type glycan_composition):
         # these guesses will work for N-glycans and common types of mucin-type O-glycans
         # and GAG linkers
-        flag = glycan_composition._getitem_fast(_Hex2NAc) +\
-            glycan_composition._getitem_fast(_Glc2NAc) +\
-            glycan_composition._getitem_fast(_Gal2NAc)
+        flag = PyInt_AsLong(glycan_composition._getitem_fast(_Hex2NAc)) +\
+               PyInt_AsLong(glycan_composition._getitem_fast(_Glc2NAc)) +\
+               PyInt_AsLong(glycan_composition._getitem_fast(_Gal2NAc))
         return flag or self._use_query
 
     cpdef long count_glycosylation_type(self, glycotype):
-        return self.glycosylation_manager.count_glycosylation_type(glycotype)
+        return GlycosylationManager.count_glycosylation_type(self.glycosylation_manager, glycotype)
 
 
 @cython.freelist(10000)
@@ -669,12 +670,13 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             bint is_extended, is_glycosylated
             str name_key, name
             object glycosylation
+            GlycanCompositionProxy glycan
             list accumulator
             list combos
             tuple result
 
         glycan = self.glycan_composition()
-        self._use_query = self._guess_query_mode(glycan)
+        self._use_query = (<GlycanCompositionFragmentStrategyBase>self)._guess_query_mode(glycan)
         core_count = self.count_glycosylation_type(GlycosylationType_n_linked)
         per_site_shifts = []
         base_composition = None
@@ -725,6 +727,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             GlycanCompositionFragment site
             CountTable aggregate_glycosylation
             bint is_glycosylated, is_extended
+            GlycanCompositionProxy glycan
             str name
             set seen
             list accumulator
@@ -888,6 +891,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             GlycanCompositionFragment site
             CountTable aggregate_glycosylation
             bint is_glycosylated, is_extended
+            GlycanCompositionProxy glycan
             str name
             set seen
             list accumulator
