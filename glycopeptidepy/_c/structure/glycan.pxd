@@ -3,6 +3,12 @@ from glypy._c.structure.glycan_composition cimport _CompositionBase
 
 from glycopeptidepy._c.structure.base cimport PeptideSequenceBase
 
+ctypedef fused glycan_composition_type:
+    _CompositionBase
+    GlycanCompositionProxy
+    object
+
+
 cdef class GlycanCompositionProxy(object):
     '''A mapping-like object that imitates the GlycanComposition interface in
     a read-only fashion.
@@ -10,10 +16,14 @@ cdef class GlycanCompositionProxy(object):
 
     cdef:
         public _CompositionBase obj
+        public str _serialized
 
     cpdef object _getitem_fast(self, key)
 
     cpdef str serialize(self)
+
+    @staticmethod
+    cdef GlycanCompositionProxy _create(glycan_composition_type obj)
 
 
 cdef class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
@@ -26,7 +36,7 @@ cdef class GlycosylationManager(object):
         public dict mapping
         public object parent
         public object _aggregate
-        public object _proxy
+        public GlycanCompositionProxy _proxy
         public dict _type_track
         public int _total_glycosylation_size
 
@@ -55,8 +65,8 @@ cdef class GlycosylationManager(object):
     cpdef double mass(self)
     cpdef bint is_fully_specified_topologies(self)
 
-    cdef object get_glycan_composition(self)
-    cdef object _make_glycan_composition_proxy(self)
+    cdef GlycanCompositionProxy get_glycan_composition(self)
+    cdef GlycanCompositionProxy _make_glycan_composition_proxy(self)
     cdef int get_total_glycosylation_size(self)
     cpdef int total_glycosylation_size(self)
 

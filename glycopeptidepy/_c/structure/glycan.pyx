@@ -18,6 +18,27 @@ cdef class GlycanCompositionProxy(object):
     a read-only fashion.
     '''
 
+    @staticmethod
+    cdef GlycanCompositionProxy _create(glycan_composition_type obj):
+        cdef:
+            GlycanCompositionProxy self
+        self = <GlycanCompositionProxy>GlycanCompositionProxy.__new__(GlycanCompositionProxy)
+        if glycan_composition_type is _CompositionBase:
+            self.obj = obj
+            self._serialized = None
+        elif glycan_composition_type is GlycanCompositionProxy:
+            self.obj = obj.obj
+            self._serialized = obj._serialized
+        return self
+
+    def __init__(self, glycan_composition):
+        if isinstance(glycan_composition, GlycanCompositionProxy):
+            self._serialized = glycan_composition._serialized
+            self.obj = glycan_composition.obj
+        else:
+            self.obj = glycan_composition
+            self._serialized = None
+
     def mass(self, *args, **kwargs):
         return self.obj.mass(*args, **kwargs)
 
@@ -52,13 +73,16 @@ cdef class GlycanCompositionProxy(object):
         return self.obj.query(query, exact=exact, **kwargs)
 
     cpdef str serialize(self):
-        return self.obj.serialize()
+        if self._serialized is not None:
+            return self._serialized
+        self._serialized = self.obj.serialize()
+        return self._serialized
 
     def __repr__(self):
         return repr(self.obj)
 
     def __str__(self):
-        return str(self.obj)
+        return self.serialize()
 
     def __hash__(self):
         return hash(self.obj)
@@ -94,8 +118,9 @@ cdef class GlycanCompositionWithOffsetProxy(GlycanCompositionProxy):
     def __init__(self, obj, offset=None):
         if offset is None:
             offset = CComposition._create(None)
-        self.obj = obj
+        GlycanCompositionProxy.__init__(self, obj)
         self.composition_offset = offset
+
 
     def clone(self, *args, **kwargs):
         return self.__class__(self.obj, self.composition_offset.copy())
@@ -113,12 +138,6 @@ cdef CComposition WATER_OFFSET = CComposition({"H": 2, "O": 1})
 
 
 cdef object GlycanCompositionProxyType = None
-
-
-def set_glycan_composition_proxy_type(tp):
-    global GlycanCompositionProxyType
-    GlycanCompositionProxyType = tp
-    return GlycanCompositionProxyType
 
 
 @cython.freelist(10000)
@@ -295,7 +314,7 @@ cdef class GlycosylationManager(object):
     def glycan_composition(self):
         return self.get_glycan_composition()
 
-    cdef object get_glycan_composition(self):
+    cdef GlycanCompositionProxy get_glycan_composition(self):
         if self._proxy is None:
             self._proxy = self._make_glycan_composition_proxy()
         return self._proxy
@@ -356,7 +375,7 @@ cdef class GlycosylationManager(object):
                 break
         return is_fully_specified
 
-    cdef object _make_glycan_composition_proxy(self):
+    cdef GlycanCompositionProxy _make_glycan_composition_proxy(self):
         cdef:
             object aggregate
             object base
@@ -393,7 +412,11 @@ cdef class GlycosylationManager(object):
                 # when initializing the base above.
                 gc = HashableGlycanComposition.from_glycan(rule._original)
                 base += gc
-        return GlycanCompositionProxyType(base)
+        if not isinstance(base, GlycanCompositionProxy):
+            proxy = GlycanCompositionProxy(base)
+        else:
+            proxy = base
+        return proxy
 
     cpdef int count_glycosylation_type(self, glycosylation_type):
         cdef:
