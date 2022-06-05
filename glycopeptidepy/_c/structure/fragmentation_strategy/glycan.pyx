@@ -130,7 +130,7 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
     cpdef GlycanCompositionProxy glycan_composition(self):
         return self.glycosylation_manager.get_glycan_composition()
 
-    cpdef bint _guess_query_mode(self, glycan_composition_type glycan_composition):
+    cdef bint _guess_query_mode(self, GlycanCompositionProxy glycan_composition):
         # these guesses will work for N-glycans and common types of mucin-type O-glycans
         # and GAG linkers
         flag = PyInt_AsLong(glycan_composition._getitem_fast(_Hex2NAc)) +\
@@ -676,7 +676,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             tuple result
 
         glycan = self.glycan_composition()
-        self._use_query = (<GlycanCompositionFragmentStrategyBase>self)._guess_query_mode(glycan)
+        self._use_query = self._guess_query_mode(glycan)
         core_count = self.count_glycosylation_type(GlycosylationType_n_linked)
         per_site_shifts = []
         base_composition = None

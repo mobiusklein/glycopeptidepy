@@ -35,7 +35,7 @@ cdef class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
         public GlycosylationManager glycosylation_manager
 
     cpdef GlycanCompositionProxy glycan_composition(self)
-    cpdef bint _guess_query_mode(self, glycan_composition_type glycan_composition)
+    cdef bint _guess_query_mode(self, GlycanCompositionProxy glycan_composition)
     cpdef long count_glycosylation_type(self, glycotype)
 
 
