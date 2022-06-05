@@ -4,18 +4,16 @@ import warnings
 
 from io import BytesIO
 from collections import OrderedDict, defaultdict
-try:
-    from collections.abc import Mapping, Sequence as SequenceABC
-except ImportError:
-    from collections import Mapping, Sequence as SequenceABC
+from collections.abc import Mapping, Sequence as SequenceABC
 
 from six import text_type
+
+from glypy.utils.base import opener
 
 from glycopeptidepy.structure.residue import UnknownAminoAcidException, symbol_to_residue
 from glycopeptidepy.structure.sequence import ProteinSequence
 from glycopeptidepy.structure.parser import parse_simple
 from glycopeptidepy.utils.sequence_tree import SuffixTree
-from glypy.utils.base import opener
 
 from .cv.peff import peff_cv_term
 
@@ -745,7 +743,7 @@ class PEFFReader(ProteinFastaFileReader):
         super(PEFFReader, self).__init__(
             opener(path, 'rb'), defline_parser, encoding='ascii', index=index)
         try:
-            if 'b' not in self.handle.mode:
+            if 'b' not in self.handle.mode: # pylint: disable=unsupported-membership-test
                 raise ValueError(
                     "PEFF files must be opened in binary mode! Make sure to open the file with 'rb'.")
         except (AttributeError, TypeError):

@@ -1,3 +1,6 @@
+'''A generic implementation of sequence features
+'''
+
 import json
 from six import add_metaclass
 
@@ -7,10 +10,10 @@ from . import uniprot
 class AnnotationMeta(type):
     _cache = {}
 
-    def __new__(mcs, name, parents, attrs):
-        new_type = type.__new__(mcs, name, parents, attrs)
+    def __new__(cls, name, parents, attrs):
+        new_type = type.__new__(cls, name, parents, attrs)
         try:
-            mcs._cache[name] = new_type
+            cls._cache[name] = new_type
         except AttributeError:
             pass
         return new_type
