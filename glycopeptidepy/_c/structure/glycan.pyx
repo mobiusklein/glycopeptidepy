@@ -82,6 +82,8 @@ cdef class GlycanCompositionProxy(object):
         return repr(self.obj)
 
     def __str__(self):
+        if self._serialized is not None:
+            return self._serialized
         return self.serialize()
 
     def __hash__(self):
