@@ -1,14 +1,22 @@
 import re
+
+import pkg_resources
+
 from glycopeptidepy.structure.residue import long_to_symbol
+
 from glycopeptidepy.structure.modification import (
     ModificationRule,
     ModificationTarget,
     SequenceLocation)
+
 from glypy import Composition
 
 
 class UniProtPTMListParser(object):  # pragma: no cover
-    def __init__(self, path):
+
+    def __init__(self, path=None):
+        if path is None:
+            path = pkg_resources.resource_filename("glycopeptidepy.io.cv.data", "uniprot_ptmlist.txt")
         self.path = path
         self.handle = open(path)
         self._find_starting_point()
@@ -87,7 +95,7 @@ class UniProtPTMListParser(object):  # pragma: no cover
                 break
         if mass_difference is None or correction_formula is None:
             return None
-        mod_target = ModificationTarget([target] if target else None, position)
+        mod_target = ModificationTarget([target] if target else set(), position)
         rule = ModificationRule(
             [mod_target], ptm_id, monoisotopic_mass=mass_difference, composition=correction_formula,
             alt_names={accession} | set(crossref), categories=keywords)
@@ -105,3 +113,17 @@ class UniProtPTMListParser(object):  # pragma: no cover
             except StopIteration:
                 break
         return table
+
+
+def target_to_source(target: ModificationTarget) -> str:
+    aas = {a.symbol for a in target.amino_acid_targets}
+    pos = target.position_modifier
+    return f"ModificationTarget({aas}, SequenceLocation[{pos.name!r}])"
+
+
+def rule_to_source(rule: ModificationRule) -> str:
+    targets = f"[{', '.join([target_to_source(t) for t in rule.targets])}]"
+    name = rule.name
+    mass = rule.mass
+    formula = dict(rule.composition)
+    return f"ModificationRule({targets}, {name!r}, monoisotopic_mass={mass}, composition=Composition({formula}), alt_names={rule.names})"

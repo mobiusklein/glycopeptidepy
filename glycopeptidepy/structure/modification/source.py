@@ -26,7 +26,7 @@ from .glycosylation import (
     OGlcNAcylation,
     OGlycanCoreGlycosylation,
     NGlycanCoreGlycosylation,)
-
+from .data import psimod, uniprot
 
 def load_from_csv(stream):
     """Load a sequence of :class:`~.ModificationRule` objects from
@@ -99,6 +99,8 @@ class ModificationSource(object):
         defs += load_from_json(cls._unimod_definitions())
         if cls.use_protein_prospector:
             defs += load_from_csv(cls._table_definition_file())
+        defs += psimod.rules
+        defs += uniprot.rules
         return defs
 
     @classmethod

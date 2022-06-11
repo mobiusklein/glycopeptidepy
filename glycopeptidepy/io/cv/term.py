@@ -106,6 +106,10 @@ class MappingProxy(object):
         self._ensure_mapping()
         return self.mapping[key]
 
+    def values(self):
+        self._ensure_mapping()
+        return self.mapping.values()
+
 
 def _lazy_load_psims():
     try:
@@ -116,7 +120,18 @@ def _lazy_load_psims():
     return cv_psims
 
 
+def _lazy_load_psimod():
+    try:
+        from psims.controlled_vocabulary.controlled_vocabulary import load_psimod
+        cv = load_psimod()
+    except Exception:  # pragma: no cover
+        cv = None
+    return cv
+
+
 cv_psims = MappingProxy(_lazy_load_psims)
+
+cv_psimod = MappingProxy(_lazy_load_psimod)
 
 
 def type_path(term, seed):  # pragma: no cover
@@ -137,7 +152,10 @@ def type_path(term, seed):  # pragma: no cover
         try:
             steps.append(term.is_a.comment)
         except AttributeError:
-            steps.extend(t.comment for t in term.is_a)
+            try:
+                steps.extend(t.comment for t in term.is_a)
+            except KeyError:
+                continue
         except KeyError:
             continue
     return _unique_list(path)
