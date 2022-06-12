@@ -70,6 +70,7 @@ class UniProtPTMListParser(object):  # pragma: no cover
 
         keywords = []
         crossref = []
+        psimod_id = None
         while True:
             typecode, line = self._next_line()
             if typecode == "ID":
@@ -91,6 +92,9 @@ class UniProtPTMListParser(object):  # pragma: no cover
                 keywords.append(line.strip("."))
             elif typecode == "DR":
                 crossref.append(':'.join(line.strip('.').split("; ")))
+                if crossref[-1].startswith("PSI-MOD"):
+                    crossref[-1] = crossref[-1].replace("PSI-", "")
+                    psimod_id = crossref[-1]
             elif typecode == "//":
                 break
         if mass_difference is None or correction_formula is None:
@@ -99,7 +103,7 @@ class UniProtPTMListParser(object):  # pragma: no cover
         rule = ModificationRule(
             [mod_target], ptm_id, monoisotopic_mass=mass_difference, composition=correction_formula,
             alt_names={accession} | set(crossref), categories=keywords)
-        rule.preferred_name = ptm_id
+        rule.preferred_name = ptm_id if psimod_id is None else psimod_id
         return rule
 
     def build_table(self):
@@ -123,7 +127,7 @@ def target_to_source(target: ModificationTarget) -> str:
 
 def rule_to_source(rule: ModificationRule) -> str:
     targets = f"[{', '.join([target_to_source(t) for t in rule.targets])}]"
-    name = rule.name
+    name = rule.preferred_name
     mass = rule.mass
     formula = dict(rule.composition)
     return f"ModificationRule({targets}, {name!r}, monoisotopic_mass={mass}, composition=Composition({formula}), alt_names={rule.names})"

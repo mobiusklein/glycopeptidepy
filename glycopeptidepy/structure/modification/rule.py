@@ -134,6 +134,17 @@ except ImportError:
             '''A string representation for inclusion in sequences'''
             return self.name
 
+        @property
+        def unimod_id(self):
+            for name in self.names:
+                if name.startswith("UNIMOD:"):
+                    return name
+
+        @property
+        def psimod_id(self):
+            for name in self.names:
+                if name.startswith("MOD:"):
+                    return name
 
 def _ModificationRule_reconstructor(tp):
     return tp.__new__(tp)
@@ -292,7 +303,7 @@ class ModificationRule(ModificationRuleBase):
 
     @staticmethod
     def _get_preferred_name(names):
-        return min([x for x in names if not x.startswith("UNIMOD:")], key=len)
+        return min([x for x in names if not x.startswith("UNIMOD:") and not x.startswith("PTM-")], key=len)
 
     def __init__(self, amino_acid_specificity, modification_name,
                  title=None, monoisotopic_mass=None, composition=None,

@@ -54,6 +54,17 @@ cdef class ModificationRuleBase(ModificationBase):
         """
         return True
 
+    @property
+    def unimod_id(self):
+        for name in self.names:
+            if name.startswith("UNIMOD:"):
+                return name
+
+    @property
+    def psimod_id(self):
+        for name in self.names:
+            if name.startswith("MOD:"):
+                return name
 
 cdef class NeutralLossBase(object):
     def __eq__(self, other):
