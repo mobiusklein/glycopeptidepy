@@ -1,8 +1,3 @@
-from typing import List, Tuple
-
-from glycopeptidepy.structure import Modification
-from .. import annotation
-from ..fasta import FastaHeader
 from .term import Term
 
 
@@ -430,49 +425,3 @@ def peff_cv_term(name, strict=False):
             return PEFFTerm(name, name, name, name, [name])
         else:
             raise
-
-
-def tag_to_annotation(name: str, values: List[Tuple]) -> annotation.AnnotationCollection:
-    result = []
-    if name == "Processed":
-        for spec in values:
-            start = spec[0]
-            end = spec[1]
-            names = spec[2:]
-            if annotation.SignalPeptide.feature_type in names:
-                result.append(annotation.SignalPeptide(start - 1, end))
-            elif annotation.MatureProtein.feature_type in names:
-                result.append(annotation.MatureProtein(start - 1, end))
-            elif annotation.MaturationPeptide.feature_type in names:
-                result.append(annotation.MaturationPeptide(start - 1, end))
-            elif annotation.Propeptide.feature_type in names:
-                result.append(annotation.Propeptide(start - 1, end))
-            else:
-                annot = annotation.PeptideBase(start - 1, end)
-                annot.feature_type = names[0]
-                result.append(annot)
-    elif name == "ModResPsi" or name == "ModRes":
-        for pos, acc, name in values:
-            try:
-                if acc:
-                    mod = Modification(acc)
-                elif name:
-                    mod = Modification(name)
-                annotation.ModifiedResidue(pos - 1, mod.name)
-            except KeyError:
-                continue
-    elif name == "VariantSimple":
-        for pos, sub in values:
-            result.append(annotation.SimpleVariant(pos - 1, sub))
-
-    return annotation.AnnotationCollection(result)
-
-
-def defline_to_annotation(defline: 'FastaHeader') -> annotation.AnnotationCollection:
-    annots = [tag_to_annotation(k, v) for k, v in defline.items()]
-    if annots:
-        base = annots[0]
-        for a in annots[1:]:
-            base.extend(a)
-        return base
-    return annotation.AnnotationCollection([])
