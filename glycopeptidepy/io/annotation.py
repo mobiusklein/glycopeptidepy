@@ -2,6 +2,10 @@
 '''
 
 import json
+import io
+
+from typing import Dict, Iterable, List, Sequence
+
 from six import add_metaclass
 
 from . import uniprot
@@ -29,6 +33,9 @@ class AnnotationMeta(type):
 
 @add_metaclass(AnnotationMeta)
 class AnnotationBase(object):
+    feature_type: str
+    description: str
+
     def __init__(self, feature_type, description, **kwargs):
         self.feature_type = feature_type
         self.description = description
@@ -53,6 +60,8 @@ class AnnotationBase(object):
 
 
 class AnnotatedResidue(AnnotationBase):
+    position: int
+
     def __init__(self, position, feature_type, description, **kwargs):
         super(AnnotatedResidue, self).__init__(feature_type, description, **kwargs)
         self.position = position
@@ -81,6 +90,9 @@ class AnnotatedResidue(AnnotationBase):
 
 
 class AnnotatedInterval(AnnotationBase):
+    start: int
+    end: int
+
     def __init__(self, start, end, feature_type, description, **kwargs):
         super(AnnotatedInterval, self).__init__(
             feature_type, description, **kwargs)
@@ -149,6 +161,10 @@ class TransitPeptide(PeptideBase):
     feature_type = "transit peptide"
 
 
+class MaturationPeptide(PeptideBase):
+    feature_type = "maturation peptide"
+
+
 class Peptide(PeptideBase):
     feature_type = 'peptide'
 
@@ -200,6 +216,8 @@ class SimpleVariant(AnnotatedResidue):
         d['substitution'] = d.pop('description')
         return d
 
+    def __repr__(self):
+        return "{self.__class__.__name__}({self.position}, {self.description!r})".format(self=self)
 
 class ComplexVariant(AnnotatedInterval):
     feature_type = 'complex variant'
@@ -218,17 +236,20 @@ class ComplexVariant(AnnotatedInterval):
         return d
 
 
-class AnnotationCollection(object):
+class AnnotationCollection(Sequence[AnnotationBase]):
     def __init__(self, items):
         self.items = list(items)
 
-    def append(self, item):
+    def append(self, item: AnnotationBase):
         self.items.append(item)
+
+    def extend(self, items: Iterable[AnnotationBase]):
+        self.items.extend(items)
 
     def __getitem__(self, i):
         return self.items[i]
 
-    def __setitem__(self, i, item):
+    def __setitem__(self, i, item: AnnotationBase):
         self.items[i] = item
 
     def __len__(self):
@@ -240,18 +261,18 @@ class AnnotationCollection(object):
     def __repr__(self):
         return "{self.__class__.__name__}({self.items})".format(self=self)
 
-    def to_json(self):
+    def to_json(self) -> List[Dict]:
         return [a.to_dict() for a in self]
 
     @classmethod
-    def from_json(cls, d):
+    def from_json(cls, d: Dict):
         return cls([AnnotationBase.from_dict(di) for di in d])
 
     def dump(self, fp):
         json.dump(self.to_json(), fp)
 
     @classmethod
-    def load(cls, fp):
+    def load(cls, fp: io.IOBase):
         d = json.load(fp)
         inst = cls.from_json(d)
         return inst

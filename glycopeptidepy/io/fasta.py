@@ -753,6 +753,9 @@ class PEFFReader(ProteinFastaFileReader):
         self.comments = []
         self.number_of_entries = 0
         self._parse_header()
+        if self.index:
+            self.index.index_by("Tag")
+            self.index.index_by("DbUniqueId")
 
     def _parse_header(self):
         offset = 0
