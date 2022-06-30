@@ -1,10 +1,12 @@
 '''A REST API for the UniProt protein database and a parser for their XML format.
 '''
 import csv
+from typing import List
 import warnings
 import threading
 import gzip
 import io
+import logging
 
 try:
     from urllib import urlopen
@@ -25,6 +27,16 @@ from six import add_metaclass, string_types as basestring
 uri_template = "https://www.uniprot.org/uniprot/{accession}.xml"
 batch_uri = "https://www.uniprot.org/uploadlists/"
 nsmap = {"up": "http://uniprot.org/uniprot"}
+batch_uri_query = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
+
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+
+def _batch_uri_query_builder(accessions: List[str]) -> str:
+    query = " OR ".join([f"accession:{acc}" for acc in accessions])
+    return batch_uri_query + query
 
 
 class UniProtFeatureMeta(type):
@@ -473,12 +485,8 @@ def get_features_for(accession, error=False):
 
 def get_features_for_many(accessions, error=False):
     query_to_doc = dict()
-    r = requests.post(batch_uri, params={
-        "format": "xml",
-        "from": "ACC+ID",
-        "to": "ACC",
-        "query": " ".join(accessions)
-    })
+    url = _batch_uri_query_builder(accessions)
+    r = requests.get(url)
     tree = etree.fromstring(r.content)
     for doc in parse_all(tree, error=error):
         for acc in doc.accessions:
