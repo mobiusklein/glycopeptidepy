@@ -52,6 +52,19 @@ class StubGlycopeptideStrategyTest(unittest.TestCase):
         assert len(strategy.n_glycan_composition_fragments(strategy.glycan_composition(), 1, 1)) == 69
         assert len(strategy.n_glycan_composition_fragments(strategy.glycan_composition(), 1, 2)) == 35
 
+    def test_mixed_stub_generation(self):
+        gp = sequence.PeptideSequence(
+            "AVLPQEEEGS(GAG-Linker)GGGQLVT(O-Glycosylation)EVTK{Xyl:1; Hex:3; HexNAc:1; Neu5Ac:2}")
+        fragments = list(fragmentation_strategy.StubGlycopeptideStrategy(gp, extended=True))
+        assert len(fragments) == 11
+        for f in fragments:
+            if f.name == "peptide":
+                self.assertAlmostEqual(f.mass, 2127.0695, 3)
+            elif f.name == "peptide+Xyl1":
+                self.assertAlmostEqual(f.mass, 2259.1118, 3)
+            elif f.name == "peptide+HexNAc1":
+                self.assertAlmostEqual(f.mass, 2330.1489, 3)
+
 
 class EXDFragmentationStrategyTest(unittest.TestCase):
     def test_approximated(self):

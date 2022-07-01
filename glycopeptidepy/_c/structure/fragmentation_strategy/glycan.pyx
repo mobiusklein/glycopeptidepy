@@ -997,14 +997,89 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
                         core_shifts.append(shift)
         return core_shifts
 
+    cpdef list mixed_stub_fragments(self):
+
+        cdef:
+            int core_count
+            int total_core_count
+            list per_site_shifts
+            GlycanCompositionFragment site
+            CComposition base_composition, composition
+            double base_mass
+            size_t i
+            size_t n_combos
+            bint is_extended, is_glycosylated
+            str name_key, name
+            object glycosylation
+            GlycanCompositionProxy glycan
+            list accumulator
+            list combos
+            tuple result
+
+        glycan = self.glycan_composition()
+        self._use_query = self._guess_query_mode(glycan)
+        per_site_shifts = []
+        base_composition = None
+        if self.compute_compositions:
+            base_composition = self.peptide_composition()
+            base_mass = base_composition.calc_mass()
+        else:
+            base_mass = self.peptide.get_peptide_backbone_mass()
+
+        core_count = self.count_glycosylation_type(GlycosylationType_n_linked)
+        for i in range(core_count):
+            core_shifts = self.n_glycan_composition_fragments(glycan, core_count, i)
+            per_site_shifts.append(core_shifts)
+
+        total_core_count += core_count
+        core_count = self.count_glycosylation_type(GlycosylationType_o_linked)
+        for i in range(core_count):
+            core_shifts = self.o_glycan_composition_fragments(glycan, core_count, i)
+            per_site_shifts.append(core_shifts)
+
+        total_core_count += core_count
+        core_count = self.count_glycosylation_type(GlycosylationType_glycosaminoglycan)
+        for i in range(core_count):
+            core_shifts = self.gag_linker_composition_fragments(glycan, core_count, i)
+            per_site_shifts.append(core_shifts)
+
+        core_count += total_core_count
+        combos = self._combinate_sites(per_site_shifts, glycan)
+        n_combos = PyList_Size(combos)
+        accumulator = PyList_New(n_combos)
+        for i in range(n_combos):
+            result = <tuple>PyList_GetItem(combos, i)
+            site = <GlycanCompositionFragment>PyTuple_GetItem(result, 0)
+            name = <str>PyTuple_GetItem(result, 1)
+            glycosylation = <object>PyTuple_GetItem(result, 2)
+            is_glycosylated = (site.mass != 0)
+
+            composition = None
+            if self.compute_compositions:
+                composition = base_composition.clone()
+                composition.add_from(site.composition)
+
+            frag = StubFragment._create(
+                name=name,
+                mass=base_mass + site.mass,
+                composition=composition,
+                is_glycosylated=is_glycosylated,
+                kind=IonSeries_stub_glycopeptide,
+                chemical_shift=None,
+                glycosylation=glycosylation,
+                is_extended=site.is_extended,
+                glycosylation_size=site.get_glycosylation_size())
+            Py_INCREF(frag)
+            PyList_SET_ITEM(accumulator, i, frag)
+        return accumulator
+
     cpdef list stub_fragments(self):
         n_glycan = self.count_glycosylation_type(GlycosylationType_n_linked) > 0
         o_glycan = self.count_glycosylation_type(GlycosylationType_o_linked) > 0
         gag_linker = self.count_glycosylation_type(GlycosylationType_glycosaminoglycan) > 0
-        if (n_glycan + o_glycan + gag_linker) > 2:
-            raise ValueError(
-                "Does not support mixed-type glycan fragmentation (yet)")
-        if n_glycan:
+        if (n_glycan + o_glycan + gag_linker) > 1:
+            return self.mixed_stub_fragments()
+        elif n_glycan:
             return self.n_glycan_stub_fragments()
         elif o_glycan:
             return self.o_glycan_stub_fragments()
