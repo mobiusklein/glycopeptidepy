@@ -146,8 +146,112 @@ def _merge_dictlists(adict, bdict):
     return result
 
 
+class ModificationLocatingMixin(object):
+    __slots__ = ()
 
-class ModificationRule(ModificationRuleBase):
+    def clear_targets(self):
+        self._n_term_targets = None
+        self._c_term_targets = None
+        self.targets = set()
+
+    def _configure_targets(self, amino_acid_specificity):
+        self._n_term_targets = None
+        self._c_term_targets = None
+
+        # The type of the parameter passed for amino_acid_specificity is variable
+        # so select the method correct for the passed type
+
+        # If the specificity is a string, parse it into rules
+        if isinstance(amino_acid_specificity, basestring):
+            try:
+                self.targets = set([
+                    extract_targets_from_string(amino_acid_specificity)])
+            except TypeError:
+                raise TypeError("Could not extract targets from %s" %
+                                amino_acid_specificity)
+
+        # If the specificity is already a rule, store it as a list of one rules
+        elif isinstance(amino_acid_specificity, ModificationTarget):
+            self.targets = set([amino_acid_specificity])
+
+        # If the specificity is a collection of rules, store it as is
+        elif isinstance(amino_acid_specificity, Iterable):
+            self.targets = set(amino_acid_specificity)
+        else:
+            raise ValueError("Could not interpret target specificity from %r" % (
+                amino_acid_specificity,))
+
+    def valid_site(self, amino_acid=None, position_modifiers=None):
+        valid_sites = []
+        for target in self.targets:
+            result, site = target.valid_site(amino_acid, position_modifiers)
+            if not result:
+                continue
+            # if SequenceLocation.anywhere is encountered, store 0 since None
+            # can't be ordered with numbers
+            if site.value is None:
+                valid_sites.append(0)
+            else:
+                # otherwise store the location's numeric value
+                valid_sites.append(site.value)
+        if not valid_sites:
+            return False
+        # Find the minimum site type. Terminal sites are negative numbers
+        # and prefer those from 0 which denotes SequenceLocation.anywhere
+        site_type = min(valid_sites)
+        if site_type == 0:
+            return SequenceLocation.anywhere
+        return SequenceLocation[site_type]
+
+    def why_valid(self, amino_acid=None, position_modifiers=None):
+        possible_targets = [target for target in self.targets if target.valid_site(
+            amino_acid, position_modifiers)[0]]
+        if not possible_targets:
+            return None
+        minimized_target = min(possible_targets, key=len)
+        return minimized_target
+
+    def find_valid_sites(self, sequence, protein_n_term=False, protein_c_term=False):
+        valid_indices = []
+        position_modifier_rules = get_position_modifier_rules_dict(
+            sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
+        for index in range(len(sequence)):
+            position = sequence[index]
+            if position.modifications:
+                continue
+            amino_acid = position[0].name
+            position_modifiers = position_modifier_rules.get(index)
+            is_valid = self.valid_site(amino_acid, position_modifiers)
+            if is_valid:
+                if (is_valid is SequenceLocation.n_term) or (is_valid is SequenceLocation.c_term):
+                    valid_indices.append(is_valid)
+                else:
+                    valid_indices.append(index)
+
+        return valid_indices
+
+    @property
+    def n_term_targets(self):
+        if self._n_term_targets is None:
+            solutions = []
+            for target in self.targets:
+                if target.position_modifier == SequenceLocation.n_term or target.position_modifier == SequenceLocation.protein_n_term:
+                    solutions.append(target)
+            self._n_term_targets = solutions
+        return self._n_term_targets
+
+    @property
+    def c_term_targets(self):
+        if self._c_term_targets is None:
+            solutions = []
+            for target in self.targets:
+                if target.position_modifier == SequenceLocation.c_term or target.position_modifier == SequenceLocation.protein_c_term:
+                    solutions.append(target)
+            self._c_term_targets = solutions
+        return self._c_term_targets
+
+
+class ModificationRule(ModificationRuleBase, ModificationLocatingMixin):
     '''Represent the name, mass, and position specifities associated with a given modification.
     Additionally stores information on metadata about this rule computed from these values and
     categorical information from expert sources.
@@ -318,38 +422,6 @@ class ModificationRule(ModificationRuleBase):
 
         self.neutral_losses = neutral_losses
 
-    def clear_targets(self):
-        self._n_term_targets = None
-        self._c_term_targets = None
-        self.targets = set()
-
-    def _configure_targets(self, amino_acid_specificity):
-        self._n_term_targets = None
-        self._c_term_targets = None
-
-        # The type of the parameter passed for amino_acid_specificity is variable
-        # so select the method correct for the passed type
-
-        # If the specificity is a string, parse it into rules
-        if isinstance(amino_acid_specificity, basestring):
-            try:
-                self.targets = set([
-                    extract_targets_from_string(amino_acid_specificity)])
-            except TypeError:
-                raise TypeError("Could not extract targets from %s" %
-                                amino_acid_specificity)
-
-        # If the specificity is already a rule, store it as a list of one rules
-        elif isinstance(amino_acid_specificity, ModificationTarget):
-            self.targets = set([amino_acid_specificity])
-
-        # If the specificity is a collection of rules, store it as is
-        elif isinstance(amino_acid_specificity, Iterable):
-            self.targets = set(amino_acid_specificity)
-        else:
-            raise ValueError("Could not interpret target specificity from %r" % (
-                amino_acid_specificity,))
-
     def _configure_names(self, modification_name, title, alt_names, aliases):
 
         # Attempt to parse the protein prospector name which contains the
@@ -392,55 +464,6 @@ class ModificationRule(ModificationRuleBase):
             self.categories, **self.options)
         dup.names.update(self.names)
         return dup
-
-    def valid_site(self, amino_acid=None, position_modifiers=None):
-        valid_sites = []
-        for target in self.targets:
-            result, site = target.valid_site(amino_acid, position_modifiers)
-            if not result:
-                continue
-            # if SequenceLocation.anywhere is encountered, store 0 since None
-            # can't be ordered with numbers
-            if site.value is None:
-                valid_sites.append(0)
-            else:
-                # otherwise store the location's numeric value
-                valid_sites.append(site.value)
-        if not valid_sites:
-            return False
-        # Find the minimum site type. Terminal sites are negative numbers
-        # and prefer those from 0 which denotes SequenceLocation.anywhere
-        site_type = min(valid_sites)
-        if site_type == 0:
-            return SequenceLocation.anywhere
-        return SequenceLocation[site_type]
-
-    def why_valid(self, amino_acid=None, position_modifiers=None):
-        possible_targets = [target for target in self.targets if target.valid_site(
-            amino_acid, position_modifiers)[0]]
-        if not possible_targets:
-            return None
-        minimized_target = min(possible_targets, key=len)
-        return minimized_target
-
-    def find_valid_sites(self, sequence, protein_n_term=False, protein_c_term=False):
-        valid_indices = []
-        position_modifier_rules = get_position_modifier_rules_dict(
-            sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
-        for index in range(len(sequence)):
-            position = sequence[index]
-            if position.modifications:
-                continue
-            amino_acid = position[0].name
-            position_modifiers = position_modifier_rules.get(index)
-            is_valid = self.valid_site(amino_acid, position_modifiers)
-            if is_valid:
-                if (is_valid is SequenceLocation.n_term) or (is_valid is SequenceLocation.c_term):
-                    valid_indices.append(is_valid)
-                else:
-                    valid_indices.append(index)
-
-        return valid_indices
 
 
     def __repr__(self):
@@ -522,26 +545,6 @@ class ModificationRule(ModificationRuleBase):
         self._n_term_targets = state.get('_n_term_targets', state.get('_n_term_target', None))
         self._c_term_targets = state.get('_c_term_targets', state.get('_c_term_target', None))
         self._hash = hash(self.name)
-
-    @property
-    def n_term_targets(self):
-        if self._n_term_targets is None:
-            solutions = []
-            for target in self.targets:
-                if target.position_modifier == SequenceLocation.n_term or target.position_modifier == SequenceLocation.protein_n_term:
-                    solutions.append(target)
-            self._n_term_targets = solutions
-        return self._n_term_targets
-
-    @property
-    def c_term_targets(self):
-        if self._c_term_targets is None:
-            solutions = []
-            for target in self.targets:
-                if target.position_modifier == SequenceLocation.c_term or target.position_modifier == SequenceLocation.protein_c_term:
-                    solutions.append(target)
-            self._c_term_targets = solutions
-        return self._c_term_targets
 
     def as_spec_strings(self):
         for target in self.targets:

@@ -14,7 +14,7 @@ from ..composition import Composition
 from ..glycan import TypedGlycan, TypedGlycanComposition, GlycosylationType
 
 from .target import ModificationTarget
-from .rule import ModificationRule
+from .rule import ModificationRule, ModificationLocatingMixin
 from .descriptors import ModificationCategory
 
 
@@ -120,7 +120,7 @@ except ImportError:
 
 
 @ModificationRule.resolve.register
-class Glycosylation(GlycosylationBase):
+class Glycosylation(GlycosylationBase, ModificationLocatingMixin):
     """
     Incubator Idea - Represent occupied glycosylation sites
     using the Modification interface.
@@ -314,10 +314,10 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self.title = "N-Glycan Core Glycosylation"
         self.unimod_name = "N-Glycosylation"
         self.name = self.unimod_name
-        self.targets = [(ModificationTarget("N"))]
         self.composition = _hexnac.total_composition().clone()
         self._glycosylation_type = GlycosylationType.n_linked
         self._common_init()
+        self.targets = [(ModificationTarget("N"))]
 
 class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
     mass_ladder = {k: FrozenGlycanComposition.parse(k).total_composition() - Composition("H2O") for k in {
@@ -331,10 +331,10 @@ class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
         self.title = "Mucin O-Glycan Core Glycosylation"
         self.unimod_name = "O-Glycosylation"
         self.name = self.unimod_name
-        self.targets = [ModificationTarget("S"), ModificationTarget("T")]
         self.composition = _hexnac.total_composition().clone()
         self._glycosylation_type = GlycosylationType.o_linked
         self._common_init()
+        self.targets = [ModificationTarget("S"), ModificationTarget("T")]
 
 
 OGlycanCoreGlycosylation = MucinOGlycanCoreGlycosylation
@@ -354,10 +354,10 @@ class GlycosaminoglycanLinkerGlycosylation(CoreGlycosylation):
         self.title = "Glycosaminoglycan Linker Glycosylation"
         self.unimod_name = "GAG-Linker"
         self.name = self.unimod_name
-        self.targets = [ModificationTarget("S")]
         self.composition = _hexnac.total_composition().clone()
         self._glycosylation_type = GlycosylationType.glycosaminoglycan
         self._common_init()
+        self.targets = [ModificationTarget("S")]
 
 class OGlcNAcylation(CoreGlycosylation):
     mass_ladder = {
