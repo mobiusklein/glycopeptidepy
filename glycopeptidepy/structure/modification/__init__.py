@@ -14,7 +14,7 @@ from .glycosylation import (
     parse_glycan, glycan_resolvers, glycoct, iupac, linear_code, wurcs)
 
 from .source import (
-    ModificationSource, ModificationTable, RestrictedModificationTable)
+    ModificationSource, ModificationTable, RestrictedModificationTable, rule_string_to_specialized_rule)
 
 from .modification import Modification
 
@@ -35,6 +35,7 @@ __all__ = [
     "parse_glycan", "glycan_resolvers", "glycoct", "iupac", "linear_code", "wurcs",
 
     "ModificationSource", "ModificationTable", "RestrictedModificationTable",
+    "rule_string_to_specialized_rule",
 
     "Modification",
 ]
