@@ -1,6 +1,7 @@
 import re
 
 from functools import partial
+from typing import List, Dict, Tuple, TYPE_CHECKING, Optional, Set
 
 from six import string_types as basestring
 
@@ -21,6 +22,9 @@ from .descriptors import ModificationCategory
 _hexnac = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
 _hexose = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
 _xylose = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
+
+if TYPE_CHECKING:
+    from glycopeptidepy.structure import PeptideSequence
 
 
 hexnac_modification = ModificationRule.from_unimod({
@@ -319,6 +323,17 @@ class NGlycanCoreGlycosylation(CoreGlycosylation):
         self._glycosylation_type = GlycosylationType.n_linked
         self._common_init()
         self.targets = {ModificationTarget("N")}
+
+    def find_valid_sites(self, sequence: 'PeptideSequence', protein_n_term=False, protein_c_term=False):
+        from glycopeptidepy.structure.sequence import find_n_glycosylation_sequons
+        valid = set(find_n_glycosylation_sequons(sequence, include_cysteine=True))
+        n = len(sequence)
+        any_valid = set(super().find_valid_sites(sequence, protein_n_term, protein_c_term))
+        for i in any_valid:
+            if (n - i) < 3:
+                valid.add(i)
+        return sorted(valid)
+
 
 class MucinOGlycanCoreGlycosylation(CoreGlycosylation):
     mass_ladder = {k: FrozenGlycanComposition.parse(k).total_composition() - Composition("H2O") for k in {
