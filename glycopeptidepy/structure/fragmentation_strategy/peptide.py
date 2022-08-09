@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 from collections import defaultdict
 from itertools import product, combinations
+from typing import Any, Dict, List, Tuple, Union
 
 from glypy.structure.glycan_composition import FrozenGlycanComposition
+from glycopeptidepy.structure.modification.modification import Modification
 
 from glycopeptidepy.utils.collectiontools import descending_combination_counter, _AccumulatorBag
 from glycopeptidepy.structure import constants as structure_constants
@@ -350,12 +352,17 @@ class GlycanCompositionFragment(SimpleFragment):
 
 
 class _GlycanFragmentingMixin(_GlycanFragmentingStrategyBase):
+    max_glycan_cleavages: int
+    allow_ambiguous_fragmentation: bool
+    _glycan_fragment_cache: Dict[Tuple, List]
+    _glycan_fragment_wrapper_cache: Dict[Any, GlycanFragment]
+    _glycan_fragment_combination_cache: Dict
 
     def _make_fragmentation_strategy(self):
         strat = StubGlycopeptideStrategy(self.peptide, True)
         return strat
 
-    def _get_glycan_composition_fragments(self, glycosylation, series, position):
+    def _get_glycan_composition_fragments(self, glycosylation: Modification, series: str, position: int) -> List[GlycanCompositionFragment]:
         strat = self._make_fragmentation_strategy()
         gc = strat.glycan_composition()
         if glycosylation.rule.glycosylation_type == GlycosylationType.n_linked:
@@ -379,24 +386,28 @@ class _GlycanFragmentingMixin(_GlycanFragmentingStrategyBase):
                 name, mass, IonSeries.other, composition, frag_spec['key']))
         return fragments
 
-    def _get_glycan_structure_fragments(self, glycosylation, series, position):
+    def _get_glycan_structure_fragments(self, glycosylation: Modification, series: str, position: int):
         fragments = sorted(glycosylation.rule.get_fragments(
             series, max_cleavages=self.max_glycan_cleavages),
             key=lambda x: x.mass)
         return fragments
 
-    def _get_glycan_fragments(self, glycosylation, series, position):
+    def _get_glycan_fragments(self, glycosylation: Modification, series: str, position: int) -> List[Union[GlycanCompositionFragment,
+                                                                                                           GlycanFragment]]:
         try:
             return self._glycan_fragment_cache[glycosylation, series, position]
         except KeyError:
             if glycosylation.rule.is_composition:
-                fragments = self._get_glycan_composition_fragments(glycosylation, series, position)
+                if glycosylation.rule.is_core and not self.allow_ambiguous_fragmentation:
+                    fragments = []
+                else:
+                    fragments = self._get_glycan_composition_fragments(glycosylation, series, position)
             else:
                 fragments = self._get_glycan_structure_fragments(glycosylation, series, position)
             self._glycan_fragment_cache[glycosylation, series, position] = fragments
             return fragments
 
-    def _wrap_glycan_fragment(self, fragment):
+    def _wrap_glycan_fragment(self, fragment) -> GlycanFragment:
         try:
             return self._glycan_fragment_wrapper_cache[fragment]
         except KeyError:
@@ -409,17 +420,18 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
     glycan_fragment_ladder = "Y"
 
     def __init__(self, peptide, series, chemical_shifts=None, max_chemical_shifts=1, max_glycan_cleavages=None,
-                 include_neutral_losses=False, **kwargs):
+                 include_neutral_losses=False, allow_ambiguous_fragmentation=True, **kwargs):
         super(EXDFragmentationStrategy, self).__init__(
             peptide, series, chemical_shifts, max_chemical_shifts, include_neutral_losses, **kwargs)
         if max_glycan_cleavages is None:
             max_glycan_cleavages = self._guess_max_glycan_cleavages()
         self.max_glycan_cleavages = max_glycan_cleavages
+        self.allow_ambiguous_fragmentation = allow_ambiguous_fragmentation
         self._glycan_fragment_cache = {}
         self._glycan_fragment_wrapper_cache = {}
         self._glycan_fragment_combination_cache = {}
 
-    def _strip_glycosylation_from_modification_dict(self, modification_dict):
+    def _strip_glycosylation_from_modification_dict(self, modification_dict: Dict[int, Modification]):
         glycosylations = []
         stripped_modifications = {}
         for position, glycosylation in sorted(self.glycosylation_manager.items()):
@@ -473,7 +485,7 @@ class EXDFragmentationStrategy(PeptideFragmentationStrategyBase, _GlycanFragment
                                                     glycan_fragment_ladder] = wrapped_fragment_combinations
         return wrapped_fragment_combinations
 
-    def partial_loss(self, fragment, glycan_fragment_ladder=None):
+    def partial_loss(self, fragment: PeptideFragment, glycan_fragment_ladder=None):
         if glycan_fragment_ladder is None:
             glycan_fragment_ladder = self.glycan_fragment_ladder
         # make a clone in case we mutate anything
