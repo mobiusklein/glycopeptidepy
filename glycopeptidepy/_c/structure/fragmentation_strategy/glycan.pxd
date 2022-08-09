@@ -56,6 +56,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
     cpdef list o_glycan_composition_fragments(self, glycan, long core_count=*, long iteration_count=*)
     cpdef list gag_linker_composition_fragments(self, glycan, long core_count=*, long iteration_count=*)
 
+    cpdef list mixed_stub_fragments(self)
     cpdef list n_glycan_stub_fragments(self)
     cpdef list o_glycan_stub_fragments(self)
     cpdef list gag_linker_stub_fragments(self)

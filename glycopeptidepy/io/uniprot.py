@@ -1,10 +1,13 @@
 '''A REST API for the UniProt protein database and a parser for their XML format.
 '''
 import csv
+import json
+from typing import List
 import warnings
 import threading
 import gzip
 import io
+import logging
 
 try:
     from urllib import urlopen
@@ -25,6 +28,16 @@ from six import add_metaclass, string_types as basestring
 uri_template = "https://www.uniprot.org/uniprot/{accession}.xml"
 batch_uri = "https://www.uniprot.org/uploadlists/"
 nsmap = {"up": "http://uniprot.org/uniprot"}
+batch_uri_query = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
+
+
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
+
+
+def _batch_uri_query_builder(accessions: List[str]) -> str:
+    query = " OR ".join([f"accession:{acc}" for acc in accessions])
+    return batch_uri_query + query
 
 
 class UniProtFeatureMeta(type):
@@ -466,6 +479,13 @@ def parse_all(tree, error=False):
     return [parse(e, error=error) for e in entries]
 
 
+def iterparse(stream, error=False):
+    for event, tag in etree.iterparse(stream, huge_tree=True, events=("start", "end")):
+        if event == "end":
+            if tag.tag.split("}")[1] == 'entry':
+                yield parse(tag, error=error)
+
+
 def get_features_for(accession, error=False):
     tree = get_etree_for(accession)
     return parse(tree, error)
@@ -473,12 +493,8 @@ def get_features_for(accession, error=False):
 
 def get_features_for_many(accessions, error=False):
     query_to_doc = dict()
-    r = requests.post(batch_uri, params={
-        "format": "xml",
-        "from": "ACC+ID",
-        "to": "ACC",
-        "query": " ".join(accessions)
-    })
+    url = _batch_uri_query_builder(accessions)
+    r = requests.get(url)
     tree = etree.fromstring(r.content)
     for doc in parse_all(tree, error=error):
         for acc in doc.accessions:
@@ -573,10 +589,10 @@ rdf = UniprotRDFClient()
 
 def search(query):
     url = (
-        "https://www.uniprot.org/uniprot/?sort=score&"
-        "desc=&compress=no&query={query}&fil=&&format=tab"
-        "&columns=id,entry%20name,reviewed,protein%20names,genes,organism,length")
-    response = requests.get(url.format(query=query), stream=True)
+        r"https://rest.uniprot.org/uniprot/search?"
+        f"compressed=false&query={query}&format=tsv"
+        r"&fields=id,accession,protein_name,organism_name,reviewed,gene_names,annotation_score,length")
+    response = requests.get(url, stream=True)
     response.raise_for_status()
     response_buffer = response.raw
     data = response_buffer.read()
@@ -592,7 +608,21 @@ def search(query):
 
 class _UniProtRestClientBase(object):
 
-    def _get_response_buffer(self, url):
+    def _buffer_to_tsv(self, data: bytes) -> csv.DictReader:
+        return csv.DictReader(io.StringIO(data.decode("utf8")), delimiter='\t')
+
+    def _buffer_to_json(self, data: bytes) -> dict:
+        return json.loads(data.decode("utf8"))
+
+    def _get_stream(self, url: str) -> io.IOBase:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        response_buffer = response.raw
+        if response.headers.get("content-encoding") == 'gzip':
+            response_buffer = gzip.GzipFile(mode='rb', fileobj=response_buffer)
+        return response_buffer
+
+    def _get_response_buffer(self, url: str) -> bytes:
         response = requests.get(url, stream=True)
         response.raise_for_status()
         response_buffer = response.raw
@@ -616,18 +646,22 @@ class ProteomeClient(_UniProtRestClientBase):
 
     SearchResultType = ProteomeSearchResult
 
-    def search(self, format='tab', raw=False, **kwargs):
-        query = "&".join(["query=%s:%s" % (k, v) for k, v in kwargs.items()])
-        uri = "https://www.uniprot.org/proteomes/?{query}&sort=score&format={format}&sort=score"
+    def search(self, format='tsv', raw=False, query=None, **kwargs):
+        if query is None:
+            query = ""
+        query += " AND ".join(["%s:%s" % (k, v) for k, v in kwargs.items()])
+        uri = "https://rest.uniprot.org/proteomes/search?query={query}&format={format}"
         url = uri.format(query=query, format=format)
         data = self._get_response_buffer(url)
         if raw:
             return io.BytesIO(data)
-        if format == 'tab':
-            result = list(map(self.SearchResultType, csv.DictReader(io.BytesIO(data), delimiter='\t')))
+        if format == 'tsv':
+            result = list(map(self.SearchResultType, self._buffer_to_tsv(data)))
             for item in result:
                 item.bind = self
             return result
+        elif format == 'json':
+            return json.loads(data.decode("utf8"))
         elif format == 'list':
             result = []
             for line in data.splitlines():
@@ -639,13 +673,19 @@ class ProteomeClient(_UniProtRestClientBase):
             return result
         return io.BytesIO(data)
 
-    def get(self, proteome_id, include_isoforms=False, raw=False, format='fasta'):
-        uri = "https://www.uniprot.org/uniprot/?{query}&{params}&force=no&format={format}"
+    def get(self, proteome_id, include_isoforms=False, raw=False, format='fasta', stream: bool=False):
+        uri = "https://rest.uniprot.org/uniprotkb/stream?{query}&{params}&format={format}"
         query = {"proteome": proteome_id, }
-        query = '&'.join(["query=%s:%s" % (k, v) for k, v in query.items()])
-        params = {"include": str(bool(include_isoforms)).lower()}
+        query = '&'.join(["query=%s:\"%s\"" % (k, v) for k, v in query.items()])
+        params = {"includeIsoform": str(bool(include_isoforms)).lower()}
         params = '&'.join(["%s=%s" % (k, v) for k, v in params.items()])
         url = uri.format(query=query, params=params, format=format)
+        if stream:
+            stream = self._get_stream(url)
+            if format == "fasta":
+                from .fasta import ProteinFastaFileReader
+                return ProteinFastaFileReader(stream, index=False)
+            return stream
         data = self._get_response_buffer(url)
         if raw:
             return io.BytesIO(data)
@@ -662,22 +702,26 @@ proteome = ProteomeClient()
 
 class TaxonomyClient(_UniProtRestClientBase):
 
-    def search(self, format='tab', raw=False, params=None, **kwargs):
+    def search(self, format='tsv', raw=False, query=None, params=None, **kwargs):
+        if query is None:
+            query = ''
         if params is None:
             params = dict()
-        query = "&".join(["query=%s:%s" % (k, v) for k, v in kwargs.items()])
+        query += "AND".join(["%s:%s" % (k, v)
+                                      for k, v in kwargs.items()])
         params = '&'.join(["%s=%s" % (k, v) for k, v in params.items()])
         if params:
             params += '&'
-        uri = "https://www.uniprot.org/taxonomy/?{query}&{params}sort=score&format={format}&sort=score"
+        uri = "https://rest.uniprot.org/taxonomy/search?query={query}&{params}format={format}"
         url = uri.format(query=query, params=params, format=format)
         data = self._get_response_buffer(url)
         if raw:
             return io.BytesIO(data)
-        if format == 'tab':
-            result = list(map(dict, csv.DictReader(
-                io.BytesIO(data), delimiter='\t')))
+        if format == 'tsv':
+            result = list(self._buffer_to_tsv(data))
             return result
+        if format == 'json':
+            return json.loads(data.decode('utf8'))
         elif format == 'list':
             result = data.splitlines()
             return result

@@ -502,3 +502,7 @@ try:
     from glycopeptidepy._c.structure.glycan import GlycosylationManager
 except ImportError:
     pass
+
+
+Mapping.register(GlycanCompositionProxy)
+Mapping.register(GlycosylationManager)

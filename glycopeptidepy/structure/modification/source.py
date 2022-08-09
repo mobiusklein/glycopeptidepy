@@ -7,6 +7,7 @@ import bisect
 
 from io import StringIO
 from copy import deepcopy
+from typing import List
 
 from pkg_resources import resource_stream
 
@@ -403,7 +404,7 @@ class RestrictedModificationTable(ModificationTable):
         self._include_other_rules()
 
 
-def rule_string_to_specialized_rule(rule_string):
+def rule_string_to_specialized_rule(rule_string: str) -> ModificationRule:
     from .modification import Modification
     name, targets = title_cleaner.search(rule_string).groups()
     targets = {extract_targets_from_string(targets)}
