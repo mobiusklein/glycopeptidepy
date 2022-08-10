@@ -1,3 +1,4 @@
+from typing import List
 from glypy import GlycanComposition
 
 from .. import constants as structure_constants
@@ -11,7 +12,7 @@ from ..fragment import (
 
 
 @glycosylation_site_detectors(GlycosylationType.o_linked)
-def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
+def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()) -> List[int]:
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification("HexNAc")}
@@ -34,7 +35,7 @@ def find_o_glycosylation_sequons(sequence, allow_modified=frozenset()):
 
 
 @glycosylation_site_detectors(GlycosylationType.n_linked)
-def find_n_glycosylation_sequons(sequence, allow_modified=frozenset(), include_cysteine: bool=False):
+def find_n_glycosylation_sequons(sequence, allow_modified=frozenset(), include_cysteine: bool = False) -> List[int]:
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification(
@@ -85,7 +86,7 @@ def find_n_glycosylation_sequons(sequence, allow_modified=frozenset(), include_c
 
 
 @glycosylation_site_detectors(GlycosylationType.glycosaminoglycan)
-def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()):
+def find_glycosaminoglycan_sequons(sequence, allow_modified=frozenset()) -> List[int]:
     try:
         iter(allow_modified)
         allow_modified = set(allow_modified) | {Modification(

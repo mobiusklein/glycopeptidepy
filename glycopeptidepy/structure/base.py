@@ -1,3 +1,4 @@
+from typing import List, Optional
 from glypy.utils import make_struct
 
 
@@ -25,6 +26,8 @@ class ModificationBase(MoleculeBase):
     '''
     __slots__ = ()
 
+    name: str
+
     def serialize(self):
         '''A string representation for inclusion in sequences'''
         return self.name
@@ -39,6 +42,9 @@ class ResidueBase(MoleculeBase):
 
 class SequencePosition(make_struct('SequencePosition', ['amino_acid', 'modifications'])):
     __slots__ = ()
+
+    amino_acid: ResidueBase
+    modifications: Optional[List[ModificationBase]]
 
     def __init__(self, parts):
         super(SequencePosition, self).__init__(*parts)

@@ -1,3 +1,4 @@
+from typing import Optional
 from glycopeptidepy.utils.memoize import memoize
 
 from .base import MoleculeBase
@@ -10,6 +11,10 @@ from six import string_types as basestring
 class TerminalGroup(MoleculeBase):
     __slots__ = ("base_composition", "mass", "_modification")
 
+    base_composition: Composition
+    mass: float
+    _modification: Optional[Modification]
+
     def __init__(self, base_composition, modification=None):
         if not isinstance(base_composition, Composition):
             base_composition = Composition(base_composition)
@@ -20,7 +25,7 @@ class TerminalGroup(MoleculeBase):
             self.modification = modification
         self.mass = self._calculate_mass()
 
-    def _calculate_mass(self):
+    def _calculate_mass(self) -> float:
         base_mass = self.base_composition.mass
         mod = self.modification
         if mod is not None:

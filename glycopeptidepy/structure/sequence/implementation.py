@@ -1,9 +1,13 @@
+from typing import Dict, List, Optional, Type, Union
 from six import string_types as basestring
 
+from glycopeptidepy.structure.fragmentation_strategy.peptide import PeptideFragmentationStrategyBase
+
 from ..fragmentation_strategy import HCDFragmentationStrategy
-from ..fragment import IonSeries
-from ..base import SequencePosition
+from ..fragment import ChemicalShift, IonSeries
+from ..base import ModificationBase, SequencePosition
 from ..modification import SequenceLocation
+from ..residue import AminoAcidResidue
 
 from .base import _PeptideSequenceCore
 from .glycosylated_sequence import GlycosylatedSequenceMixin
@@ -76,7 +80,8 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         """
         return [(i, position) for i, position in enumerate(self) if position.modifications]
 
-    def has_modification(self, position, modification_type):
+    def has_modification(self, position: Union[int, SequenceLocation],
+                         modification_type: Union[str, ModificationBase]) -> bool:
         '''Check if a modification is present on the sequence
 
         Parameters
@@ -98,7 +103,7 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         return self.sequence[position].has_modification(modification_type)
 
 
-    def strip_modifications(self):
+    def strip_modifications(self) -> 'PeptideSequence':
         """Return a copy of this sequence with all modifications removed.
 
         Returns
@@ -108,7 +113,7 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
         parts = [[pos.amino_acid, []] for pos in self]
         return self.from_iterable(parts)
 
-    def subsequence(self, slice_obj):
+    def subsequence(self, slice_obj: slice) -> 'PeptideSequence':
         sub = self[slice_obj]
         subseq = self.from_iterable(sub)
         if slice_obj.start == 0:
@@ -127,7 +132,12 @@ class PeptideSequence(_PeptideSequenceCore, GlycosylatedSequenceMixin, MutableSe
                 seq.glycan = self.glycan_composition.clone()
         return seq
 
-    def get_fragments(self, kind, chemical_shifts=None, strategy=None, include_neutral_losses=False, **kwargs):
+    def get_fragments(self,
+                      kind: Union[str, IonSeries],
+                      chemical_shifts: Dict[AminoAcidResidue, List[ChemicalShift]]=None,
+                      strategy: Optional[Type[PeptideFragmentationStrategyBase]]=None,
+                      include_neutral_losses: bool=False,
+                      **kwargs) -> PeptideFragmentationStrategyBase:
         """Generate fragments from this structure according to the strategy specified
         by ``strategy``, returning an iterator over the sequence of theoretical fragments.
 

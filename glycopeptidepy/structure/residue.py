@@ -1,3 +1,4 @@
+from typing import List
 from . import ResidueBase
 from .composition import Composition
 from ..utils.memoize import memoize
@@ -259,12 +260,12 @@ class AminoAcidResidue(ResidueBase):
     else:
         __slots__ = ["name", "symbol", "mass", "composition", "_hash", "neutral_loss"]
 
-    @staticmethod
-    @memoize()
-    def mass_by_name(sym):
-        name = symbol_to_residue.get(sym, sym)
-        formula = residue_table.get(name)
-        return Composition(formula).mass
+    name: str
+    symbol: str
+    mass: float
+    composition: Composition
+    _hash: int
+    neutral_loss: List
 
     def __init__(self, symbol=None, name=None):
         self.symbol = symbol
@@ -281,7 +282,7 @@ class AminoAcidResidue(ResidueBase):
         self._hash = hash(self.name)
         self.neutral_loss = residue_to_neutral_loss[self.name]
 
-    def _by_name(self, name):
+    def _by_name(self, name: str):
         """Configure this instance by name information
 
         Parameters
@@ -294,7 +295,7 @@ class AminoAcidResidue(ResidueBase):
         self.mass = self.composition.mass
         self.symbol = residue_to_symbol[name]
 
-    def _by_symbol(self, symbol):
+    def _by_symbol(self, symbol: str):
         """Configure this instance by symbol information,
         by going from symbol to name, and from name to data
 

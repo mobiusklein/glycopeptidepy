@@ -1,3 +1,4 @@
+from typing import List
 from six import string_types as basestring
 
 from .. import constants as structure_constants
@@ -6,7 +7,7 @@ from ..composition import Composition
 from ..glycan import GlycosylationManager
 from ..modification import Modification, ModificationCategory
 from ..residue import Residue
-from ..terminal_group import _make_terminal_group
+from ..terminal_group import TerminalGroup, _make_terminal_group
 from ..parser import sequence_tokenizer
 
 
@@ -27,6 +28,14 @@ def _total_composition(sequence):
 
 
 class _PeptideSequenceCore(PeptideSequenceBase):
+    sequence: List[SequencePosition]
+    mass: float
+    _glycosylation_manager: GlycosylationManager
+
+    _n_term: TerminalGroup
+    _c_term: TerminalGroup
+
+
     def __init__(self, sequence=None, parser_function=None, **kwargs):
         if parser_function is None:
             parser_function = sequence_tokenizer
@@ -213,11 +222,11 @@ class _PeptideSequenceCore(PeptideSequenceBase):
         self._mass = value
 
     @property
-    def peptide_backbone_mass(self):
+    def peptide_backbone_mass(self) -> float:
         return self.peptide_composition().mass
 
     @property
-    def total_mass(self):
+    def total_mass(self) -> float:
         total = 0
         for position in self:
             total += position[0].mass
@@ -232,7 +241,7 @@ class _PeptideSequenceCore(PeptideSequenceBase):
             total += gc.mass()
         return total
 
-    def peptide_composition(self):
+    def peptide_composition(self) -> Composition:
         if self._peptide_composition is None:
             if self.glycan is None:
                 glycan_composition = Composition()
@@ -241,7 +250,7 @@ class _PeptideSequenceCore(PeptideSequenceBase):
             self._peptide_base_composition = self.total_composition() - glycan_composition
         return self._peptide_base_composition
 
-    def total_composition(self):
+    def total_composition(self) -> Composition:
         if self._total_composition is None:
             self._total_composition = _total_composition(self)
         return self._total_composition

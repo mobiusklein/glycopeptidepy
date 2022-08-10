@@ -576,8 +576,15 @@ class IonSeries(_IonSeriesBase):
         The elemental composition delta applied to the raw components of the fragment.
     '''
 
+    name: str
+    direction: int
+    includes_peptide: bool
+    mass_shift: float
+    composition_shift: Composition
+    int_code: int
+
     @classmethod
-    def get(cls, name):
+    def get(cls, name: str):
         '''Get a particular cached :class:`IonSeries` by name
 
         Returns
@@ -622,7 +629,7 @@ class IonSeries(_IonSeriesBase):
     def __str__(self):
         return str(self.name)
 
-    def is_member(self, key):
+    def is_member(self, key: str) -> bool:
         '''Test if ``key`` matches this series name.
 
         Parameters
