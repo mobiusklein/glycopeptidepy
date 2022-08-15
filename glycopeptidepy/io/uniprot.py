@@ -30,6 +30,7 @@ batch_uri = "https://www.uniprot.org/uploadlists/"
 nsmap = {"up": "http://uniprot.org/uniprot"}
 batch_uri_query = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
 
+verify_ssl = False
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -494,7 +495,7 @@ def get_features_for(accession, error=False):
 def get_features_for_many(accessions, error=False):
     query_to_doc = dict()
     url = _batch_uri_query_builder(accessions)
-    r = requests.get(url)
+    r = requests.get(url, verify=verify_ssl)
     tree = etree.fromstring(r.content)
     for doc in parse_all(tree, error=error):
         for acc in doc.accessions:
@@ -592,7 +593,7 @@ def search(query):
         r"https://rest.uniprot.org/uniprot/search?"
         f"compressed=false&query={query}&format=tsv"
         r"&fields=id,accession,protein_name,organism_name,reviewed,gene_names,annotation_score,length")
-    response = requests.get(url, stream=True)
+    response = requests.get(url, stream=True, verify=verify_ssl)
     response.raise_for_status()
     response_buffer = response.raw
     data = response_buffer.read()
@@ -615,7 +616,7 @@ class _UniProtRestClientBase(object):
         return json.loads(data.decode("utf8"))
 
     def _get_stream(self, url: str) -> io.IOBase:
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, verify=verify_ssl)
         response.raise_for_status()
         response_buffer = response.raw
         if response.headers.get("content-encoding") == 'gzip':
@@ -623,7 +624,7 @@ class _UniProtRestClientBase(object):
         return response_buffer
 
     def _get_response_buffer(self, url: str) -> bytes:
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, verify=verify_ssl)
         response.raise_for_status()
         response_buffer = response.raw
         data = response_buffer.read()
