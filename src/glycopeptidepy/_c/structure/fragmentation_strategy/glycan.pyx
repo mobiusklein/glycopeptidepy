@@ -1016,6 +1016,7 @@ cdef class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase):
             list combos
             tuple result
 
+        total_core_count = 0
         glycan = self.glycan_composition()
         self._use_query = self._guess_query_mode(glycan)
         per_site_shifts = []
