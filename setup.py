@@ -3,7 +3,7 @@ import os
 import re
 import traceback
 
-from setuptools import setup, find_packages, Extension
+from setuptools import setup, find_packages, Extension as _Extension
 
 from distutils.command.build_ext import build_ext
 from distutils.errors import (CCompilerError, DistutilsExecError,
@@ -27,6 +27,12 @@ include_diagnostics = has_option("include-diagnostics")
 force_cythonize = has_option("force-cythonize")
 
 
+def Extension(*args, **kwargs):
+    ext = _Extension(*args, **kwargs)
+    ext.include_dirs.append("src/glycopeptidepy/_c")
+    return ext
+
+
 def make_extensions():
     is_ci = bool(os.getenv("CI", ""))
     macros = []
@@ -41,56 +47,62 @@ def make_extensions():
         if is_ci and include_diagnostics:
             cython_directives['linetrace'] = True
         extensions = cythonize([
-            Extension("glycopeptidepy._c.collectiontools", sources=['glycopeptidepy/_c/collectiontools.pyx']),
-            Extension("glycopeptidepy._c.count_table", sources=['glycopeptidepy/_c/count_table.pyx']),
-            Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.pyx']),
-            Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.pyx']),
-            Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.pyx']),
-            Extension("glycopeptidepy._c.structure.constants", sources=['glycopeptidepy/_c/structure/constants.pyx']),
+            Extension("glycopeptidepy._c.collectiontools", sources=['src/glycopeptidepy/_c/collectiontools.pyx']),
+            Extension("glycopeptidepy._c.count_table", sources=[
+                      'src/glycopeptidepy/_c/count_table.pyx']),
+            Extension("glycopeptidepy._c.parser", sources=[
+                      'src/glycopeptidepy/_c/parser.pyx']),
+            Extension("glycopeptidepy._c.structure.base", sources=[
+                      'src/glycopeptidepy/_c/structure/base.pyx']),
+            Extension("glycopeptidepy._c.structure.fragment",
+                      sources=['src/glycopeptidepy/_c/structure/fragment.pyx']
+                     ),
+            Extension("glycopeptidepy._c.structure.constants", sources=[
+                      'src/glycopeptidepy/_c/structure/constants.pyx']),
             Extension("glycopeptidepy._c.structure.glycan", sources=[
-                      'glycopeptidepy/_c/structure/glycan.pyx']),
+                      'src/glycopeptidepy/_c/structure/glycan.pyx']),
             Extension("glycopeptidepy._c.structure.sequence_methods",
-                      sources=['glycopeptidepy/_c/structure/sequence_methods.pyx']),
+                      sources=['src/glycopeptidepy/_c/structure/sequence_methods.pyx']),
             Extension("glycopeptidepy._c.structure.modification.rule",
-                      sources=['glycopeptidepy/_c/structure/modification/rule.pyx']),
+                      sources=['src/glycopeptidepy/_c/structure/modification/rule.pyx']),
             Extension("glycopeptidepy._c.structure.modification.modification",
-                      sources=['glycopeptidepy/_c/structure/modification/modification.pyx']),
+                      sources=['src/glycopeptidepy/_c/structure/modification/modification.pyx']),
             Extension("glycopeptidepy._c.structure.modification.source",
-                      sources=['glycopeptidepy/_c/structure/modification/source.pyx']),
+                      sources=['src/glycopeptidepy/_c/structure/modification/source.pyx']),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.base",
-                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/base.pyx"]),
+                      sources=["src/glycopeptidepy/_c/structure/fragmentation_strategy/base.pyx"]),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.peptide",
-                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/peptide.pyx"]),
+                      sources=["src/glycopeptidepy/_c/structure/fragmentation_strategy/peptide.pyx"]),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.glycan",
-                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/glycan.pyx"]),
-            Extension("glycopeptidepy._c.algorithm", sources=[
-                      'glycopeptidepy/_c/algorithm.pyx']),
+                      sources=["src/glycopeptidepy/_c/structure/fragmentation_strategy/glycan.pyx"]),
+            Extension("glycopeptidepy._c.algorithm",
+                      sources=['src/glycopeptidepy/_c/algorithm.pyx']),
         ], compiler_directives=cython_directives, force=force_cythonize)
     except ImportError:
         extensions = [
-            Extension("glycopeptidepy._c.collectiontools", sources=['glycopeptidepy/_c/collectiontools.c']),
-            Extension("glycopeptidepy._c.count_table", sources=['glycopeptidepy/_c/count_table.c']),
-            Extension("glycopeptidepy._c.parser", sources=['glycopeptidepy/_c/parser.c']),
-            Extension("glycopeptidepy._c.structure.base", sources=['glycopeptidepy/_c/structure/base.c']),
-            Extension("glycopeptidepy._c.structure.fragment", sources=['glycopeptidepy/_c/structure/fragment.c']),
-            Extension("glycopeptidepy._c.structure.constants", sources=['glycopeptidepy/_c/structure/constants.c']),
+            Extension("glycopeptidepy._c.collectiontools", sources=['src/glycopeptidepy/_c/collectiontools.c']),
+            Extension("glycopeptidepy._c.count_table", sources=['src/glycopeptidepy/_c/count_table.c']),
+            Extension("glycopeptidepy._c.parser", sources=['src/glycopeptidepy/_c/parser.c']),
+            Extension("glycopeptidepy._c.structure.base", sources=['src/glycopeptidepy/_c/structure/base.c']),
+            Extension("glycopeptidepy._c.structure.fragment", sources=['src/glycopeptidepy/_c/structure/fragment.c']),
+            Extension("glycopeptidepy._c.structure.constants", sources=['src/glycopeptidepy/_c/structure/constants.c']),
             Extension("glycopeptidepy._c.structure.glycan", sources=[
-                      'glycopeptidepy/_c/structure/glycan.c']),
+                      'src/glycopeptidepy/_c/structure/glycan.c']),
             Extension("glycopeptidepy._c.structure.sequence_methods",
-                      sources=['glycopeptidepy/_c/structure/sequence_methods.c']),
+                      sources=['src/glycopeptidepy/_c/structure/sequence_methods.c']),
             Extension("glycopeptidepy._c.structure.modification.rule",
-                      sources=['glycopeptidepy/_c/structure/modification/rule.c']),
+                      sources=['src/glycopeptidepy/_c/structure/modification/rule.c']),
             Extension("glycopeptidepy._c.structure.modification.modification",
-                      sources=['glycopeptidepy/_c/structure/modification/modification.c']),
+                      sources=['src/glycopeptidepy/_c/structure/modification/modification.c']),
             Extension("glycopeptidepy._c.structure.modification.source",
-                      sources=['glycopeptidepy/_c/structure/modification/source.c']),
+                      sources=['src/glycopeptidepy/_c/structure/modification/source.c']),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.base",
-                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/base.c"]),
+                      sources=["src/glycopeptidepy/_c/structure/fragmentation_strategy/base.c"]),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.peptide",
-                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/peptide.c"]),
+                      sources=["src/glycopeptidepy/_c/structure/fragmentation_strategy/peptide.c"]),
             Extension("glycopeptidepy._c.structure.fragmentation_strategy.glycan",
-                      sources=["glycopeptidepy/_c/structure/fragmentation_strategy/glycan.c"]),
-            Extension("glycopeptidepy._c.algorithm", sources=['glycopeptidepy/_c/algorithm.c']),
+                      sources=["src/glycopeptidepy/_c/structure/fragmentation_strategy/glycan.c"]),
+            Extension("glycopeptidepy._c.algorithm", sources=['src/glycopeptidepy/_c/algorithm.c']),
         ]
     return extensions
 
@@ -148,7 +160,7 @@ def status_msgs(*msgs):
 
 
 def version():
-    return re.sub(r'[\s\'"\n]', '', open("glycopeptidepy/version.py").readline().split("=")[1])
+    return re.sub(r'[\s\'"\n]', '', open("src/glycopeptidepy/version.py").readline().split("=")[1])
 
 
 required = []
@@ -160,28 +172,30 @@ def run_setup(include_cext=True):
     setup(
         name='glycopeptidepy',
         version=version(),
-        packages=find_packages(),
+        packages=find_packages(where='src', include='glycopeptidepy*'),
         install_requires=required,
         include_package_data=True,
+        package_dir={"": "src"},
         ext_modules=make_extensions() if include_cext else None,
         cmdclass=cmdclass,
         zip_safe=False,
         package_data={
-            'glycopeptidepy': ["*.csv", "*.xml", "*.json", "data/*.csv"],
-            'glycopeptidepy.structure': [
+            'src/glycopeptidepy': ["*.csv", "*.xml", "*.json", "data/*.csv"],
+            'src/glycopeptidepy/structure': [
                 "structure/modification/data/*.csv",
                 "structure/modification/data/*.json"]
         },
     )
 
 
-try:
-    run_setup(True)
-except Exception as exc:
-    run_setup(False)
+run_setup(True)
+# try:
+#     run_setup(True)
+# except Exception as exc:
+#     run_setup(False)
 
-    status_msgs(
-        "WARNING: The C extension could not be compiled, " +
-        "speedups are not enabled.",
-        "Plain-Python build succeeded."
-    )
+#     status_msgs(
+#         "WARNING: The C extension could not be compiled, " +
+#         "speedups are not enabled.",
+#         "Plain-Python build succeeded."
+#     )

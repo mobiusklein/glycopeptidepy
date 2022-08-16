@@ -8,7 +8,7 @@ except ImportError:
 
 from glycopeptidepy.io import fasta
 
-from glycopeptidepy.test.common import datafile
+from .common import datafile
 
 
 class TestFastaIO(unittest.TestCase):

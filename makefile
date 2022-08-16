@@ -1,8 +1,8 @@
 test:
-	py.test -v  glycopeptidepy --cov=glycopeptidepy --cov-report html --cov-report term
+	py.test -v  ./tests --cov=glycopeptidepy --cov-report html --cov-report term
 
 retest:
-	py.test -v glycopeptidepy --lf
+	py.test -v ./tests --lf
 
 update-cv-lists:
 	python -m cogapp -r glycopeptidepy/io/cv/peff.py
