@@ -1,7 +1,7 @@
 recursive-include src/glycopeptidepy/structure/modification/data *.csv
 recursive-include src/glycopeptidepy/structure/modification/data *.json
-recursive-include src/glycopeptidepy *.c
-recursive-include src/glycopeptidepy *.h
-recursive-include src/glycopeptidepy *.pyx
-recursive-include src/glycopeptidepy *.pxd
+recursive-include src/glycopeptidepy/* *.c
+recursive-include src/glycopeptidepy/* *.h
+recursive-include src/glycopeptidepy/* *.pyx
+recursive-include src/glycopeptidepy/* *.pxd
 include requirements.txt
