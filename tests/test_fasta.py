@@ -1,10 +1,6 @@
 import unittest
 import warnings
 from io import BytesIO
-try:
-    from StringIO import StringIO
-except ImportError:
-    from io import StringIO
 
 from glycopeptidepy.io import fasta
 

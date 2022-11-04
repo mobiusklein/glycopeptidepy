@@ -14,6 +14,8 @@ from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
 
 from cpython.int cimport PyInt_AsLong, PyInt_Check, PyInt_FromLong
 
+from cython.view cimport array as cvarray
+
 from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.collectiontools cimport descending_combination_counter
@@ -87,9 +89,9 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
         self.index = -1
         self.size = self.peptide.get_size()
 
-        self.modification_index = ModificationIndex()
+        self.modification_index = CountTable._create()
         self.glycosylation_manager = dict()
-        self.amino_acids_counter = _AccumulatorBag()
+        self.amino_acids_counter = CountTable._create()
 
         self.running_mass += self.series.mass_shift
         if self.compute_compositions:
@@ -274,6 +276,9 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
             self.__class__.__name__,
             self.peptide, self.series, self.running_composition,
             self.running_mass, self.index)
+
+    cpdef reset(self):
+        self._initialize_fields()
 
 
 hcd_modifications_of_interest = {k.name: k for k in [
@@ -572,3 +577,18 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
                     delta_mass=&delta_mass
                 ))
         return fragments
+
+    @cython.boundscheck(False)
+    cpdef double[::1] mass_series(self):
+        cdef:
+            double[::1] masses
+            size_t i
+
+        masses = cvarray(shape=(self.size - 1,), itemsize=sizeof(double), format='d')
+
+        i = 0
+        while self.has_more():
+            self._update_state()
+            masses[i] = self.running_mass
+            i += 1
+        return masses

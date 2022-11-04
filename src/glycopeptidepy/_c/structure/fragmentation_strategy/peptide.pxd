@@ -58,6 +58,7 @@ cdef class PeptideFragmentationStrategyBase(FragmentationStrategyBase):
     cpdef object step(self)
 
     cpdef _update_state(self)
+    cpdef reset(self)
 
 
 @cython.freelist(1000)
@@ -93,3 +94,4 @@ cdef class HCDFragmentationStrategy(PeptideFragmentationStrategyBase):
     cpdef _replace_cores(self, CountTable modifications_of_interest)
     cpdef list _generate_modification_variants(self, CountTable interesting_modifications, CountTable other_modifications)
 
+    cpdef double[::1] mass_series(self)
