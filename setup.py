@@ -160,7 +160,11 @@ def status_msgs(*msgs):
 
 
 def version():
-    return re.sub(r'[\s\'"\n]', '', open("src/glycopeptidepy/version.py").readline().split("=")[1])
+    return re.sub(
+        r'[\s\'"\n]',
+        '',
+        open("src/glycopeptidepy/version.py").readline().split("=")[1]
+    )
 
 
 required = []

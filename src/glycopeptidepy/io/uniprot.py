@@ -2,12 +2,15 @@
 '''
 import csv
 import json
-from typing import List
 import warnings
 import threading
 import gzip
 import io
 import logging
+
+from typing import List, Optional, ClassVar, Dict
+from dataclasses import dataclass, field
+
 
 try:
     from urllib import urlopen
@@ -25,13 +28,13 @@ from glypy.io.glyspace import UniprotRDFClient
 
 from six import add_metaclass, string_types as basestring
 
-uri_template = "https://www.uniprot.org/uniprot/{accession}.xml"
-batch_uri = "https://www.uniprot.org/uploadlists/"
-nsmap = {"up": "http://uniprot.org/uniprot"}
-# batch_uri_query = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
-batch_uri_query = "https://rest.uniprot.org/uniprotkb/accessions?format=xml&accessions="
+URI_TEMPLATE = "https://www.uniprot.org/uniprot/{accession}.xml"
+BATCH_URI = "https://www.uniprot.org/uploadlists/"
+NSMAP = {"up": "http://uniprot.org/uniprot"}
+# BATCH_URI_QUERY = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
+BATCH_URI_QUERY = "https://rest.uniprot.org/uniprotkb/accessions?format=xml&accessions="
 
-verify_ssl = False
+VERIFY_SSL = False
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -40,11 +43,11 @@ logger.addHandler(logging.NullHandler())
 def _batch_uri_query_builder(accessions: List[str]) -> str:
     # query = " OR ".join([f"accession:{acc}" for acc in accessions])
     query = ','.join(accessions)
-    return batch_uri_query + query
+    return BATCH_URI_QUERY + query
 
 
 class UniProtFeatureMeta(type):
-    _cache = {}
+    _cache: ClassVar[Dict[str, 'UniProtFeatureMeta']] = {}
 
     def __new__(cls, name, parents, attrs):
         new_type = type.__new__(cls, name, parents, attrs)
@@ -54,13 +57,13 @@ class UniProtFeatureMeta(type):
             pass
         return new_type
 
-    def feature_type(self, feature_type):
+    def from_feature_type(self, feature_type: str) -> 'UniProtFeatureMeta':
         return self._cache[feature_type]
 
-    def handle_tag(self, tag):
+    def handle_tag(self, tag: etree.Element) -> 'UniProtFeatureBase':
         feature_type = tag.attrib['type']
         try:
-            feature_type_t = self.feature_type(feature_type)  # pylint: disable=no-value-for-parameter
+            feature_type_t = self.from_feature_type(feature_type)  # pylint: disable=no-value-for-parameter
             return feature_type_t.fromxml(tag)
         except KeyError:
             return None
@@ -70,14 +73,14 @@ class UniProtFeatureMeta(type):
 class UniProtFeatureBase(object):
     __repr__ = simple_repr
 
-    known = True
-    _name = None
+    known: bool = True
+    _name: Optional[str] = None
 
     @property
     def is_defined(self):
         return self.known
 
-    def describe(self):
+    def describe(self) -> str:
         return self.description.split("; ")
 
     @property
@@ -86,6 +89,8 @@ class UniProtFeatureBase(object):
 
 
 class Keyword(str):
+    id: str
+
     def __new__(cls, content, idstr):
         obj = str.__new__(cls, content)
         obj.id = idstr
@@ -96,6 +101,8 @@ class Keyword(str):
 
 
 class PeptideBase(UniProtFeatureBase):
+    start: int
+    end: int
 
     def __init__(self, start, end, known=True):
         self.start = start
@@ -103,23 +110,23 @@ class PeptideBase(UniProtFeatureBase):
         self.known = known
 
     @classmethod
-    def fromxml(cls, feature):
+    def fromxml(cls, feature: etree.Element):
         known = True
 
         try:
-            begin = int(feature.find(".//{http://uniprot.org/uniprot}begin", nsmap).attrib['position']) - 1
+            begin = int(feature.find(".//{http://uniprot.org/uniprot}begin", NSMAP).attrib['position']) - 1
         except (KeyError, AttributeError):
             begin = 0
             known = False
         try:
-            end = int(feature.find(".//{http://uniprot.org/uniprot}end", nsmap).attrib['position'])
+            end = int(feature.find(".//{http://uniprot.org/uniprot}end", NSMAP).attrib['position'])
         except (KeyError, AttributeError):
             end = float('inf')
             known = False
         if not known:
             if begin == 0 and end == float('inf'):
                 begin = int(feature.find(
-                    ".//{http://uniprot.org/uniprot}location", nsmap).attrib['position']) - 1
+                    ".//{http://uniprot.org/uniprot}location", NSMAP).attrib['position']) - 1
                 end = begin + 1
                 known = True
         return cls(begin, end, known)
@@ -148,6 +155,9 @@ class MatureProtein(PeptideBase):
 class SpanBase(UniProtFeatureBase):
     feature_type = "__spanbase__"
 
+    start: int
+    end: int
+
     def __init__(self, name, start, end, known=True):
         self.name = name
         self.start = start
@@ -155,24 +165,24 @@ class SpanBase(UniProtFeatureBase):
         self.known = known
 
     @classmethod
-    def fromxml(cls, feature):
+    def fromxml(cls, feature: etree.Element):
         known = True
         try:
             try:
                 begin = int(feature.find(
-                    ".//up:begin", nsmap).attrib['position']) - 1
+                    ".//up:begin", NSMAP).attrib['position']) - 1
             except KeyError:
                 begin = 0
                 known = False
             try:
                 end = int(feature.find(
-                    ".//up:end", nsmap).attrib['position'])
+                    ".//up:end", NSMAP).attrib['position'])
             except KeyError:
                 end = float('inf')
                 known = False
         except AttributeError:
             begin = int(feature.find(
-                ".//up:position", nsmap).attrib['position']) - 1
+                ".//up:position", NSMAP).attrib['position']) - 1
             end = begin + 1
 
         description = feature.attrib.get("description")
@@ -223,24 +233,27 @@ class DisulfideBond(Domain):
         try:
             try:
                 begin = int(feature.find(
-                    ".//up:begin", nsmap).attrib['position']) - 1
+                    ".//up:begin", NSMAP).attrib['position']) - 1
             except KeyError:
                 begin = 0
                 known = False
             try:
                 end = int(feature.find(
-                    ".//up:end", nsmap).attrib['position'])
+                    ".//up:end", NSMAP).attrib['position'])
             except KeyError:
                 end = float('inf')
                 known = False
         except AttributeError:
             begin = end = int(feature.find(
-                ".//up:position", nsmap).attrib['position'])
+                ".//up:position", NSMAP).attrib['position'])
         return cls(name, begin, end, known)
 
 
 class ModifiedResidue(UniProtFeatureBase):
     feature_type = 'modified residue'
+
+    position: int
+    modification: str
 
     def __init__(self, position, modification):
         self.position = position
@@ -266,12 +279,16 @@ class ModifiedResidue(UniProtFeatureBase):
     def fromxml(cls, feature):
         return cls(
             int(feature.find(
-                ".//up:position", nsmap).attrib['position']) - 1,
+                ".//up:position", NSMAP).attrib['position']) - 1,
             feature.attrib["description"])
 
 
 class SequenceVariant(UniProtFeatureBase):
     feature_type = "sequence variant"
+
+    position: int
+    original: str
+    variation: str
 
     def __init__(self, position, original, variation):
         self.position = position
@@ -288,16 +305,16 @@ class SequenceVariant(UniProtFeatureBase):
 
     @classmethod
     def fromxml(cls, feature):
-        position = feature.find(".//up:position", nsmap)
+        position = feature.find(".//up:position", NSMAP)
         if position is None:
             # Deletion mutations not supported
             return None
         else:
             position = int(position.attrib['position']) - 1
-            original = feature.find(".//up:original", nsmap)
+            original = feature.find(".//up:original", NSMAP)
             if original is not None:
                 original = original.text
-            variation = feature.find(".//up:variation", nsmap)
+            variation = feature.find(".//up:variation", NSMAP)
             if variation is not None:
                 variation = variation.text
         return cls(position, original, variation)
@@ -313,6 +330,10 @@ class Site(Domain):
 
 class GlycosylationSite(UniProtFeatureBase):
     feature_type = 'glycosylation site'
+
+    position: int
+    glycosylation_type: str
+    description: str
 
     def __init__(self, position, glycosylation_type, description=None):
         self.position = position
@@ -334,9 +355,22 @@ class GlycosylationSite(UniProtFeatureBase):
     @classmethod
     def fromxml(cls, feature):
         position = int(feature.find(
-            ".//up:position", nsmap).attrib['position']) - 1
+            ".//up:position", NSMAP).attrib['position']) - 1
         glycosylation_type = feature.attrib["description"].split(" ")[0]
         return cls(position, glycosylation_type, feature.attrib["description"])
+
+
+
+# @dataclass
+# class UniProtProtein:
+#     sequence: str
+#     features: List[UniProtFeatureBase]
+#     recommended_name: str
+#     gene_name: str
+#     names: List[str]
+#     accessions: List[str]
+#     keywords: List[Keyword]
+#     dbreferences: List
 
 
 _UniProtProtein = make_struct("UniProtProtein", (
@@ -378,7 +412,7 @@ def get_etree_for(accession):
 
 
 def _open_url_for(accession):
-    return urlopen(uri_template.format(accession=accession))
+    return urlopen(URI_TEMPLATE.format(accession=accession))
 
 
 def parse(tree, error=False):
@@ -396,21 +430,21 @@ def parse(tree, error=False):
     -------
     UniProtProtein
     '''
-    entry = tree.find(".//up:entry", nsmap)
+    entry = tree.find(".//up:entry", NSMAP)
     if entry is None:
         if hasattr(tree, "tag") and tree.tag.endswith("entry"):
             entry = tree
         else:
             raise ValueError("Could not find root entry!")
     seq = entry.find(
-        "./up:sequence", nsmap).text
+        "./up:sequence", NSMAP).text
     if seq is not None:
         seq = seq.replace("\n", '')
     names = [el.text for el in entry.findall(
-        ".//up:protein/*/up:fullName", nsmap)] + [el.text for el in entry.findall(
-            ".//up:protein/*/up:shortName", nsmap)]
+        ".//up:protein/*/up:fullName", NSMAP)] + [el.text for el in entry.findall(
+            ".//up:protein/*/up:shortName", NSMAP)]
     recommended_name_tags = entry.findall(
-        ".//up:protein/up:recommendedName", nsmap) + entry.findall(".//up:protein/*/up:recommendedName", nsmap)
+        ".//up:protein/up:recommendedName", NSMAP) + entry.findall(".//up:protein/*/up:recommendedName", NSMAP)
     if recommended_name_tags:
         recommended_name_tag = recommended_name_tags[0]
     else:
@@ -425,24 +459,24 @@ def parse(tree, error=False):
             recommended_name = names[0]
         except IndexError:
             recommended_name = ""
-    gene_name_tag = entry.find(".//up:name", nsmap)
+    gene_name_tag = entry.find(".//up:name", NSMAP)
     if gene_name_tag is not None:
         gene_name = gene_name_tag.text
     else:
         gene_name = ""
     accessions = [el.text for el in entry.findall(
-        ".//up:accession", nsmap)]
+        ".//up:accession", NSMAP)]
     dbreferences = defaultdict(list)
-    for tag in entry.findall(".//up:dbReference", nsmap):
+    for tag in entry.findall(".//up:dbReference", NSMAP):
         db = tag.attrib['type']
         rec = dict(id=tag.attrib['id'])
-        for prop in tag.findall(".//up:property", nsmap):
+        for prop in tag.findall(".//up:property", NSMAP):
             rec[prop.attrib['type']] = prop.attrib['value']
         dbreferences[db].append(rec)
 
     features = []
     exc_type = Exception
-    for tag in entry.findall(".//up:feature", nsmap):
+    for tag in entry.findall(".//up:feature", NSMAP):
         feature_type = tag.attrib['type']
         try:
             feature_obj = UniProtFeatureBase.handle_tag(tag)
@@ -455,7 +489,7 @@ def parse(tree, error=False):
                 warnings.warn("An exception %r occurred while parsing feature type %s for %s" % (
                     e, feature_type, accessions[0]))
     keywords = set()
-    for kw in entry.findall(".//up:keyword", nsmap):
+    for kw in entry.findall(".//up:keyword", NSMAP):
         keywords.add(Keyword(kw.text, kw.attrib['id']))
     return UniProtProtein(
         seq, features, recommended_name, gene_name, names, accessions,
@@ -478,7 +512,7 @@ def parse_all(tree, error=False):
     -------
     list
     """
-    entries = tree.findall(".//up:entry", nsmap)
+    entries = tree.findall(".//up:entry", NSMAP)
     return [parse(e, error=error) for e in entries]
 
 
@@ -497,7 +531,7 @@ def get_features_for(accession, error=False):
 def get_features_for_many(accessions, error=False):
     query_to_doc = dict()
     url = _batch_uri_query_builder(accessions)
-    r = requests.get(url, verify=verify_ssl)
+    r = requests.get(url, verify=VERIFY_SSL)
     tree = etree.fromstring(r.content)
     for doc in parse_all(tree, error=error):
         for acc in doc.accessions:
@@ -595,7 +629,7 @@ def search(query):
         r"https://rest.uniprot.org/uniprot/search?"
         f"compressed=false&query={query}&format=tsv"
         r"&fields=id,accession,protein_name,organism_name,reviewed,gene_names,annotation_score,length")
-    response = requests.get(url, stream=True, verify=verify_ssl)
+    response = requests.get(url, stream=True, verify=VERIFY_SSL)
     response.raise_for_status()
     response_buffer = response.raw
     data = response_buffer.read()
@@ -618,7 +652,7 @@ class _UniProtRestClientBase(object):
         return json.loads(data.decode("utf8"))
 
     def _get_stream(self, url: str) -> io.IOBase:
-        response = requests.get(url, stream=True, verify=verify_ssl)
+        response = requests.get(url, stream=True, verify=VERIFY_SSL)
         response.raise_for_status()
         response_buffer = response.raw
         if response.headers.get("content-encoding") == 'gzip':
@@ -626,7 +660,7 @@ class _UniProtRestClientBase(object):
         return response_buffer
 
     def _get_response_buffer(self, url: str) -> bytes:
-        response = requests.get(url, stream=True, verify=verify_ssl)
+        response = requests.get(url, stream=True, verify=VERIFY_SSL)
         response.raise_for_status()
         response_buffer = response.raw
         data = response_buffer.read()

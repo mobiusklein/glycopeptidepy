@@ -67,3 +67,9 @@ try:
         SequencePosition)
 except ImportError:
     pass
+
+
+__all__ = [
+    "ResidueBase", "ModificationBase", "PeptideSequenceBase",
+    "SequencePosition"
+]

@@ -1,7 +1,6 @@
 from typing import List
 from . import ResidueBase
 from .composition import Composition
-from ..utils.memoize import memoize
 from glypy.utils.multimap import MultiMap
 from six import add_metaclass
 

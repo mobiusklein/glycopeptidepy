@@ -2,15 +2,14 @@
 
 import itertools
 
-try:
-    basestring
-except Exception:
-    from six import string_types as basestring
+from six import string_types as basestring
 
 from glypy import MonosaccharideResidue
 
+from glycopeptidepy.utils.memoize import memoize
+
 from .sequence import PeptideSequenceBase
-from .residue import Residue as AminoAcidResidue, memoize, get_all_residues
+from .residue import Residue as AminoAcidResidue, get_all_residues
 from .composition import Composition
 from .modification import Modification
 from .base import SequencePosition
