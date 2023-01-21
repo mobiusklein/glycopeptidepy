@@ -28,7 +28,8 @@ from six import add_metaclass, string_types as basestring
 uri_template = "https://www.uniprot.org/uniprot/{accession}.xml"
 batch_uri = "https://www.uniprot.org/uploadlists/"
 nsmap = {"up": "http://uniprot.org/uniprot"}
-batch_uri_query = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
+# batch_uri_query = "https://rest.uniprot.org/uniprotkb/search?format=xml&query="
+batch_uri_query = "https://rest.uniprot.org/uniprotkb/accessions?format=xml&accessions="
 
 verify_ssl = False
 
@@ -37,7 +38,8 @@ logger.addHandler(logging.NullHandler())
 
 
 def _batch_uri_query_builder(accessions: List[str]) -> str:
-    query = " OR ".join([f"accession:{acc}" for acc in accessions])
+    # query = " OR ".join([f"accession:{acc}" for acc in accessions])
+    query = ','.join(accessions)
     return batch_uri_query + query
 
 
