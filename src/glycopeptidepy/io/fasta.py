@@ -1,3 +1,4 @@
+import os
 import re
 import textwrap
 import warnings
@@ -759,7 +760,7 @@ class PEFFReader(ProteinFastaFileReader):
     def _parse_header(self):
         offset = 0
         line = self.handle.readline()
-        offset += len(line)
+        offset = len(line)
         line = line.decode('ascii')
         if not line.startswith("# PEFF"):
             raise ValueError("Not a PEFF File")
@@ -768,11 +769,11 @@ class PEFFReader(ProteinFastaFileReader):
         current_block = defaultdict(list)
         while in_header:
             line = self.handle.readline()
-            offset += len(line)
+            offset = len(line)
             line = line.decode('ascii')
             if not line.startswith("#"):
                 in_header = False
-                self.handle.seek(offset)
+                self.handle.seek(-offset, os.SEEK_CUR)
             line = line.strip()[2:]
             if '=' in line:
                 key, value = line.split("=", 1)

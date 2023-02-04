@@ -96,9 +96,8 @@ class TestPEFF(unittest.TestCase):
             assert parser.number_of_entries == 29
             proteins = list(parser)
             n = len(proteins)
-            # this file was manually corrupted by its creator
-            # to include a space in the first sequence
-            assert n + 1 == parser.number_of_entries
+
+            assert n == parser.number_of_entries
             annotations = proteins[0].annotations
             assert len(annotations) == 7
             assert annotations['Length'] == 265
