@@ -100,7 +100,7 @@ class TestPEFF(unittest.TestCase):
             assert n == parser.number_of_entries
             annotations = proteins[0].annotations
             assert len(annotations) == 7
-            assert annotations['Length'] == 265
+            assert annotations['Length'] == 529
 
 
 class DictWrapperSuiteBase(object):
