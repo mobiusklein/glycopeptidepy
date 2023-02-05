@@ -9,7 +9,6 @@ import io
 import logging
 
 from typing import List, Optional, ClassVar, Dict
-from dataclasses import dataclass, field
 
 
 try:
@@ -22,9 +21,12 @@ from collections import defaultdict
 import requests
 
 from lxml import etree
-from glycopeptidepy.utils import simple_repr
+
 from glypy.utils import make_struct
 from glypy.io.glyspace import UniprotRDFClient
+
+from glycopeptidepy.utils import simple_repr
+from glycopeptidepy.structure.glycan import GlycosylationType
 
 from six import add_metaclass, string_types as basestring
 
@@ -337,7 +339,10 @@ class GlycosylationSite(UniProtFeatureBase):
 
     def __init__(self, position, glycosylation_type, description=None):
         self.position = position
-        self.glycosylation_type = glycosylation_type
+        try:
+            self.glycosylation_type = GlycosylationType[glycosylation_type]
+        except KeyError:
+            self.glycosylation_type = GlycosylationType[None]
         self.description = description
 
     @property

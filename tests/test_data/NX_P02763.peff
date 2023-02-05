@@ -1,0 +1,16 @@
+# PEFF 1.0
+# //
+# DbName=neXtProt: NX_P02763
+# DbSource=https://www.nextprot.org
+# DbVersion=2022-08-18
+# Prefix=nxp
+# NumberOfEntries=1
+# SequenceType=AA
+# GeneralComment=Copyrighted by the SIB Swiss Institute of Bioinformatics
+# GeneralComment=Distributed under the Creative Commons Attribution 4.0 International Public License (CC BY 4.0)
+# //
+>nxp:NX_P02763-1 \PName=Alpha-1-acid glycoprotein 1 isoform Iso 1 \GName=ORM1 \NcbiTaxId=9606 \TaxName=Homo Sapiens \Length=201 \SV=1 \EV=216 \PE=1 \ModResPsi=(19|MOD:00040|2-pyrrolidone-5-carboxylic acid (Gln))(23|MOD:00798|half cystine)(165|MOD:00798|half cystine)(90|MOD:00798|half cystine)(183|MOD:00798|half cystine) \ModRes=(33||N-linked (GlcNAc...) asparagine)(33||N-linked (GlcNAc...) (complex) asparagine)(56||N-linked (GlcNAc...) asparagine)(56||N-linked (GlcNAc...) (complex) asparagine)(72||N-linked (GlcNAc...) (complex) asparagine)(72||N-linked (GlcNAc...) asparagine)(93||N-linked (GlcNAc...) asparagine)(93||N-linked (GlcNAc...) (complex) asparagine)(103||N-linked (GlcNAc...) asparagine) \VariantSimple=(38|R)(167|C)(174|M) \Processed=(1|18|PEFF:0001021|signal peptide)(19|201|PEFF:0001020|mature protein)
+MALSWVLTVLSLLPLLEAQIPLCANLVPVPITNATLDQITGKWFYIASAFRNEEYNKSVQ
+EIQATFFYFTPNKTEDTIFLREYQTRQDQCIYNTTYLNVQRENGTISRYVGGQEHFAHLL
+ILRDTKTYMLAFDVNDEKNWGLSVYADKPETTKEQLGEFYEALDCLRIPKSDVVYTDWKK
+DKCEPLEKQHEKERKQEEGES
