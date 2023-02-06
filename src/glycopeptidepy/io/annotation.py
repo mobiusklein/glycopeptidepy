@@ -1,4 +1,6 @@
+import io
 import json
+import zlib
 import warnings
 
 from typing import List, Sequence, Union, TextIO
@@ -320,13 +322,26 @@ class AnnotationCollection(Sequence[Union[AnnotationBase, AnnotatedInterval, Ann
         return cls([AnnotationBase.from_dict(di) for di in d])
 
     def dump(self, fp: TextIO):
-        json.dump(self.to_json(), fp)
+        json.dump(self.to_dict(), fp)
 
     @classmethod
     def load(cls, fp: TextIO):
         d = json.load(fp)
-        inst = cls.from_json(d)
+        inst = cls.from_dict(d)
         return inst
+
+    def to_bytes(self) -> bytes:
+        buffer = io.StringIO()
+        self.dump(buffer)
+        return zlib.compress(buffer.getvalue().encode("utf8"))
+
+    @classmethod
+    def from_bytes(cls, data: bytes) -> 'AnnotationCollection':
+        data = zlib.decompress(data)
+        return cls.load(io.StringIO(data.decode("utf8")))
+
+    def __reduce__(self):
+        return self.from_bytes, (self.to_bytes(), )
 
     def __eq__(self, other):
         return self.items == list(other)

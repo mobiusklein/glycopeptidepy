@@ -15,14 +15,19 @@ class UniprotToPeffConverter(object):
         uniprot.TransitPeptide.feature_type: ('Processed', 'PEFF:0001022'),
         uniprot.Propeptide.feature_type: ('Processed', 'PEFF:0001034'),
         uniprot.SequenceVariant.feature_type: ('VariantSimple', 'PEFF:0001028'),
+        uniprot.GlycosylationSite: ('ModRes', ''),
     }
 
-    def handle_Processed(self, feature, accession):
+    def handle_Processed(self, feature: uniprot.PeptideBase, accession):
         peff_feature = PEFFFeature(feature.start + 1, feature.end, feature.feature_type)
         return peff_feature
 
     def handle_VariantSimple(self, feature, accession):
-        peff_feature = PEFFFeature(feature.position, feature.original, feature.variation)
+        peff_feature = PEFFFeature(feature.position + 1, feature.original, feature.variation)
+        return peff_feature
+
+    def handle_GlycosylationSite(self, feature: uniprot.GlycosylationSite, accession):
+        peff_feature = PEFFFeature(feature.position + 1, str(feature.glycosylation_type))
         return peff_feature
 
     def __call__(self, record):
