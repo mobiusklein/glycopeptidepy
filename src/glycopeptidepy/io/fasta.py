@@ -508,7 +508,7 @@ class FastaFileReader(object):
         else:
             raise ValueError("No index was built")
 
-    def process_result(self, d):
+    def process_result(self, d: dict):
         return d
 
     def __iter__(self):
@@ -622,7 +622,7 @@ class ProteinFastaFileReader(FastaFileReader):
         pattern = self._replace_amino_acid_pattern
         return pattern.sub("X", sequence)
 
-    def process_result(self, d):
+    def process_result(self, d: dict) -> ProteinSequence:
         try:
             p = ProteinSequence(
                 d['name'], d['sequence'], parser_funciton=parse_simple, annotations=dict(d['name']))
