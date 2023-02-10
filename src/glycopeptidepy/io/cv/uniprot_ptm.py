@@ -1,14 +1,21 @@
 import re
+
+
+from importlib import resources
+from typing import Optional, Tuple
+
+from glypy import Composition
+
 from glycopeptidepy.structure.residue import long_to_symbol
 from glycopeptidepy.structure.modification import (
     ModificationRule,
     ModificationTarget,
-    SequenceLocation)
-from glypy import Composition
+    SequenceLocation,
+    ModificationTable)
 
 
 class UniProtPTMListParser(object):  # pragma: no cover
-    def __init__(self, path):
+    def __init__(self, path=None):
         self.path = path
         self.handle = open(path)
         self._find_starting_point()
@@ -19,7 +26,7 @@ class UniProtPTMListParser(object):  # pragma: no cover
             if line.startswith("___"):
                 break
 
-    def _next_line(self):
+    def _next_line(self) -> Tuple[str, str]:
         line = next(self.handle)
         line = line.strip("\n")
         tokens = re.split(r"\s+", line, maxsplit=1)
@@ -29,7 +36,7 @@ class UniProtPTMListParser(object):  # pragma: no cover
             typecode, content = tokens
             return typecode, content
 
-    def _formula_parser(self, formula):
+    def _formula_parser(self, formula: str) -> Composition:
         counts = dict()
         for symbol, count in re.findall(r"([A-Za-z]+)(-?\d+)", formula):
             count = int(count)
@@ -51,7 +58,7 @@ class UniProtPTMListParser(object):  # pragma: no cover
             return None
         return symbol
 
-    def parse_entry(self):
+    def parse_entry(self) -> Optional[ModificationRule]:
         ptm_id = None
         accession = None
         # feature_key = None
@@ -82,7 +89,10 @@ class UniProtPTMListParser(object):  # pragma: no cover
             elif typecode == "KW":
                 keywords.append(line.strip("."))
             elif typecode == "DR":
-                crossref.append(':'.join(line.strip('.').split("; ")))
+                alias = ':'.join(line.strip('.').split("; "))
+                if alias.startswith("PSI-MOD:"):
+                    alias = alias.replace("PSI-MOD:", "MOD:")
+                crossref.append(alias)
             elif typecode == "//":
                 break
         if mass_difference is None or correction_formula is None:
@@ -91,10 +101,10 @@ class UniProtPTMListParser(object):  # pragma: no cover
         rule = ModificationRule(
             [mod_target], ptm_id, monoisotopic_mass=mass_difference, composition=correction_formula,
             alt_names={accession} | set(crossref), categories=keywords)
-        rule.preferred_name = ptm_id
+        rule.preferred_name = rule.name = ptm_id
         return rule
 
-    def build_table(self):
+    def build_table(self) -> ModificationTable:
         table = {}
         while True:
             try:
@@ -104,4 +114,16 @@ class UniProtPTMListParser(object):  # pragma: no cover
                 table[entry.name] = entry
             except StopIteration:
                 break
+        return ModificationTable(table.values())
+
+
+def load(path=None):
+    if path is None:
+        with resources.path("glycopeptidepy.io.cv.data", "uniprot_ptmlist.txt") as path:
+            parser = UniProtPTMListParser(path)
+            table = parser.build_table()
+            return table
+    else:
+        parser = UniProtPTMListParser(path)
+        table = parser.build_table()
         return table

@@ -417,7 +417,12 @@ def from_peff(record: fasta.PEFFFastaHeader) -> AnnotationCollection:
             warnings.warn(f"Unknown processing annotation {start}-{end} {name}")
 
     mods = record.get("ModRes", []) + record.get("ModResUnimod", [])
-    for position, accession, name in mods:
+    for node in mods:
+        if len(node) == 2:
+            position, name = node
+            accession = None
+        else:
+            position, accession, name = node
         position = position - 1
         if accession:
             annotations.append(

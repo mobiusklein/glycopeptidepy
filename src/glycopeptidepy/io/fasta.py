@@ -1,6 +1,7 @@
 import os
 import re
 import textwrap
+from typing import Any, Tuple, Union
 import warnings
 
 from io import BytesIO
@@ -678,9 +679,13 @@ class ProteinFastaFileWriter(FastaFileWriter):
         super(ProteinFastaFileWriter, self).__init__(handle, encoding)
         self.line_length = line_length
 
-    def write(self, protein): # pylint: disable=arguments-differ
-        defline = str(protein.name)
-        seq = '\n'.join(textwrap.wrap(protein.get_sequence(), self.line_length))
+    def write(self, protein: Union[ProteinSequence, Tuple[Any, str]]): # pylint: disable=arguments-differ
+        if isinstance(protein, tuple):
+            defline = str(protein[0])
+            seq = '\n'.join(textwrap.wrap(protein[1], self.line_length))
+        else:
+            defline = str(protein.name)
+            seq = '\n'.join(textwrap.wrap(protein.get_sequence(), self.line_length))
         super(ProteinFastaFileWriter, self).write(defline, seq)
 
     def writelines(self, iterable):
@@ -714,6 +719,15 @@ class PEFFHeaderBlock(Mapping):
 
     def __getitem__(self, key):
         return self._storage[key]
+
+    def __setitem__(self, key, value):
+        self._storage[key] = value
+
+    def __delitem__(self, key):
+        del self._storage[key]
+
+    def pop(self, key, default=None):
+        return self._storage.pop(key, default)
 
     def __len__(self):
         return len(self._storage)
@@ -806,13 +820,14 @@ class PEFFWriter(ProteinFastaFileWriter):
             comments = []
         if blocks is None:
             blocks = []
-        self.handle.write("# PEFF %d.%d\n" % self.version)
+        self.handle.write(("# PEFF %d.%d\n" % self.version).encode("ascii"))
         for comment in comments:
-            self.handle.write("# GeneralComment=%s\n" % comment)
-        self.handle.write("# //\n")
+            self.handle.write(("# GeneralComment=%s\n" %
+                               comment).encode("ascii"))
+        self.handle.write(b"# //\n")
         for block in blocks:
-            self.handle.write(str(block))
-            self.handle.write("\n# //\n")
+            self.handle.write(str(block).encode("ascii"))
+            self.handle.write(b"\n# //\n")
 
 
 class FastaIndexer(object):
