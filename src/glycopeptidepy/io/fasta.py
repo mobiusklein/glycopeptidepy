@@ -1,11 +1,12 @@
 import os
 import re
 import textwrap
-from typing import Any, Tuple, Union
 import warnings
 
+from typing import Any, Dict, List, Optional, Set, Tuple, Union, OrderedDict, DefaultDict, BinaryIO
+
 from io import BytesIO
-from collections import OrderedDict, defaultdict
+
 try:
     from collections.abc import Mapping, Sequence as SequenceABC
 except ImportError:
@@ -449,10 +450,19 @@ default_parser = DispatchingDefLineParser(
 
 
 class FastaFileReader(object):
-    '''A base class for parsing amino acid Fasta Files. Supports
-    sequential access through iteration, and random access if :attr:`index`
-    is :const:`True`.
+    '''A base class for parsing amino acid Fasta Files.
+
+    Supports sequential access through iteration, and random access if
+    :attr:`index` is :const:`True`.
     '''
+
+    state: str
+    handle: BinaryIO
+    encoding: str
+    defline_parser: DefLineParserBase
+    case_sensitive: bool
+    _index: Optional['FastaIndex']
+
     def __init__(self, path, defline_parser=default_parser, encoding='utf8', index=False, case_sensitive=False):
         self.state = "defline"
         self.handle = opener(path, 'rb')
@@ -698,12 +708,17 @@ def read(f, defline_parser=default_parser, reader_type=ProteinFastaFileParser, *
 
 
 class PEFFHeaderBlock(Mapping):
-    def __init__(self, storage=None, block_type=None):
+    _storage: OrderedDict[str, Any]
+    block_type: Optional[str]
+    comments: List[str]
+
+    def __init__(self, storage=None, block_type=None, comments: Optional[List[str]]=None):
         Mapping.__init__(self)
         if storage is None:
             storage = OrderedDict()
         self.block_type = block_type
         self._storage = storage
+        self.comments = comments
 
     def keys(self):
         return self._storage.keys()
@@ -749,7 +764,12 @@ class PEFFHeaderBlock(Mapping):
         return list(base | keys)
 
     def __str__(self):
-        return "%s" % '\n'.join('# %s=%s' % kv for kv in self.items())
+        buffer = []
+        for k, v in self.items():
+            buffer.append(f"# {k}={v}")
+        for comment in self.comments:
+            buffer.append(f"# GeneralComment={comment}")
+        return '\n'.join(buffer)
 
     def __repr__(self):
         return "{self.__class__.__name__}({self._storage})".format(self=self)
@@ -780,7 +800,7 @@ class PEFFReader(ProteinFastaFileReader):
             raise ValueError("Not a PEFF File")
         self.version = tuple(map(int, line.strip()[7:].split(".")))
         in_header = True
-        current_block = defaultdict(list)
+        current_block = DefaultDict(list)
         while in_header:
             line = self.handle.readline()
             offset = len(line)
@@ -799,7 +819,7 @@ class PEFFReader(ProteinFastaFileReader):
                 if current_block:
                     self.blocks.append(PEFFHeaderBlock(OrderedDict((k, v if len(v) > 1 else v[0])
                                                                    for k, v in current_block.items())))
-                current_block = defaultdict(list)
+                current_block = DefaultDict(list)
         number_of_entries = 0
         for block in self.blocks:
             try:
@@ -923,6 +943,11 @@ class FastaIndex(object):
     '''A :class:`~.Mapping`-like object which stores the byte offsets
     and entry metadata for a Fasta file.
     '''
+
+    mapping: OrderedDict[FastaHeader, int]
+    _suffix: Optional[SuffixTree]
+    _index_map: Dict[str, DefaultDict[str, Set[FastaHeader]]]
+
     def __init__(self, mapping):
         self.mapping = mapping
         self._suffix = None
@@ -932,7 +957,7 @@ class FastaIndex(object):
         template = "{self.__class__.__name__}({size:d})"
         return template.format(self=self, size=len(self))
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: FastaHeader):
         return self.mapping[key]
 
     def __iter__(self):
@@ -979,8 +1004,8 @@ class FastaIndex(object):
             self._suffix = self._build_suffix_tree()
         return self._suffix.subsequences_of(key)
 
-    def _build_index_for_key(self, key):
-        index = defaultdict(set)
+    def _build_index_for_key(self, key: str):
+        index = DefaultDict(set)
         for header in self.keys():
             try:
                 value = header[key]
