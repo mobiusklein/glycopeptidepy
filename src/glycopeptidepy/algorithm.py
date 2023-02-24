@@ -1,6 +1,8 @@
 import itertools
 from collections import defaultdict
 
+from typing import List, TYPE_CHECKING, Dict, Optional, Tuple, Set
+
 from six import string_types as basestring
 
 from glycopeptidepy.enzyme import Protease
@@ -8,6 +10,9 @@ from glycopeptidepy.structure.residue import UnknownAminoAcidException
 from glycopeptidepy.structure.modification import SequenceLocation
 from glycopeptidepy.structure.sequence import PeptideSequence, list_to_sequence
 from glycopeptidepy.structure.parser import sequence_tokenizer_respect_sequons, sequence_tokenizer
+
+if TYPE_CHECKING:
+    from glycopeptidepy.structure.modification import ModificationRule
 
 
 def pair_rotate(sequence):
@@ -188,10 +193,11 @@ class LimitedCrossproduct(object):
 
 
 class ModificationSiteAssignmentCombinator(object):
-    def __init__(self, variable_site_map, max_modifications=4):
+    def __init__(self, variable_site_map, max_modifications=4, include_empty=True):
         self.modification_to_site = variable_site_map
         self.site_to_modification = self.transpose_sites()
         self.max_modifications = max_modifications
+        self.include_empty = include_empty
 
     def transpose_sites(self):
         """Given a dictionary mapping between modification names and
@@ -206,8 +212,10 @@ class ModificationSiteAssignmentCombinator(object):
         for mod, varsites in self.modification_to_site.items():
             for site in varsites:
                 sites[site].append(mod)
-        for site in list(sites):
-            sites[site].append(None)
+
+        if self.include_empty:
+            for site in list(sites):
+                sites[site].append(None)
         return sites
 
     def _remove_empty_sites(self, site_mod_pairs):
@@ -228,6 +236,13 @@ class ModificationSiteAssignmentCombinator(object):
 
 
 class PeptidoformGenerator(object):
+    max_variable_modifications: int
+
+    constant_modifications: List['ModificationRule']
+    variable_modifications: List['ModificationRule']
+    n_term_modifications: List['ModificationRule']
+    c_term_modifications: List['ModificationRule']
+
     def __init__(self, constant_modifications, variable_modifications, max_variable_modifications=None):
         if max_variable_modifications is None:
             max_variable_modifications = 4
@@ -240,7 +255,7 @@ class PeptidoformGenerator(object):
          self.variable_modifications) = self.split_terminal_modifications(self.variable_modifications)
 
     @staticmethod
-    def split_terminal_modifications(modifications):
+    def split_terminal_modifications(modifications: List['ModificationRule']):
         """Group modification rules into three classes, N-terminal,
         C-terminal, and Internal modifications.
 
@@ -281,12 +296,15 @@ class PeptidoformGenerator(object):
 
         return n_terminal, c_terminal, internal
 
-    def prepare_peptide(self, sequence):
+    def prepare_peptide(self, sequence) -> PeptideSequence:
         if not isinstance(sequence, PeptideSequence):
             return PeptideSequence(str(sequence))
         return sequence
 
-    def terminal_modifications(self, sequence, protein_n_term=False, protein_c_term=False):
+    def terminal_modifications(self, sequence: PeptideSequence,
+                               protein_n_term: bool = False,
+                               protein_c_term: bool = False) -> Tuple[List[Optional['ModificationRule']],
+                                                                      List[Optional['ModificationRule']]]:
         n_term_modifications = [
             mod for mod in self.n_term_modifications if mod.find_valid_sites(
                 sequence, protein_n_term=protein_n_term)]
@@ -298,25 +316,37 @@ class PeptidoformGenerator(object):
         c_term_modifications.append(None)
         return (n_term_modifications, c_term_modifications)
 
-    def apply_fixed_modifications(self, sequence, protein_n_term=False, protein_c_term=False):
+    def apply_fixed_modifications(self, sequence: PeptideSequence,
+                                  protein_n_term: bool=False,
+                                  protein_c_term: bool=False):
         has_fixed_n_term = False
         has_fixed_c_term = False
+
+        comb_sites = defaultdict(set)
 
         for mod in self.constant_modifications:
             for site in mod.find_valid_sites(sequence, protein_n_term=protein_n_term,
                                              protein_c_term=protein_c_term):
                 if site == SequenceLocation.n_term or site == SequenceLocation.protein_n_term:
                     has_fixed_n_term = True
+                    sequence.add_modification(site, mod.name)
                 elif site == SequenceLocation.c_term or site == SequenceLocation.protein_c_term:
                     has_fixed_c_term = True
-                sequence.add_modification(site, mod.name)
-        return has_fixed_n_term, has_fixed_c_term
+                    sequence.add_modification(site, mod.name)
+                else:
+                    comb_sites[mod.name].add(site)
+        for assignment in ModificationSiteAssignmentCombinator(dict(comb_sites), 2 ** 16, include_empty=False):
+            form, _ = self.apply_variable_modifications(sequence, assignment, None, None)
+            yield form, has_fixed_n_term, has_fixed_c_term
 
-    def modification_sites(self, sequence):
+    def modification_sites_for(self, sequence: PeptideSequence,
+                               rules: List["ModificationRule"],
+                               include_empty: bool=True) -> ModificationSiteAssignmentCombinator:
         variable_sites = {
             mod.name: set(
-                mod.find_valid_sites(sequence)) for mod in self.variable_modifications}
-        modification_sites = ModificationSiteAssignmentCombinator(variable_sites)
+                mod.find_valid_sites(sequence)) for mod in rules}
+        modification_sites = ModificationSiteAssignmentCombinator(
+            variable_sites, self.max_variable_modifications, include_empty)
         return modification_sites
 
     def apply_variable_modifications(self, sequence, assignments, n_term, c_term):
@@ -343,23 +373,24 @@ class PeptidoformGenerator(object):
          c_term_modifications) = self.terminal_modifications(
              sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
 
-        (has_fixed_n_term,
-         has_fixed_c_term) = self.apply_fixed_modifications(
-             sequence, protein_n_term=protein_n_term, protein_c_term=protein_c_term)
 
-        if has_fixed_n_term:
-            n_term_modifications = [None]
-        if has_fixed_c_term:
-            c_term_modifications = [None]
+        for peptidoform, has_fixed_n_term, has_fixed_c_term in self.apply_fixed_modifications(sequence,
+                                                                                              protein_n_term,
+                                                                                              protein_c_term):
+            if has_fixed_n_term:
+                n_term_modifications = [None]
+            if has_fixed_c_term:
+                c_term_modifications = [None]
 
-        modification_sites = self.modification_sites(sequence)
+            modification_sites = self.modification_sites_for(
+                peptidoform, self.variable_modifications, include_empty=True)
 
-        for n_term, c_term in itertools.product(n_term_modifications, c_term_modifications):
-            for assignments in modification_sites:
-                if len(assignments) > self.max_variable_modifications:
-                    continue
-                yield self.apply_variable_modifications(
-                    sequence, assignments, n_term, c_term)
+            for n_term, c_term in itertools.product(n_term_modifications, c_term_modifications):
+                for assignments in modification_sites:
+                    if len(assignments) > self.max_variable_modifications:
+                        continue
+                    yield self.apply_variable_modifications(
+                        peptidoform, assignments, n_term, c_term)
 
     def __call__(self, peptide, protein_n_term=False, protein_c_term=False):
         return self.generate_peptidoforms(
@@ -437,6 +468,7 @@ class ProteinDigestor(object):
 
 try:
     _ModificationSiteAssignmentCombinator = ModificationSiteAssignmentCombinator
+    _LimitedCrossproduct = LimitedCrossproduct
     has_c = True
     from glycopeptidepy._c.algorithm import ModificationSiteAssignmentCombinator, LimitedCrossproduct
 except ImportError:

@@ -89,11 +89,13 @@ cdef class ModificationSiteAssignmentCombinator(object):
         public dict modification_to_site
         public dict site_to_modification
         public size_t max_modifications
+        public bint include_empty
 
-    def __init__(self, variable_site_map, max_modifications=4):
+    def __init__(self, variable_site_map, max_modifications=4, include_empty=True):
         self.modification_to_site = variable_site_map
-        self.site_to_modification = self.transpose_sites()
+        self.include_empty = include_empty
         self.max_modifications = PyInt_AsLong(max_modifications)
+        self.site_to_modification = self.transpose_sites()
 
     cdef dict transpose_sites(self):
         """Given a dictionary mapping between modification names and
@@ -129,10 +131,11 @@ cdef class ModificationSiteAssignmentCombinator(object):
                     bucket = <list>tmp
                 PyList_Append(bucket, mod)
 
-        pos = 0
-        while PyDict_Next(sites, &pos, &pkey, &pval):
-            bucket = <list>pval
-            PyList_Append(bucket, None)
+        if self.include_empty:
+            pos = 0
+            while PyDict_Next(sites, &pos, &pkey, &pval):
+                bucket = <list>pval
+                PyList_Append(bucket, None)
 
         return sites
 

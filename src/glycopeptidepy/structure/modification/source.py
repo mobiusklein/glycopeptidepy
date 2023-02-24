@@ -4,10 +4,10 @@ sources.
 import csv
 import json
 import bisect
+import warnings
 
 from io import StringIO
 from copy import deepcopy
-from typing import List
 
 from pkg_resources import resource_stream
 
@@ -18,9 +18,9 @@ except ImportError:
 
 from ..composition import Composition
 
-from .target import title_cleaner, extract_targets_from_string
+from .target import ModificationTarget, title_cleaner, extract_targets_from_string
 from .rule import ModificationRule
-from .utils import ModificationStringParseError
+from .utils import ModificationNameResolutionError, ModificationStringParseError
 from .glycosylation import (
     hexnac_modification, xylose_modification,
     GlycosaminoglycanLinkerGlycosylation,
@@ -189,7 +189,7 @@ class ModificationSource(object):
 
 try:
     from glycopeptidepy._c.structure.modification.source import ModificationTableBase
-except ImportError as err:
+except ImportError:
 
     class ModificationTableBase(object):
         '''A mixin class to provide implementation for :class:`ModificationSource`
@@ -378,15 +378,30 @@ class RestrictedModificationTable(ModificationTable):
         self.variable_modifications = variable_modifications
         self.collect_available_modifications()
 
+    @staticmethod
+    def extract_target(name: str) -> ModificationTarget:
+        target = extract_targets_from_string(
+            title_cleaner.search(name).groupdict()["target"])
+        return target
+
+    @staticmethod
+    def extract_name(name: str):
+        name, _target = title_cleaner.search(name).groups()
+        return name
+
     def collect_available_modifications(self):
         '''Clears the rules stored in the core dictionary (on self, but not its data members),
         and copies all information in the data member sub-tables into the core dictionary'''
         modifications = {}
 
         for name in self.constant_modifications + self.variable_modifications:
-            mod = deepcopy(self[name])
             try:
-                target = extract_targets_from_string(title_cleaner.search(name).groupdict()["target"])
+                mod = deepcopy(self[name])
+            except ModificationNameResolutionError:
+                warnings.warn(f"Failed to resolve while building restricted modification rule: {name}")
+                continue
+            try:
+                target = self.extract_target(name)
                 mod.clear_targets()
                 mod.targets = {target}
             except Exception:

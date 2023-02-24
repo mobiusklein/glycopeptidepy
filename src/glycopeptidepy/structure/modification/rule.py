@@ -591,14 +591,6 @@ class AnonymousModificationRule(ModificationRule):
     def is_standard(self):
         return False
 
-    def valid_site(self, *args, **kwargs):  # pylint: disable=arguments-differ
-        raise TypeError(
-            "AnonymousModificationRule does not support site validation")
-
-    def find_valid_sites(self, *args, **kwargs):  # pylint: disable=arguments-differ
-        raise TypeError(
-            "AnonymousModificationRule does not support site validation")
-
     def serialize(self):
         return "@" + self.name + "-" + str(self.mass)
 
