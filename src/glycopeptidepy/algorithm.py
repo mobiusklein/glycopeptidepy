@@ -190,8 +190,6 @@ class LimitedCrossproduct(object):
         return next(self.iterator)
 
 
-
-
 class ModificationSiteAssignmentCombinator(object):
     def __init__(self, variable_site_map, max_modifications=4, include_empty=True):
         self.modification_to_site = variable_site_map
@@ -329,12 +327,12 @@ class PeptidoformGenerator(object):
                                              protein_c_term=protein_c_term):
                 if site == SequenceLocation.n_term or site == SequenceLocation.protein_n_term:
                     has_fixed_n_term = True
-                    sequence.add_modification(site, mod.name)
+                    sequence.add_modification(site, mod())
                 elif site == SequenceLocation.c_term or site == SequenceLocation.protein_c_term:
                     has_fixed_c_term = True
-                    sequence.add_modification(site, mod.name)
+                    sequence.add_modification(site, mod())
                 else:
-                    comb_sites[mod.name].add(site)
+                    comb_sites[mod].add(site)
         for assignment in ModificationSiteAssignmentCombinator(dict(comb_sites), 2 ** 16, include_empty=False):
             form, _ = self.apply_variable_modifications(sequence, assignment, None, None)
             yield form, has_fixed_n_term, has_fixed_c_term
@@ -342,14 +340,16 @@ class PeptidoformGenerator(object):
     def modification_sites_for(self, sequence: PeptideSequence,
                                rules: List["ModificationRule"],
                                include_empty: bool=True) -> ModificationSiteAssignmentCombinator:
-        variable_sites = {
-            mod.name: set(
-                mod.find_valid_sites(sequence)) for mod in rules}
+        variable_sites: Dict['ModificationRule', Set[int]] = {
+            mod: set(mod.find_valid_sites(sequence)) for mod in rules
+        }
+
         modification_sites = ModificationSiteAssignmentCombinator(
             variable_sites, self.max_variable_modifications, include_empty)
         return modification_sites
 
-    def apply_variable_modifications(self, sequence, assignments, n_term, c_term):
+    def apply_variable_modifications(self, sequence: PeptideSequence, assignments: List[Tuple[int, 'ModificationRule']],
+                                     n_term: Optional['ModificationRule'], c_term: Optional['ModificationRule']):
         n_variable = 0
         result = sequence.clone()
         if n_term is not None:
@@ -360,7 +360,7 @@ class PeptidoformGenerator(object):
             n_variable += 1
         for site, mod in assignments:
             if mod is not None:
-                result.add_modification(site, mod)
+                result.add_modification(site, mod())
                 n_variable += 1
         return result, n_variable
 
