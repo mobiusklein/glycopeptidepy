@@ -12,9 +12,6 @@ except ImportError:
     from collections import Mapping, MutableMapping
 
 
-DEF USE_FREELIST = 0
-
-
 cdef struct count_table_bin_freelist_node:
     count_table_bin* pointer
     count_table_bin_freelist_node* next
@@ -99,10 +96,6 @@ cdef int initialize_count_table_bin_freelist(size_t n, count_table_bin_freelist*
 
 cdef count_table_bin_freelist* _count_table_bin_freelist = NULL
 
-IF USE_FREELIST:
-    _count_table_bin_freelist = <count_table_bin_freelist*>PyMem_Malloc(sizeof(count_table_bin_freelist))
-    initialize_count_table_bin_freelist(100, _count_table_bin_freelist)
-
 
 cdef int initialize_count_table_bin(count_table_bin* bin, size_t size):
     if size == 0:
@@ -181,10 +174,7 @@ cdef count_table* make_count_table(size_t table_size, size_t bin_size):
         PyErr_SetString(MemoryError, "Could not allocate memory for count_table")
         return NULL
     for i in range(table_size):
-        IF USE_FREELIST:
-            count_table_bin_freelist_get(_count_table_bin_freelist, &table.bins[i])
-        ELSE:
-            initialize_count_table_bin(&(table.bins[i]), 0)
+        initialize_count_table_bin(&(table.bins[i]), 0)
     table.size = table_size
     table.count = 0
     return table
@@ -192,10 +182,7 @@ cdef count_table* make_count_table(size_t table_size, size_t bin_size):
 
 cdef void free_count_table(count_table* table):
     for i in range(table.size):
-        IF USE_FREELIST:
-            count_table_bin_freelist_put(_count_table_bin_freelist, &table.bins[i])
-        ELSE:
-            free_count_table_bin(&table.bins[i])
+        free_count_table_bin(&table.bins[i])
     PyMem_Free(table.bins)
     PyMem_Free(table)
 

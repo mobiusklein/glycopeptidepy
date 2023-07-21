@@ -1,7 +1,7 @@
 import itertools
 from collections import defaultdict
 
-from typing import List, TYPE_CHECKING, Dict, Optional, Tuple, Set
+from typing import Generator, List, TYPE_CHECKING, Dict, Optional, Tuple, Set, Generic, TypeVar, Union
 
 from six import string_types as basestring
 
@@ -13,6 +13,9 @@ from glycopeptidepy.structure.parser import sequence_tokenizer_respect_sequons, 
 
 if TYPE_CHECKING:
     from glycopeptidepy.structure.modification import ModificationRule
+
+
+T = TypeVar("T")
 
 
 def pair_rotate(sequence):
@@ -141,8 +144,12 @@ def reverse_sequence(sequence, prefix_len=0, suffix_len=1, peptide_type=None, kn
     return rev_sequence
 
 
-class LimitedCrossproduct(object):
-    def __init__(self, collections, max_depth=4):
+class LimitedCrossproduct(Generic[T]):
+    collections: List[List[T]]
+    max_depth: int
+    size: int
+
+    def __init__(self, collections: List[List[T]], max_depth: int=4):
         self.collections = collections
         self.max_depth = max_depth
         self.size = len(collections)
@@ -157,7 +164,8 @@ class LimitedCrossproduct(object):
         for res in self.compose_inner(i, current, depth):
             yield res
 
-    def compose_inner(self, layer_index, current, depth):
+    def compose_inner(self, layer_index: int, current: List[T],
+                      depth: int) -> Generator[Tuple[List[T], int], None, None]:
         if layer_index == self.size:
             yield current, depth
             return
@@ -171,10 +179,9 @@ class LimitedCrossproduct(object):
                 continue
 
     def compose_iterative(self):
-        previous = [([], 0)]
-        layer_index = 0
+        previous: List[Tuple[List[T], int]] = [([], 0)]
         for layer in self.collections:
-            current = []
+            current: List[Tuple[List[T], int]] = []
             for rec, depth in previous:
                 for val in layer:
                     new_depth = depth + (val is not None)
@@ -186,11 +193,16 @@ class LimitedCrossproduct(object):
     def __iter__(self):
         return self
 
-    def __next__(self):
+    def __next__(self) -> Tuple[List[T], int]:
         return next(self.iterator)
 
 
 class ModificationSiteAssignmentCombinator(object):
+    modification_to_site: Dict['ModificationRule', List[int]]
+    site_to_modification: Dict[int, List[Optional['ModificationRule']]]
+    max_modifications: int
+    include_empty: bool
+
     def __init__(self, variable_site_map, max_modifications=4, include_empty=True):
         self.modification_to_site = variable_site_map
         self.site_to_modification = self.transpose_sites()
@@ -220,8 +232,8 @@ class ModificationSiteAssignmentCombinator(object):
         return [sm for sm in site_mod_pairs if sm[1] is not None]
 
     def assign(self):
-        sites = list(self.site_to_modification.keys())
-        choices = list(self.site_to_modification.values())
+        sites: List[int] = list(self.site_to_modification.keys())
+        choices: List[List[Optional['ModificationRule']]] = list(self.site_to_modification.values())
         for selected in LimitedCrossproduct(choices, max_depth=self.max_modifications):
             site_mod_pairs = zip(sites, selected)
             assignment = self._remove_empty_sites(site_mod_pairs)
@@ -241,7 +253,9 @@ class PeptidoformGenerator(object):
     n_term_modifications: List['ModificationRule']
     c_term_modifications: List['ModificationRule']
 
-    def __init__(self, constant_modifications, variable_modifications, max_variable_modifications=None):
+    def __init__(self, constant_modifications: List['ModificationRule'],
+                 variable_modifications: List['ModificationRule'],
+                 max_variable_modifications: Optional[int]=None):
         if max_variable_modifications is None:
             max_variable_modifications = 4
         self.constant_modifications = list(constant_modifications)
@@ -274,9 +288,9 @@ class PeptidoformGenerator(object):
         internal: list
             list of Internal modification rules
         """
-        n_terminal = []
-        c_terminal = []
-        internal = []
+        n_terminal: List['ModificationRule'] = []
+        c_terminal: List['ModificationRule'] = []
+        internal: List['ModificationRule'] = []
 
         for mod in modifications:
             n_term = mod.n_term_targets
@@ -364,7 +378,8 @@ class PeptidoformGenerator(object):
                 n_variable += 1
         return result, n_variable
 
-    def generate_peptidoforms(self, sequence, protein_n_term=False, protein_c_term=False):
+    def generate_peptidoforms(self, sequence, protein_n_term=False,
+                              protein_c_term=False) -> Generator[PeptideSequence, None, None]:
         try:
             sequence = self.prepare_peptide(sequence)
         except UnknownAminoAcidException:
@@ -404,10 +419,23 @@ class PeptidoformGenerator(object):
 
 
 class ProteinDigestor(object):
+    protease: Protease
 
-    def __init__(self, protease, constant_modifications=None, variable_modifications=None,
-                 max_missed_cleavages=2, min_length=6, max_length=60, semispecific=False,
-                 max_variable_modifications=None):
+    variable_modifications: List['ModificationRule']
+    constant_modifications: List['ModificationRule']
+    max_variable_modifications: int
+    peptidoform_generator: PeptidoformGenerator
+
+    min_length: int
+    max_length: int
+    max_missed_cleavages: int
+
+    semispecific: bool
+
+    def __init__(self, protease: Protease, constant_modifications: List['ModificationRule'] = None,
+                 variable_modifications: List['ModificationRule'] = None,
+                 max_missed_cleavages: int =2, min_length: int=6, max_length: int=60,
+                 semispecific: bool=False, max_variable_modifications: Optional[int]=None):
         if constant_modifications is None:
             constant_modifications = []
         if variable_modifications is None:
@@ -425,7 +453,7 @@ class ProteinDigestor(object):
         self.semispecific = semispecific
         self.max_variable_modifications = max_variable_modifications
 
-    def _prepare_protease(self, protease):
+    def _prepare_protease(self, protease: Union[Protease, str, List[Union[Protease, str]]]) -> Protease:
         if isinstance(protease, Protease):
             pass
         elif isinstance(protease, basestring):
@@ -434,7 +462,7 @@ class ProteinDigestor(object):
             protease = Protease.combine(*protease)
         return protease
 
-    def cleave(self, sequence):
+    def cleave(self, sequence: Union[str, PeptideSequence]) -> Generator[Tuple[str, int, int, int], None, None]:
         seqs = self.protease.cleave(
             sequence, self.max_missed_cleavages,
             min_length=self.min_length, max_length=self.max_length,
@@ -449,7 +477,7 @@ class ProteinDigestor(object):
             return protein
         return PeptideSequence(str(protein))
 
-    def digest(self, protein):
+    def digest(self, protein: Union[PeptideSequence, str]) -> Generator[PeptideSequence, None, None]:
         sequence = self._prepare_protein(protein)
         for peptide, start, end, n_missed_cleavages in self.cleave(sequence):
             if end - start > self.max_length:
@@ -460,7 +488,7 @@ class ProteinDigestor(object):
                 inst.end_position = end
                 yield inst
 
-    def modify_string(self, peptide):
+    def modify_string(self, peptide: Union[PeptideSequence, str]) -> Generator[PeptideSequence, None, None]:
         for modified_peptide, n_variable_modifications in self.peptidoform_generator(peptide):
             modified_peptide.count_variable_modifications = n_variable_modifications
             yield modified_peptide

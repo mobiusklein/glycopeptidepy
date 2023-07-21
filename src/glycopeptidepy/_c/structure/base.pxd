@@ -60,23 +60,10 @@ cdef class ModificationBase(object):
     cpdef bint is_tracked_for(self, object category)
 
 
-IF int == long:
-    DEF PY_VERSION = 3
-ELSE:
-    DEF PY_VERSION = 2
-
-
-IF PY_VERSION == 3:
-    ctypedef fused modification_or_string:
-        str
-        bytes
-        ModificationBase
-
-ELSE:
-    ctypedef fused modification_or_string:
-        str
-        unicode
-        ModificationBase
+ctypedef fused modification_or_string:
+    str
+    bytes
+    ModificationBase
 
 
 cdef class SequencePosition(object):
