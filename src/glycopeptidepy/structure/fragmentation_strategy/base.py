@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from glycopeptidepy.structure.modification import (
     Modification,
     NGlycanCoreGlycosylation,
@@ -6,6 +8,9 @@ from glycopeptidepy.structure.modification import (
 
 
 from glycopeptidepy.structure.glycan import (GlycosylationType)
+
+if TYPE_CHECKING:
+    from glycopeptidepy.structure import PeptideSequence
 
 _n_glycosylation = NGlycanCoreGlycosylation()
 _o_glycosylation = OGlycanCoreGlycosylation()
@@ -22,6 +27,9 @@ glycosylation_type_to_core = {
 
 
 class FragmentationStrategyBase(object):
+    peptide: 'PeptideSequence'
+    compute_compositions: bool
+
     def __init__(self, peptide, compute_compositions=False, *args, **kwargs):
         self.peptide = peptide
         self.compute_compositions = compute_compositions

@@ -1,7 +1,7 @@
 import re
 
 from functools import partial
-from typing import List, Dict, Tuple, TYPE_CHECKING, Optional, Set
+from typing import List, Dict, Tuple, TYPE_CHECKING, Optional, Set, Callable, Union
 
 from six import string_types as basestring
 
@@ -9,6 +9,12 @@ from glypy import Substituent, Glycan
 from glypy.io import glycoct, iupac, linear_code, wurcs
 from glypy.structure.glycan_composition import (
     FrozenMonosaccharideResidue, FrozenGlycanComposition)
+
+from glypy.structure.fragment import (
+    DepthFirstLinkTraversal as _GlycanTraversal,
+    LabileLeafMask,
+    y_fragments_to_glycan_compositions
+)
 
 
 from ..composition import Composition
@@ -25,7 +31,6 @@ _xylose = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
 
 if TYPE_CHECKING:
     from glycopeptidepy.structure import PeptideSequence
-
 
 hexnac_modification = ModificationRule.from_unimod({
     "title": "HexNAc",
@@ -75,12 +80,12 @@ xylose_modification = ModificationRule.from_unimod({
 })
 
 
-glycan_resolvers = dict()
+glycan_resolvers: Dict[str, Callable[[str], Union[TypedGlycan, TypedGlycanComposition]]] = dict()
 glycan_resolvers['glycoct'] = partial(glycoct.loads, structure_class=TypedGlycan)
 glycan_resolvers['iupac'] = partial(iupac.loads, structure_class=TypedGlycan)
 glycan_resolvers['iupac_simple'] = partial(iupac.loads, structure_class=TypedGlycan, dialect='simple')
 glycan_resolvers['linear_code'] = partial(linear_code.loads, structure_class=TypedGlycan)
-glycan_resolvers['wurcs2'] = partial(wurcs.loads, structure_class=TypedGlycan)
+glycan_resolvers['wurcs'] = partial(wurcs.loads, structure_class=TypedGlycan)
 glycan_resolvers['iupaclite'] = TypedGlycanComposition.parse
 
 
@@ -228,6 +233,7 @@ class Glycosylation(GlycosylationBase, ModificationLocatingMixin):
         self.options = {}
         self._hash = hash(self.name)
         self.neutral_losses = []
+        self._fragments = None
         self._n_term_targets = None
         self._c_term_targets = None
         self.targets = set()
@@ -259,11 +265,32 @@ class Glycosylation(GlycosylationBase, ModificationLocatingMixin):
         return self.__class__(
             self._original, self.encoding_format, self.metadata)
 
-    def get_fragments(self, *args, **kwargs):
+    def get_fragments(self, *args, mask_residues: Optional[List]=None,
+                      fold_glycan_compositions: bool=False, **kwargs):
         if self.is_composition:
             raise TypeError("Cannot generate fragments from composition")
-        for frag in self.glycan.fragments(*args, **kwargs):
-            yield frag
+        if kwargs.get('kind') == 'Y':
+            if self._fragments is not None:
+                yield from self._fragments
+            else:
+                if mask_residues is not None:
+                    snapshot = self.glycan.clone(index_method=None)
+                    for _, link in snapshot.iterlinks():
+                        link.label = self.glycan.link_index[link.id - 1].label
+                    with LabileLeafMask(snapshot, mask_residues):
+                        source = list(_GlycanTraversal.generate_y_fragments(snapshot))
+                        if fold_glycan_compositions:
+                            source = y_fragments_to_glycan_compositions(
+                                self._original, source, composition_offset=Composition())
+                        yield from source
+                else:
+                    source = _GlycanTraversal.generate_y_fragments(self.glycan)
+                    if fold_glycan_compositions:
+                        source = y_fragments_to_glycan_compositions(
+                            self._original, source, composition_offset=Composition())
+                    yield from source
+        else:
+            yield from self.glycan.fragments(*args, **kwargs)
 
     def total_composition(self):
         return self.glycan.total_composition()

@@ -96,7 +96,7 @@ class AminoAcidSequenceBuildingBlock(object):
 
     @classmethod
     def from_sequence_position(cls, position):
-        return cls(position.amino_acid, tuple(position.modifications))
+        return cls(position.amino_acid, tuple(position.modifications) if position.modifications else ())
 
 
 class ModificationBuildingBlock(object):

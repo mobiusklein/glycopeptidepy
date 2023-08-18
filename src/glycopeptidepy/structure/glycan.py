@@ -57,6 +57,7 @@ glycosylation_site_detectors = decoratordict({
 
 
 class TypedGlycanComposition(HashableGlycanComposition):
+    glycosylation_type: GlycosylationType
 
     def __init__(self, glycosylation_type=None, *args, **kwargs):
         if isinstance(glycosylation_type, GlycanComposition):
@@ -185,6 +186,7 @@ class GlycanCombination(Mapping):  # pragma: no cover
 
 
 class TypedGlycan(NamedGlycan):
+    glycosylation_type: GlycosylationType
 
     def __init__(self, glycosylation_type=None, *args, **kwargs):
         self.glycosylation_type = GlycosylationType[glycosylation_type]

@@ -3,6 +3,7 @@ import pickle
 
 from glycopeptidepy.structure import sequence, modification, residue, composition, parser
 from glypy import GlycanComposition, MonosaccharideResidue
+import pytest
 
 
 HYDROGEN = composition.Composition("H").mass
@@ -228,9 +229,10 @@ class PeptideSequenceSuiteBase(object):
 
     def test_cad_fragmentation(self):
         t1 = self.parse_sequence(p10)
-        low_energy_frags = list(t1.glycan_fragments(
-            oxonium=False, all_series=True))
-        assert len(low_energy_frags) == 431
+        with pytest.raises(NotImplementedError):
+            low_energy_frags = list(t1.glycan_fragments(
+                oxonium=False, all_series=True))
+            assert len(low_energy_frags) == 431
 
     def test_glycan_representations(self):
         t1 = self.parse_sequence(p9)

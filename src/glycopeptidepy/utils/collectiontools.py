@@ -1,23 +1,22 @@
 from collections import defaultdict
 
-try:
-    from collections.abc import Mapping
-except ImportError:
-    from collections import Mapping
+from typing import Any, DefaultDict, Dict, List, Iterable, TypeVar, Hashable, Callable, Iterator, Mapping
 
 import itertools
 
-try:
-    range = xrange
-except Exception:
-    pass
+
+K = TypeVar("K", bound=Hashable)
+T = TypeVar("T")
+V = TypeVar("V")
 
 
-def _identity(i):
+def _identity(i: T) -> T:
     return i
 
 
-def groupby(ungrouped_list, key_fn=_identity, transform_fn=_identity):
+def groupby(ungrouped_list: Iterable[V],
+            key_fn: Callable[[V], K]=_identity,
+            transform_fn: Callable[[V], T]=_identity) -> DefaultDict[K, List[T]]:
     groups = defaultdict(list)
     for item in ungrouped_list:
         key_value = key_fn(item)
@@ -25,22 +24,22 @@ def groupby(ungrouped_list, key_fn=_identity, transform_fn=_identity):
     return groups
 
 
-def descending_combination_counter(counter):
+def descending_combination_counter(counter: Mapping[K, int]) -> Iterator[Dict[K, int]]:
     keys = counter.keys()
     count_ranges = map(lambda x: range(x + 1), counter.values())
     for combination in itertools.product(*count_ranges):
         yield dict(zip(keys, combination))
 
 
-class decoratordict(dict):
-    def __call__(self, key):
+class decoratordict(Dict[K, Callable[[Any], Any]]):
+    def __call__(self, key: K) -> Callable[[Callable[[Any], Any]], Callable[[Any], Any]]:
         def wrapper(f):
             self[key] = f
             return f
         return wrapper
 
 
-class _AccumulatorBag(Mapping):
+class _AccumulatorBag(Mapping[K, int]):
     def __init__(self, source=None):
         self.store = defaultdict(int)
         if source is not None:

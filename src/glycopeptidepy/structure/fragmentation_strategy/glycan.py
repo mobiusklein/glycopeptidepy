@@ -1,5 +1,7 @@
 from collections import defaultdict, Counter
 from itertools import product, combinations, combinations_with_replacement
+from typing import List
+from glycopeptidepy.structure.modification.glycosylation import Glycosylation
 
 from glypy.structure.glycan_composition import (
     FrozenMonosaccharideResidue,
@@ -23,9 +25,6 @@ from glycopeptidepy.structure.fragment import (
 
 
 from .base import FragmentationStrategyBase
-
-
-from six.moves import range
 
 
 oxonium_ion_series = IonSeries.oxonium_ion
@@ -69,12 +68,25 @@ def separate_labile_modifications(glycan_composition):
     return new_counts, labile_modifications
 
 
+_HEX = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
+_HEXNAC = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
+_FUC = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
+_DHEX = FrozenMonosaccharideResidue.from_iupac_lite("dHex")
+_XYL = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
+_AHEX = FrozenMonosaccharideResidue.from_iupac_lite("aHex")
+
+_NEUAC = FrozenMonosaccharideResidue.from_iupac_lite("NeuAc")
+_NEUGC = FrozenMonosaccharideResidue.from_iupac_lite("NeuGc")
+_NEU = FrozenMonosaccharideResidue.from_iupac_lite("Neu")
+_KDN = FrozenMonosaccharideResidue.from_iupac_lite("Kdn")
+
+
 class _GlycanFragmentingStrategyBase(object):
 
     def __init__(self, *args, **kwargs):
         super(_GlycanFragmentingStrategyBase, self).__init__(*args, **kwargs)
 
-    def _guess_max_glycan_cleavages(self):
+    def _guess_max_glycan_cleavages(self) -> int:
         glycans = self.peptide.glycosylation_manager.items()
         counter = 0
         for pos, glycan in glycans:
@@ -87,63 +99,107 @@ class _GlycanFragmentingStrategyBase(object):
 
 
 class CADFragmentationStrategy(FragmentationStrategyBase, _GlycanFragmentingStrategyBase):
-    """Generate glycopeptide fragments derived from glycosidic
-    bond cleavages as in lower energy CAD fragmentation
-
-    Attributes
-    ----------
-    max_cleavages : int
-        The maximum number of glycan cleavages to allow
     """
+    Generate glycopeptide fragments derived from glycosidic
+    bond cleavages as in lower energy CAD fragmentation
+    """
+    fold_glycan_compositions: bool
 
-    def __init__(self, peptide, max_cleavages=None, **kwargs):
+    def __init__(self, peptide, fold_glycan_compositions: bool=True, **kwargs):
         super(CADFragmentationStrategy, self).__init__(peptide, **kwargs)
-        if max_cleavages is None:
-            max_cleavages = self._guess_max_glycan_cleavages()
-        self.max_cleavages = max_cleavages
-        self._generator = self._build_fragments(self.max_cleavages)
+        self.fold_glycan_compositions = fold_glycan_compositions
+        self._generator = self._build_fragments()
 
-    def _build_fragments(self, max_cleavages=2):
+    def _is_composition_extended(self, composition: HashableGlycanComposition):
+        return composition['HexNAc'] <= 2 and composition["Hex"] <= 3
+
+    def _determine_is_extended_from_glycan_compositions(self, compositions: List[HashableGlycanComposition]):
+        return any(self._is_composition_extended(c) for c in compositions)
+
+    def _build_fragments(self):
         glycans = self.peptide.glycosylation_manager.items()
         n = len(glycans)
-        base_composition = self.peptide.peptide_composition()
+        if self.compute_compositions:
+            base_composition: Composition = self.peptide.peptide_composition()
+        else:
+            base_composition = None
+        peptide_mass: float = self.peptide.peptide_backbone_mass
         for i in range(1, n + 1):
             for dissociated in combinations(glycans, i):
                 remaining = dict(glycans)
                 for position, glycan in dissociated:
                     remaining.pop(position)
-                reference_composition = base_composition.copy()
-                for position, glycan in remaining.items():
-                    reference_composition += glycan.rule.total_composition()
+                if self.compute_compositions:
+                    reference_composition = base_composition.copy()
+                else:
+                    reference_composition = None
 
-                glycan_B_ions = defaultdict(list)
-                glycan_Y_ions = defaultdict(list)
+                glycan_Y_ions = defaultdict(lambda: [None])
                 for position, glycan in dissociated:
-                    for f in glycan.rule.get_fragments("BY", max_cleavages=max_cleavages):
-                        if 'B' in f.series:
-                            glycan_B_ions[position].append(f)
-                        else:
-                            glycan_Y_ions[position].append(f)
-                for b_ion_set in glycan_B_ions.values():
-                    for f in b_ion_set:
-                        yield f
+                    rule: Glycosylation = glycan.rule
+                    for f in rule.get_fragments(
+                        kind="Y",
+                        mask_residues=(_NEUAC, _NEUGC, _NEU, _KDN),
+                        fold_glycan_compositions=self.fold_glycan_compositions):
+                        glycan_Y_ions[position].append(f)
+
                 key_order = list(glycan_Y_ions.keys())
+                is_extended = None
                 for y_ion_set in product(*glycan_Y_ions.values()):
-                    name = ",".join("%d:%s" % (k, f.name) for k, f in zip(key_order, y_ion_set))
-                    fragment_composition = reference_composition.copy()
+                    if self.fold_glycan_compositions:
+                        y_ion_set = [gc for gc in y_ion_set if gc is not None]
+                        if y_ion_set:
+                            glycan_composition: HashableGlycanComposition = sum(y_ion_set, HashableGlycanComposition())
+                            glycan_composition.set_composition_offset(Composition())
+                            name = str(glycan_composition)
+                        else:
+                            name = None
+                            glycan_composition = None
+                        is_extended = self._determine_is_extended_from_glycan_compositions(y_ion_set)
+                    else:
+                        y_ion_set = [f for f in y_ion_set if f is not None]
+                        if y_ion_set:
+                            name = ",".join("%d:%s" % (k, f.name) for k, f in zip(key_order, y_ion_set))
+                        else:
+                            name = None
+                        glycan_composition = None
+                    if self.compute_compositions:
+                        fragment_composition = reference_composition.copy()
+                    else:
+                        fragment_composition = None
                     is_glycosylated = False
-                    for f in y_ion_set:
-                        fragment_composition += f.composition
-                        is_glycosylated = True
+                    mass_shift = 0.0
+                    if self.fold_glycan_compositions:
+                        if glycan_composition is not None:
+                            mass_shift = glycan_composition.mass()
+                            if self.compute_compositions:
+                                fragment_composition += glycan_composition.total_composition()
+                        is_glycosylated = bool(y_ion_set)
+                    else:
+                        for f in y_ion_set:
+                            mass_shift += f.mass
+                            if self.compute_compositions:
+                                fragment_composition += f.composition
+                            is_glycosylated = True
                     full_name = "peptide"
                     if name:
                         full_name = "%s+%s" % (full_name, name)
-                    f = SimpleFragment(
-                        name=full_name,
-                        mass=fragment_composition.mass,
-                        composition=fragment_composition,
-                        is_glycosylated=is_glycosylated,
-                        kind=IonSeries.stub_glycopeptide)
+                    if self.fold_glycan_compositions:
+                        f = StubFragment(
+                            full_name,
+                            peptide_mass + mass_shift,
+                            IonSeries.stub_glycopeptide,
+                            fragment_composition,
+                            glycosylation=glycan_composition,
+                            is_extended=is_extended,
+                        )
+                    else:
+                        f = SimpleFragment(
+                            name=full_name,
+                            mass=peptide_mass + mass_shift,
+                            composition=fragment_composition,
+                            is_glycosylated=is_glycosylated,
+                            kind=IonSeries.stub_glycopeptide)
                     yield f
 
     def __next__(self):
@@ -249,13 +305,6 @@ class GlycanCompositionFragmentStrategyBase(FragmentationStrategyBase):
     def count_glycosylation_type(self, glycotype):
         return self.peptide.glycosylation_manager.count_glycosylation_type(glycotype)
 
-
-_HEX = FrozenMonosaccharideResidue.from_iupac_lite("Hex")
-_HEXNAC = FrozenMonosaccharideResidue.from_iupac_lite("HexNAc")
-_FUC = FrozenMonosaccharideResidue.from_iupac_lite("Fuc")
-_DHEX = FrozenMonosaccharideResidue.from_iupac_lite("dHex")
-_XYL = FrozenMonosaccharideResidue.from_iupac_lite("Xyl")
-_AHEX = FrozenMonosaccharideResidue.from_iupac_lite("aHex")
 
 
 class GlycanCompositionFragment(object):
@@ -969,7 +1018,8 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
         return monosaccharides
 
     def _glycan_structural_dissociation(self, max_cleavages=2):
-        return CADFragmentationStrategy(self.peptide, max_cleavages)
+        # return CADFragmentationStrategy(self.peptide, max_cleavages)
+        raise NotImplementedError()
 
     def _oxonium_ions(self):
         water = Composition("H2O")
