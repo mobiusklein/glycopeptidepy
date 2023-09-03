@@ -8,14 +8,8 @@ import gzip
 import io
 import logging
 
-from typing import List, Optional, ClassVar, Dict
-
-
-try:
-    from urllib import urlopen
-except ImportError:
-    from urllib.request import urlopen
-
+from typing import IO, List, Optional, ClassVar, Dict
+from urllib.request import urlopen
 from collections import defaultdict
 
 import requests
@@ -420,7 +414,7 @@ def _open_url_for(accession):
     return urlopen(URI_TEMPLATE.format(accession=accession))
 
 
-def parse(tree, error=False):
+def parse(tree: etree._Element, error=False) -> UniProtProtein:
     '''Parse an XML document into a :class:`UniProtProtein`.
 
     Parameters
@@ -525,7 +519,26 @@ def iterparse(stream, error=False):
     for event, tag in etree.iterparse(stream, huge_tree=True, events=("start", "end")):
         if event == "end":
             if tag.tag.split("}")[1] == 'entry':
-                yield parse(tag, error=error)
+                rec = parse(tag, error=error)
+                tag.clear()
+                yield rec
+
+
+def is_uniprot_xml(stream: IO) -> bool:
+    start = None
+    if isinstance(stream, io.BufferedReader) or hasattr('peek'):
+        peek = stream.peek(100)
+    elif stream.seekable():
+        start = stream.tell()
+        peek = stream.read(100)
+    else:
+        peek = stream.read(100)
+    if isinstance(peek, str):
+        peek = peek.encode('utf8')
+    result = b"<uniprot " in peek
+    if start is not None:
+        stream.seek(start)
+    return result
 
 
 def get_features_for(accession, error=False):

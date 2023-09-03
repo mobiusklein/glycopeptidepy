@@ -3,7 +3,11 @@ import json
 import zlib
 import warnings
 
-from typing import List, Sequence, Union, TextIO
+from typing import (
+    BinaryIO, Iterable, List, Sequence,
+    Union, TextIO, Mapping,
+    Dict, FrozenSet
+)
 
 from six import add_metaclass
 
@@ -155,6 +159,19 @@ class Domain(AnnotatedInterval):
         return d
 
 
+class InitiatorMethionine(AnnotatedInterval):
+    feature_type = "initiator methionine"
+    cleavable: bool = True
+
+    def __init__(self, start=0, end=1, **kwargs):
+        super().__init__(
+            start, end, self.feature_type, self.feature_type, **kwargs)
+
+    def __repr__(self):
+        template = '{self.__class__.__name__}({self.start}, {self.end})'
+        return template.format(self=self)
+
+
 class PeptideBase(AnnotatedInterval):
     feature_type = None
     cleavable: bool = True
@@ -299,6 +316,16 @@ class AnnotationCollection(Sequence[Union[AnnotationBase, AnnotatedInterval, Ann
     def append(self, item: AnnotationBase):
         self.items.append(item)
 
+    def extend(self, items: Iterable[AnnotationBase]):
+        self.items.extend(items)
+
+    def __add__(self, other: Iterable[AnnotationBase]):
+        return self.__class__(list(self) + list(other))
+
+    def __iadd__(self, other: Iterable[AnnotationBase]):
+        self.extend(other)
+        return self
+
     def __getitem__(self, i) -> AnnotationBase:
         return self.items[i]
 
@@ -357,7 +384,8 @@ def from_uniprot(record: uniprot.UniProtProtein) -> AnnotationCollection:
         uniprot.TransitPeptide.feature_type: TransitPeptide,
         uniprot.MatureProtein.feature_type: MatureProtein,
         uniprot.ModifiedResidue.feature_type: ModifiedResidue,
-        uniprot.GlycosylationSite: GlycosylationSite,
+        uniprot.GlycosylationSite.feature_type: GlycosylationSite,
+        uniprot.InitiatorMethionine.feature_type: InitiatorMethionine,
     }
     annotations = []
     for feature in record.features:
@@ -365,7 +393,7 @@ def from_uniprot(record: uniprot.UniProtProtein) -> AnnotationCollection:
             continue
         try:
             annotation_tp = mapping[feature.feature_type]
-            if issubclass(annotation_tp, PeptideBase):
+            if issubclass(annotation_tp, AnnotatedInterval):
                 annotations.append(
                     annotation_tp(feature.start, feature.end))
             elif isinstance(annotation_tp, GlycosylationSite):
@@ -405,13 +433,17 @@ def from_peff(record: fasta.PEFFFastaHeader) -> AnnotationCollection:
             annotations.append(
                 TransitPeptide(start, end)
             )
-        elif name == "propeptide":
+        elif name == "propeptide" or name == "peptide":
             annotations.append(
                 Propeptide(start, end)
             )
         elif name == "maturation peptide":
             annotations.append(
                 MaturationPeptide(start, end)
+            )
+        elif name == "initiator methionine":
+            annotations.append(
+                InitiatorMethionine()
             )
         else:
             warnings.warn(f"Unknown processing annotation {start}-{end} {name}")
@@ -438,3 +470,67 @@ def from_peff(record: fasta.PEFFFastaHeader) -> AnnotationCollection:
                     GlycosylationSite(position, glycosylation_type))
     return AnnotationCollection(annotations)
 
+
+class AnnotationDatabase(Mapping[str, AnnotationCollection]):
+    record_map: Dict[FrozenSet[str], AnnotationCollection]
+
+    def __init__(self, record_map: Dict[FrozenSet[str], AnnotationCollection]):
+        self.record_map = record_map
+        self.secondary_index = {ki: k for k in record_map for ki in k}
+
+    def __contains__(self, key: str):
+        return key in self.secondary_index
+
+    def __getitem__(self, key: str) -> AnnotationCollection:
+        idx_key = self.secondary_index[key]
+        return self.record_map[idx_key]
+
+    def __iter__(self):
+        return iter(self.secondary_index)
+
+    def __len__(self):
+        return len(self.record_map)
+
+    def to_dict(self):
+        return {'\x1e'.join(k): v.to_dict() for k, v in self.record_map.items()}
+
+    def to_bytes(self):
+        buf = io.BytesIO()
+        encoder = io.TextIOWrapper(buf, encoding='utf8')
+        json.dump(self.to_dict(), encoder)
+        encoder.flush()
+        return zlib.compress(buf.getvalue())
+
+    @classmethod
+    def from_dict(cls, state: Mapping[str, Mapping]):
+        record_map = {
+            frozenset(k.split('\x1e')): AnnotationCollection.from_dict(v)
+            for k, v in state.items()
+        }
+        return cls(record_map)
+
+    @classmethod
+    def from_bytes(cls, data: bytes):
+        buf = io.BytesIO(zlib.decompress(data))
+        decoder = io.TextIOWrapper(buf, encoding='utf8')
+        state = json.load(decoder)
+        return cls.from_dict(state)
+
+    def dump(self, fp: TextIO):
+        json.dump(self.to_dict(), fp)
+
+    @classmethod
+    def load(cls, fp: TextIO):
+        d = json.load(fp)
+        inst = cls.from_dict(d)
+        return inst
+
+    @classmethod
+    def from_uniprot_xml(cls, stream: BinaryIO):
+        record_map = {}
+
+        for rec in uniprot.iterparse(stream):
+            features = from_uniprot(rec)
+            record_map[frozenset(rec.accessions)] = features
+
+        return cls(record_map)
