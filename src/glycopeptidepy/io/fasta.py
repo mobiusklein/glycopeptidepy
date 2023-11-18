@@ -24,7 +24,8 @@ from .cv.peff import peff_cv_term
 
 
 class FastaHeader(Mapping):
-    """Hold parsed properties of a FASTA sequence's
+    """
+    Hold parsed properties of a FASTA sequence's
     definition line.
 
     This object supports the :class:`Mapping` interface, and
@@ -134,15 +135,13 @@ class FastaHeader(Mapping):
 
 
 class UnparsableDeflineError(ValueError):
-    """Indicate that a definition line could
-    not be parsed by the current parser.
-    """
+    """Indicate that a definition line could not be parsed by the current parser."""
     pass
 
 
 class DefLineParserBase(object):
-    """A base class for definition line parser, providing
-    some common machinery in the :meth:`__call__` method.
+    """
+    A base class for definition line parser, providing some common machinery in the :meth:`__call__` method.
 
     This class requires that the subclass provide a :meth:`parse`
     method to convert a string (without a ">" prefix). and return
@@ -333,8 +332,8 @@ class PEFFFastaHeader(FastaHeader):
 
 
 class CallableDefLineParser(DefLineParserBase):
-    """Parse a definition line using an arbitrary
-    provided :class:`.Callable`.
+    """
+    Parse a definition line using an arbitrary provided :class:`.Callable`.
 
     Attributes
     ----------

@@ -141,8 +141,9 @@ class Domain(AnnotatedInterval):
     domain_type: str
 
     def __init__(self, domain_type, start, end, **kwargs):
+        kwargs.setdefault('description', self.feature_type)
         super(Domain, self).__init__(
-            start, end, self.feature_type, self.feature_type, **kwargs)
+            start, end, self.feature_type, **kwargs)
         self.domain_type = domain_type
 
     @property
@@ -164,8 +165,9 @@ class InitiatorMethionine(AnnotatedInterval):
     cleavable: bool = True
 
     def __init__(self, start=0, end=1, **kwargs):
+        kwargs.setdefault('description', self.feature_type)
         super().__init__(
-            start, end, self.feature_type, self.feature_type, **kwargs)
+            start, end, self.feature_type, **kwargs)
 
     def __repr__(self):
         template = '{self.__class__.__name__}({self.start}, {self.end})'
