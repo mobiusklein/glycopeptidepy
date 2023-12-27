@@ -3,6 +3,7 @@ from itertools import product, combinations, combinations_with_replacement
 from typing import List
 from glycopeptidepy.structure.modification.glycosylation import Glycosylation
 
+from glypy.composition import formula
 from glypy.structure.glycan_composition import (
     FrozenMonosaccharideResidue,
     FrozenGlycanComposition,
@@ -19,9 +20,11 @@ from glycopeptidepy.structure.glycan import (
 
 from glycopeptidepy.structure.fragment import (
     IonSeries,
+    OxoniumIon,
     SimpleFragment,
     StubFragment,
-    _NameTree)
+    _NameTree,
+    NeutralLoss)
 
 
 from .base import FragmentationStrategyBase
@@ -957,6 +960,9 @@ class StubGlycopeptideStrategy(GlycanCompositionFragmentStrategyBase, _Monosacch
 
 
 try:
+    _StubGlycopeptideStrategy = StubGlycopeptideStrategy
+    _GlycanCompositionFragment = GlycanCompositionFragment
+
     from glycopeptidepy._c.structure.fragmentation_strategy.glycan import (
         GlycanCompositionFragmentStrategyBase, StubGlycopeptideStrategy, GlycanCompositionFragment)
     _has_c = True
@@ -991,6 +997,32 @@ labile_monosaccharides_not_to_duplicate = {
     FrozenMonosaccharideResidue.from_iupac_lite("dHex"),
 }
 
+WATER = Composition("H2O")
+SIDE_CHAIN_PLUS_CARBON = Composition("CH2O")
+TWO_SIDE_CHAIN_PLUS_CARBON = SIDE_CHAIN_PLUS_CARBON * 2
+TWO_WATER = WATER * 2
+
+
+WATER_LOSS = NeutralLoss("-" + formula(WATER), -WATER)
+SIDE_CHAIN_LOSS = NeutralLoss(
+    "-" + formula(SIDE_CHAIN_PLUS_CARBON), -SIDE_CHAIN_PLUS_CARBON
+)
+
+TWO_SIDE_CHAIN_LOSS = NeutralLoss(
+    "-" + formula(2 * SIDE_CHAIN_PLUS_CARBON), -2 * SIDE_CHAIN_PLUS_CARBON
+)
+
+TWO_WATER_LOSS = NeutralLoss("-" + formula(TWO_WATER), -TWO_WATER)
+TWO_WATER_PLUS_SIDE_CHAIN_LOSS = NeutralLoss(
+    "-" + formula((TWO_WATER + SIDE_CHAIN_PLUS_CARBON)),
+    -(TWO_WATER + SIDE_CHAIN_PLUS_CARBON),
+)
+
+TWO_WATER_PLUS_TWO_SIDE_CHAIN_LOSS = NeutralLoss(
+    "-" + formula((TWO_WATER + TWO_SIDE_CHAIN_PLUS_CARBON)),
+    -(TWO_WATER + TWO_SIDE_CHAIN_PLUS_CARBON),
+)
+
 class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideDefinitionCacher):
 
     def __init__(self, peptide, use_query=False, oxonium=True, all_series=False, allow_ambiguous=False,
@@ -1022,13 +1054,6 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
         raise NotImplementedError()
 
     def _oxonium_ions(self):
-        water = Composition("H2O")
-        water2 = water * 2
-        side_chain_plus_carbon = Composition("CH2O")
-        two_side_chains_plus_carbon = side_chain_plus_carbon * 2
-        water2_plus_sidechain_plus_carbon = water2 + side_chain_plus_carbon
-        water_plus_two_side_chains_plus_carbon = water + two_side_chains_plus_carbon
-
         glycan = (self.glycan_composition()).clone()
 
         monosaccharides = self._oxonium_fragments_get_monosaccharide_list(glycan)
@@ -1036,32 +1061,35 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
             key = str(k)
             mass = k.mass()
             composition = k.total_composition()
-            yield SimpleFragment(
+            base = OxoniumIon(
                 name=key, mass=mass,
                 composition=composition,
-                kind=oxonium_ion_series)
-            yield SimpleFragment(
-                name=key + "-H2O", mass=mass - water.mass,
-                composition=composition - water,
-                kind=oxonium_ion_series)
-            yield SimpleFragment(
-                name=key + "-H4O2", mass=mass - water2.mass,
-                composition=composition - (
-                    water2), kind=oxonium_ion_series)
-            yield SimpleFragment(
-                name=key + "-C2H4O2", mass=mass - two_side_chains_plus_carbon.mass,
-                composition=composition - (
-                    two_side_chains_plus_carbon), kind=oxonium_ion_series)
-            yield SimpleFragment(
-                name=key + "-CH6O3",
-                mass=mass - water2_plus_sidechain_plus_carbon.mass,
-                composition=composition - water2_plus_sidechain_plus_carbon,
-                kind=oxonium_ion_series)
-            yield SimpleFragment(
-                name=key + "-C2H6O3",
-                mass=mass - water_plus_two_side_chains_plus_carbon.mass,
-                composition=composition - water_plus_two_side_chains_plus_carbon,
-                kind=oxonium_ion_series)
+                kind=oxonium_ion_series,
+                monosaccharides=[k]
+            )
+
+            yield base
+
+            loss: OxoniumIon = base.clone()
+            loss.set_chemical_shift(WATER_LOSS)
+            yield loss
+
+            loss: OxoniumIon = base.clone()
+            loss.set_chemical_shift(TWO_WATER_LOSS)
+            yield loss
+
+            loss: OxoniumIon = base.clone()
+            loss.set_chemical_shift(TWO_SIDE_CHAIN_LOSS)
+            yield loss
+
+            loss: OxoniumIon = base.clone()
+            loss.set_chemical_shift(TWO_WATER_PLUS_SIDE_CHAIN_LOSS)
+            yield loss
+
+            loss: OxoniumIon = base.clone()
+            loss.set_chemical_shift(TWO_WATER_PLUS_TWO_SIDE_CHAIN_LOSS)
+            yield loss
+
         for i in range(2, self.maximum_fragment_size + 1):
             for kk in combinations_with_replacement(sorted(monosaccharides, key=str), i):
                 invalid = False
@@ -1078,14 +1106,19 @@ class OxoniumIonStrategy(GlycanCompositionFragmentStrategyBase, _MonosaccharideD
                 mass = sum(k.mass() for k in kk)
                 composition = sum((k.total_composition()
                                    for k in kk), Composition())
-                yield SimpleFragment(
-                    name=key, mass=mass, kind=oxonium_ion_series, composition=composition)
-                yield SimpleFragment(
-                    name=key + "-H2O", mass=mass - water.mass, kind=oxonium_ion_series,
-                    composition=composition - water)
-                yield SimpleFragment(
-                    name=key + "-H4O2", mass=mass - water2.mass, kind=oxonium_ion_series,
-                    composition=composition - (water2))
+                base = OxoniumIon(
+                    name=key, mass=mass, kind=oxonium_ion_series, composition=composition,
+                    monosaccharides=list(kk)
+                )
+                yield base
+
+                loss = base.clone()
+                loss.set_chemical_shift(WATER_LOSS)
+                yield loss
+
+                loss = base.clone()
+                loss.set_chemical_shift(TWO_WATER_LOSS)
+                yield loss
 
     def _ambiguous_all_series(self):
         water = Composition("H2O")

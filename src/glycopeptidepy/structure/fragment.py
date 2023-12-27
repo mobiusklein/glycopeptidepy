@@ -1,12 +1,12 @@
-'''Represents fragments of peptides and glycopeptides.
-'''
+'''Represents fragments of peptides and glycopeptides.'''
 import re
 from collections import defaultdict
+from typing import List
 from six import add_metaclass
 from .modification import (
     Modification, NGlycanCoreGlycosylation, OGlycanCoreGlycosylation,
     GlycosaminoglycanLinkerGlycosylation, ModificationCategory)
-from .glycan import HashableGlycanComposition
+from .glycan import HashableGlycanComposition, FrozenMonosaccharideResidue
 from .composition import Composition, formula
 
 _n_glycosylation = NGlycanCoreGlycosylation()
@@ -510,9 +510,25 @@ class StubFragment(SimpleFragment):
 
 
 try:
+    _StubFragment = StubFragment
     from glycopeptidepy._c.structure.fragment import StubFragment
 except ImportError:
     pass
+
+
+class OxoniumIon(SimpleFragment):
+    __slots__ = ['monosaccharides']
+
+    monosaccharides: List[FrozenMonosaccharideResidue]
+
+    def __init__(self, *args, monosaccharides=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.monosaccharides = monosaccharides
+
+    def clone(self):
+        base = super().clone()
+        base.monosaccharides = self.monosaccharides.copy()
+        return base
 
 
 class MemoizedIonSeriesMetaclass(type):
