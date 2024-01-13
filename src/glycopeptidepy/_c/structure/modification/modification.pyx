@@ -27,6 +27,10 @@ cdef class ModificationInstanceBase(ModificationBase):
         except AttributeError:
             self.composition = None
 
+    @property
+    def categories(self):
+        return self.rule.categories
+
     cpdef bint is_tracked_for(self, category):
         """Determine if :attr:`rule` is tracked by a particular
         behavioral pattern associated with a :class:`~.ModificationCategory`.
