@@ -3,7 +3,6 @@ from collections import defaultdict
 from itertools import product, combinations
 from typing import Any, Dict, List, Tuple, Union
 
-from glypy.structure.glycan_composition import FrozenGlycanComposition
 from glycopeptidepy.structure.modification.modification import Modification
 
 from glycopeptidepy.utils.collectiontools import descending_combination_counter, _AccumulatorBag
@@ -351,6 +350,16 @@ class GlycanCompositionFragment(SimpleFragment):
             name, mass, kind, composition, chemical_shift=chemical_shift, is_glycosylated=True
         )
         self.glycan_composition = glycan_composition
+
+    def clone(self):
+        return self.__class__(
+            self.name,
+            self.mass,
+            self.kind,
+            self.composition,
+            self.glycan_composition,
+            self.chemical_shift,
+        )
 
 
 class _GlycanFragmentingMixin(_GlycanFragmentingStrategyBase):

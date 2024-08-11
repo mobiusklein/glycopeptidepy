@@ -84,10 +84,10 @@ _NEU = FrozenMonosaccharideResidue.from_iupac_lite("Neu")
 _KDN = FrozenMonosaccharideResidue.from_iupac_lite("Kdn")
 
 
-class _GlycanFragmentingStrategyBase(object):
+class _GlycanFragmentingStrategyBase:
 
     def __init__(self, *args, **kwargs):
-        super(_GlycanFragmentingStrategyBase, self).__init__(*args, **kwargs)
+        pass
 
     def _guess_max_glycan_cleavages(self) -> int:
         glycans = self.peptide.glycosylation_manager.items()
