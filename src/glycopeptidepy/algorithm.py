@@ -367,10 +367,10 @@ class PeptidoformGenerator(object):
         n_variable = 0
         result = sequence.clone()
         if n_term is not None:
-            result.n_term = n_term
+            result.n_term = n_term()
             n_variable += 1
         if c_term is not None:
-            result.c_term = c_term
+            result.c_term = c_term()
             n_variable += 1
         for site, mod in assignments:
             if mod is not None:
