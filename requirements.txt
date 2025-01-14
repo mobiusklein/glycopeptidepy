@@ -1,4 +1,4 @@
-glypy
+glypy>=1.0.13
 six
 lxml
 rdflib

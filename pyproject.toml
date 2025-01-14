@@ -9,4 +9,4 @@ extend-select = []
 requires = ["setuptools",
             "wheel",
             "Cython",
-            "glypy"]
+            "glypy>=1.0.13"]
