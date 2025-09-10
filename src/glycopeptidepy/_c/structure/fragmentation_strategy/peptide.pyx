@@ -12,8 +12,6 @@ from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_Ne
 from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
 
-from cpython.int cimport PyInt_AsLong, PyInt_Check, PyInt_FromLong
-
 from cython.view cimport array as cvarray
 
 from glypy.composition.ccomposition cimport CComposition

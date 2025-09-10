@@ -196,7 +196,7 @@ cdef int count_table_find_bin(count_table* table, PyObject* query, Py_ssize_t* b
         hash_value = PyObject_Hash(<object>query)
         bin_index[0] = hash_value % table.size
     except TypeError:
-        PyErr_SetString(TypeError, "%r is not hashable" % (<object>query, ))
+        PyErr_SetString(TypeError, b"%r is not hashable" % (<object>query, ))
         return 1
     return 0
 
@@ -778,7 +778,7 @@ cdef class CountTable(object):
                     <object>key,
                     v + self.getitem(<object>key))
         except TypeError:
-            PyErr_SetString(TypeError, "%r must be a number" % (<object>value, ))
+            PyErr_SetString(TypeError, b"%r must be a number" % (<object>value, ))
             return 1
         return 0
 
@@ -799,7 +799,7 @@ cdef class CountTable(object):
                     <object>key,
                     v - self.getitem(<object>key))
         except TypeError:
-            PyErr_SetString(TypeError, "%r must be a number" % (<object>value, ))
+            PyErr_SetString(TypeError, b"%r must be a number" % (<object>value, ))
             return 1
         return 0
 

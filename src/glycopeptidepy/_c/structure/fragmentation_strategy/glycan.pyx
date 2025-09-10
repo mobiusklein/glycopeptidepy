@@ -6,13 +6,13 @@ from cpython cimport PyObject
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem, PyTuple_Size, PyTuple_GET_ITEM, PyTuple_GET_SIZE
 from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE, PyList_Append, PyList_SET_ITEM
-from cpython.int cimport PyInt_AsLong
+
 from cpython.dict cimport (PyDict_GetItem, PyDict_SetItem, PyDict_Next,
                            PyDict_Keys, PyDict_Update, PyDict_DelItem, PyDict_Size)
 
 from glypy.composition.ccomposition cimport CComposition
 from glypy._c.structure.glycan_composition cimport _CompositionBase
-
+from glycopeptidepy._c.compat cimport PyInt_AsLong, PyInt_FromLong
 from glycopeptidepy._c.structure.fragmentation_strategy.base cimport FragmentationStrategyBase
 
 from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator

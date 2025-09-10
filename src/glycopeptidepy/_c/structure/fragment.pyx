@@ -11,7 +11,6 @@ from cpython cimport PyErr_SetString
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.sequence cimport PySequence_Fast, PySequence_Fast_GET_ITEM, PySequence_Fast_GET_SIZE
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values, PyDict_Items, PyDict_Next, PyDict_GetItem
-from cpython.int cimport PyInt_AsLong, PyInt_FromLong
 from cpython.float cimport PyFloat_AsDouble
 from cpython.tuple cimport PyTuple_GetItem
 
@@ -19,7 +18,7 @@ from glypy.composition.ccomposition cimport CComposition
 
 from glycopeptidepy._c.structure.base cimport ModificationBase
 
-from glycopeptidepy._c.compat cimport PyStr_AsUTF8AndSize, PyStr_FromStringAndSize
+from glycopeptidepy._c.compat cimport PyStr_AsUTF8AndSize, PyStr_FromStringAndSize, PyInt_AsLong, PyInt_FromLong
 
 from glycopeptidepy._c.count_table cimport CountTable, CountTableIterator, count_table_items
 

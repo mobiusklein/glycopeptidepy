@@ -367,14 +367,9 @@ cdef object _sequence_tokenizer(sequence_encoded_t sequence, object implicit_n_t
 cpdef sequence_tokenizer(object sequence, object implicit_n_term=None, object implicit_c_term=None, object glycan_parser_function=None):
     if isinstance(sequence, str):
         return _sequence_tokenizer[str](<str>sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
-    if PY_MAJOR_VERSION > 2:
-        if isinstance(sequence, bytes):
-            return _sequence_tokenizer[str](
-                (<bytes>sequence).decode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function)
-    else:
-        if isinstance(sequence, unicode):
-            return _sequence_tokenizer[str](
-                (<unicode>sequence).encode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function)
+    elif isinstance(sequence, bytes):
+        return _sequence_tokenizer[str](
+            (<bytes>sequence).decode('utf8'), implicit_n_term, implicit_c_term, glycan_parser_function)
     return _sequence_tokenizer[object](sequence, implicit_n_term, implicit_c_term, glycan_parser_function)
 
 

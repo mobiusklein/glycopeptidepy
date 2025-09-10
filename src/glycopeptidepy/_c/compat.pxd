@@ -6,4 +6,5 @@ cdef extern from "compat.h":
     object PyInt_FromLong(long i)
     str PyStr_Format(object format, object args)
     str PyStr_FromStringAndSize(char* string, Py_ssize_t size)
+    bint PyInt_Check(object i)
     cdef int IS_PY3

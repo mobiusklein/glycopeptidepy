@@ -4,13 +4,15 @@ from cpython.ref cimport Py_INCREF
 from cpython cimport PyObject
 from cpython.list cimport PyList_GetItem, PyList_SetItem, PyList_Size, PyList_New, PyList_GET_ITEM, PyList_GET_SIZE
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem
-from cpython.int cimport PyInt_AsLong
+
 from cpython.float cimport PyFloat_AsDouble
 
 from glycopeptidepy._c.structure.base cimport (
     PeptideSequenceBase,
     SequencePosition, TerminalGroup, AminoAcidResidueBase,
     ModificationBase)
+
+from glycopeptidepy._c.compat cimport PyInt_AsLong, PyInt_FromLong
 
 from glycopeptidepy._c.structure.modification.source cimport ModificationTableBase
 from glycopeptidepy._c.structure.modification.modification cimport ModificationInstanceBase
