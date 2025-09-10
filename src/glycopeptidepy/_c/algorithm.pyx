@@ -1,11 +1,12 @@
 from cpython.object cimport PyObject
 from cpython.ref cimport Py_INCREF, Py_DECREF
 from cpython.iterator cimport PyIter_Next
-from cpython.int cimport PyInt_AsLong
 from cpython.dict cimport PyDict_GetItem, PyDict_SetItem, PyDict_Next, PyDict_Keys, PyDict_Values
 from cpython.list cimport PyList_Append, PyList_GetItem, PyList_Size, PyList_SetItem
 from cpython.tuple cimport PyTuple_GetItem, PyTuple_Size
 from cpython.set cimport PySet_Size
+
+from glycopeptidepy._c.compat cimport PyInt_AsLong, PyInt_FromLong
 
 import itertools
 

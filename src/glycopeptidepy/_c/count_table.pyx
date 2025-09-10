@@ -3,8 +3,9 @@ cimport cython
 from cpython cimport PyErr_SetString, PyObject_Hash
 from cpython.mem cimport PyMem_Malloc, PyMem_Free, PyMem_Realloc
 from cpython.ref cimport PyObject, Py_INCREF, Py_DECREF, Py_XDECREF, Py_XINCREF
-from cpython.int cimport PyInt_AsLong, PyInt_FromLong
 from cpython.dict cimport PyDict_Next, PyDict_SetItem
+
+from glycopeptidepy._c.compat cimport PyInt_AsLong, PyInt_FromLong
 
 try:
     from collections.abc import Mapping, MutableMapping

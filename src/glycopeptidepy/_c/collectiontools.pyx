@@ -1,10 +1,10 @@
 from cpython cimport Py_INCREF
 from cpython.list cimport PyList_GET_SIZE, PyList_GET_ITEM, PyList_Append, PyList_GetItem, PyList_SetItem, PyList_New
 from cpython.dict cimport PyDict_SetItem, PyDict_Keys, PyDict_Values
-from cpython.int cimport PyInt_AsLong
 from cpython.tuple cimport PyTuple_GetItem
 from cpython.mapping cimport PyMapping_Keys, PyMapping_Values
 
+from glycopeptidepy._c.compat cimport PyInt_AsLong, PyInt_FromLong
 from glycopeptidepy._c.count_table cimport CountTable
 
 cdef object product
